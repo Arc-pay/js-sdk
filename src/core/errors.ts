@@ -1,0 +1,47 @@
+export type ArcPayErrorType =
+  | "validation_error"
+  | "api_error"
+  | "network_error"
+  | "challenge_aborted";
+
+export interface ArcPayErrorInit {
+  type: ArcPayErrorType;
+  message: string;
+  code?: string;
+  param?: string;
+  paymentId?: string;
+  declineCode?: string;
+  retryable: boolean;
+  requestId?: string;
+}
+
+export class ArcPayError extends Error {
+  readonly type: ArcPayErrorType;
+  readonly code?: string;
+  readonly param?: string;
+  readonly paymentId?: string;
+  readonly declineCode?: string;
+  readonly retryable: boolean;
+  readonly requestId?: string;
+
+  constructor(init: ArcPayErrorInit) {
+    super(init.message);
+    this.name = "ArcPayError";
+    this.type = init.type;
+    this.code = init.code;
+    this.param = init.param;
+    this.paymentId = init.paymentId;
+    this.declineCode = init.declineCode;
+    this.retryable = init.retryable;
+    this.requestId = init.requestId;
+  }
+}
+
+export const isValidationError = (e: unknown): e is ArcPayError =>
+  e instanceof ArcPayError && e.type === "validation_error";
+export const isApiError = (e: unknown): e is ArcPayError =>
+  e instanceof ArcPayError && e.type === "api_error";
+export const isNetworkError = (e: unknown): e is ArcPayError =>
+  e instanceof ArcPayError && e.type === "network_error";
+export const isChallengeAborted = (e: unknown): e is ArcPayError =>
+  e instanceof ArcPayError && e.type === "challenge_aborted";

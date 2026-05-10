@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Arc Pay test merchant</title>
+    <script src="/arcpay.global.js"></script>
+  </head>
+  <body>
+    <h1>Arc Pay test merchant</h1>
+    <div id="status"></div>
+    <script>
+      // IIFE shape: var ArcPay = (function(exports){...exports.ArcPay = {load, __resetForTests};...})({})
+      // window.ArcPay is the exports namespace; window.ArcPay.ArcPay is the named SDK export with .load()
+      window.__arcpayReady = ArcPay.ArcPay.load("pk_test_e2e", {
+        apiBase: "http://localhost:4567/api",
+      }).then((inst) => {
+        window.__arcpay = inst;
+        document.getElementById("status").textContent = "ready";
+        return inst;
+      });
+    </script>
+  </body>
+</html>
