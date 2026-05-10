@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ArcPay } from "../../src/core/arcpay";
+import { createClient } from "../../src/core/client";
+import { tokenize } from "../../src/tokenize/tokenize";
 
 const ok = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -12,9 +14,14 @@ const VALID = {
   expiryYear: "2030",
 };
 
-describe("arcpay.tokenize", () => {
+describe("raw tokenize transport", () => {
   beforeEach(() => {
     ArcPay.__resetForTests();
+  });
+
+  it("is not exposed on the public ArcPay browser instance", async () => {
+    const arcpay = await ArcPay.load("pk_test_x");
+    expect("tokenize" in arcpay).toBe(false);
   });
 
   it("happy path: posts to /tokenize and returns mapped response", async () => {
@@ -29,8 +36,8 @@ describe("arcpay.tokenize", () => {
     );
     globalThis.fetch = fetchMock as unknown as typeof fetch;
 
-    const arcpay = await ArcPay.load("pk_test_x");
-    const out = await arcpay.tokenize(VALID);
+    const client = createClient({ apiBase: "https://api.example.test", publishableKey: "pk_test_x" });
+    const out = await tokenize(client, VALID);
 
     expect(out).toEqual({
       cardTokenId: "tok_xyz",
@@ -61,8 +68,8 @@ describe("arcpay.tokenize", () => {
       }),
     );
     globalThis.fetch = fetchMock as unknown as typeof fetch;
-    const arcpay = await ArcPay.load("pk_test_x");
-    await arcpay.tokenize({ ...VALID, cardholderName: "JOHN DOE" });
+    const client = createClient({ apiBase: "https://api.example.test", publishableKey: "pk_test_x" });
+    await tokenize(client, { ...VALID, cardholderName: "JOHN DOE" });
     const body = JSON.parse(fetchMock.mock.calls[0]![1].body as string);
     expect(body.cardholder_name).toBe("JOHN DOE");
   });
@@ -70,8 +77,10 @@ describe("arcpay.tokenize", () => {
   it("rejects invalid PAN before network call", async () => {
     const fetchMock = vi.fn();
     globalThis.fetch = fetchMock as unknown as typeof fetch;
-    const arcpay = await ArcPay.load("pk_test_x");
-    await expect(arcpay.tokenize({ ...VALID, pan: "1111111111111111" })).rejects.toThrow(/luhn/i);
+    const client = createClient({ apiBase: "https://api.example.test", publishableKey: "pk_test_x" });
+    await expect(tokenize(client, { ...VALID, pan: "1111111111111111" })).rejects.toThrow(
+      /luhn/i,
+    );
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

@@ -267,7 +267,7 @@ const complete3DSChallengeInBrowser = async (
   return { ...executed, payment_id: payment.payment_id || payment.id || paymentId, status: payment.status };
 };
 
-test("real API H2H: JS SDK tokenizes in browser, API executes payment", async ({ page }, testInfo) => {
+test.skip("real API H2H: raw JS SDK tokenization is no longer public", async ({ page }, testInfo) => {
   test.setTimeout(90_000);
 
   const card = cardForProject(testInfo.project.name);

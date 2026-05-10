@@ -2,7 +2,6 @@ import { type Client, createClient } from "./client";
 import { verifyCspAllowsApiBase } from "./csp";
 import { detectEnvironment, type Environment, validatePublishableKey as _validatePublishableKey } from "./env";
 import { showSandboxBanner } from "./sandbox-banner";
-import { tokenize, type TokenizeRequest, type TokenizeResult } from "../tokenize/tokenize";
 import { Elements, type ElementsOptions } from "../elements/elements";
 
 const validatePublishableKey: (key: unknown) => asserts key is string = _validatePublishableKey;
@@ -18,7 +17,6 @@ export interface ArcPayInstance {
   readonly apiBase: string;
   readonly environment: Environment;
   readonly client: Client;
-  tokenize: (req: TokenizeRequest) => Promise<TokenizeResult>;
   elements: (opts?: ElementsOptions) => Elements;
 }
 
@@ -36,7 +34,6 @@ const buildInstance = (publishableKey: string, opts: ArcPayLoadOptions): ArcPayI
     apiBase,
     environment: detectEnvironment(publishableKey),
     client,
-    tokenize: (req) => tokenize(client, req),
     elements: (elemOpts) => new Elements({ publishableKey, iframeBase: elemOpts?.iframeBase }),
   };
 };
