@@ -47,6 +47,7 @@ describe("postToIframe", () => {
       type: "arcpay:hello" as const,
       origin: "https://merchant.example.com",
       publishableKey: "pk_test_abc",
+      channelId: "channel-test-123",
     };
     postToIframe(iframe, msg, "https://elements.arcpay.space");
 
@@ -60,6 +61,7 @@ describe("postToIframe", () => {
       type: "arcpay:hello" as const,
       origin: "https://merchant.example.com",
       publishableKey: "pk_test_abc",
+      channelId: "channel-test-123",
     };
     expect(() => postToIframe(iframe, msg, "*")).toThrowError(ArcPayError);
     expect(() => postToIframe(iframe, msg, "*")).toThrow(

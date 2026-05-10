@@ -4,7 +4,7 @@ export type FieldType = "cardNumber" | "cardExpiry" | "cardCvv";
 
 // Parent → iframe
 export type ParentToIframe =
-  | { type: "arcpay:hello"; origin: string; publishableKey: string }
+  | { type: "arcpay:hello"; origin: string; publishableKey: string; channelId: string }
   | { type: "arcpay:style"; payload: StyleSubset }
   | { type: "arcpay:focus" }
   | { type: "arcpay:clear" }

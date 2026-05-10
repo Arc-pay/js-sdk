@@ -25,6 +25,7 @@ type Listener = (event: ElementEvent) => void;
 export interface ElementContext {
   iframeBase: string;
   publishableKey: string;
+  channelId: string;
 }
 
 export class Element {
@@ -88,6 +89,7 @@ export class Element {
           type: "arcpay:hello",
           origin: window.location.origin,
           publishableKey: this.context.publishableKey,
+          channelId: this.context.channelId,
         };
         postToIframe(this.iframe, hello, expectedOrigin);
       },

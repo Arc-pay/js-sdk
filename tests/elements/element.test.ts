@@ -11,11 +11,13 @@ import type { IframeToParent } from "../../src/elements/postmessage";
 const IFRAME_BASE = "https://js.arcpay.space";
 const IFRAME_ORIGIN = "https://js.arcpay.space";
 const PK = "pk_test_abc123";
+const CHANNEL_ID = "channel-test-123";
 
 function makeContext(overrides: Partial<ElementContext> = {}): ElementContext {
   return {
     iframeBase: IFRAME_BASE,
     publishableKey: PK,
+    channelId: CHANNEL_ID,
     ...overrides,
   };
 }
@@ -123,7 +125,7 @@ describe("Element.mount", () => {
 
     expect(cw.postMessage).toHaveBeenCalledOnce();
     expect(cw.postMessage).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "arcpay:hello", publishableKey: PK }),
+      expect.objectContaining({ type: "arcpay:hello", publishableKey: PK, channelId: CHANNEL_ID }),
       IFRAME_ORIGIN,
     );
     el.destroy();

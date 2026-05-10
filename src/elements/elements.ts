@@ -12,15 +12,29 @@ export interface ElementsOptions {
 
 const DEFAULT_IFRAME_BASE = "https://js.arcpay.space";
 
+const createChannelId = (): string => {
+  if (!globalThis.crypto?.randomUUID) {
+    throw new ArcPayError({
+      type: "validation_error",
+      code: "crypto_unavailable",
+      message: "crypto.randomUUID is required for Hosted Fields",
+      retryable: false,
+    });
+  }
+  return globalThis.crypto.randomUUID();
+};
+
 export class Elements {
   private readonly elementMap = new Map<FieldType, Element>();
   private readonly iframeBase: string;
   private readonly publishableKey: string;
+  private readonly channelId: string;
   private tokenizeInFlight = false;
 
   constructor(opts: { publishableKey: string; iframeBase?: string }) {
     this.publishableKey = opts.publishableKey;
     this.iframeBase = opts.iframeBase ?? DEFAULT_IFRAME_BASE;
+    this.channelId = createChannelId();
   }
 
   create(field: FieldType, options: ElementOptions = {}): Element {
@@ -35,6 +49,7 @@ export class Elements {
     const ctx: ElementContext = {
       iframeBase: this.iframeBase,
       publishableKey: this.publishableKey,
+      channelId: this.channelId,
     };
     const element = new Element(field, options, ctx);
     this.elementMap.set(field, element);
