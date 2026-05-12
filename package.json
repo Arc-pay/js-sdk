@@ -42,7 +42,7 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "size": "node ./scripts/check-bundle-size.mjs",
-    "e2e": "playwright test --config=e2e/playwright.config.ts",
+    "e2e": "pnpm build:all && playwright test --config=e2e/playwright.config.ts",
     "e2e:install": "playwright install --with-deps chromium firefox webkit",
     "e2e:headed": "playwright test --config=e2e/playwright.config.ts --headed"
   },

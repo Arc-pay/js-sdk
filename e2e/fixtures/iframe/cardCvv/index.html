@@ -1,0 +1,13 @@
+<!doctype html>
+<html>
+  <body>
+    <script>
+      window.addEventListener("message", (event) => {
+        const data = event.data || {};
+        if (data.type === "arcpay:hello") {
+          window.parent.postMessage({ type: "arcpay:ready" }, data.origin);
+        }
+      });
+    </script>
+  </body>
+</html>

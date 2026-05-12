@@ -1,4 +1,3 @@
-import { type Client, createClient } from "./client";
 import { verifyCspAllowsApiBase } from "./csp";
 import { detectEnvironment, type Environment, validatePublishableKey as _validatePublishableKey } from "./env";
 import { showSandboxBanner } from "./sandbox-banner";
@@ -16,7 +15,6 @@ export interface ArcPayInstance {
   readonly publishableKey: string;
   readonly apiBase: string;
   readonly environment: Environment;
-  readonly client: Client;
   elements: (opts?: ElementsOptions) => Elements;
 }
 
@@ -28,12 +26,10 @@ const buildInstance = (publishableKey: string, opts: ArcPayLoadOptions): ArcPayI
   if (detectEnvironment(publishableKey) === "sandbox") {
     showSandboxBanner();
   }
-  const client = createClient({ apiBase, publishableKey });
   return {
     publishableKey,
     apiBase,
     environment: detectEnvironment(publishableKey),
-    client,
     elements: (elemOpts) => new Elements({ publishableKey, iframeBase: elemOpts?.iframeBase }),
   };
 };

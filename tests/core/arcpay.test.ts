@@ -9,6 +9,7 @@ describe("ArcPay.load", () => {
     expect(inst.publishableKey).toBe("pk_test_abc");
     expect(inst.environment).toBe("sandbox");
     expect(inst.apiBase).toBe("https://api.arcpay.space");
+    expect("client" in inst).toBe(false);
   });
 
   it("is idempotent for same key", async () => {

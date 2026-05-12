@@ -7,7 +7,7 @@ test.describe("raw tokenize API exposure", () => {
 
     const hasRawTokenize = await page.evaluate(() => {
       const arcpay = (window as any).__arcpay;
-      return typeof arcpay.tokenize === "function";
+      return typeof arcpay.tokenize === "function" || typeof arcpay.client?.post === "function";
     });
 
     expect(hasRawTokenize).toBe(false);

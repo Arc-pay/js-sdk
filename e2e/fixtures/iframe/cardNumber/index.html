@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+  <body>
+    <script>
+      let parentOrigin = "";
+
+      window.addEventListener("message", (event) => {
+        const data = event.data || {};
+        if (data.type === "arcpay:hello") {
+          parentOrigin = data.origin;
+          window.parent.postMessage({ type: "arcpay:ready" }, parentOrigin);
+          return;
+        }
+
+        if (data.type === "arcpay:tokenize") {
+          window.parent.postMessage(
+            {
+              type: "arcpay:tokenize-result",
+              cardTokenId: "tok_hosted_fields",
+              cardMask: "424242XXXXXX4242",
+              cardScheme: "visa",
+              cardBin: "42424242",
+              expiresAt: "2026-05-12T12:00:00Z",
+            },
+            parentOrigin,
+          );
+        }
+      });
+    </script>
+  </body>
+</html>
