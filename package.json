@@ -1,8 +1,8 @@
 {
-  "name": "arcpay",
+  "name": "arc-pay",
   "version": "0.1.0",
   "description": "Arc Pay browser SDK — publishable-key tokenization, Hosted Fields, and React bindings",
-  "private": true,
+  "private": false,
   "license": "UNLICENSED",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -14,10 +14,20 @@
       "import": "./dist/index.mjs",
       "require": "./dist/index.cjs"
     },
+    "./js": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
     "./react": {
       "types": "./dist/react/index.d.ts",
       "import": "./dist/react/index.mjs",
       "require": "./dist/react/index.cjs"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.mjs",
+      "require": "./dist/server/index.cjs"
     }
   },
   "files": [
@@ -32,6 +42,9 @@
     "react": {
       "optional": true
     }
+  },
+  "dependencies": {
+    "@arcpay/api-client": "workspace:*"
   },
   "scripts": {
     "build": "tsup",

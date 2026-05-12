@@ -7,7 +7,6 @@ export interface TokenizeRequestInput {
   cvv: string;
   expiryMonth: string;
   expiryYear: string;
-  cardholderName?: string;
 }
 
 const fail = (code: string, message: string, param?: string): never => {
@@ -49,6 +48,4 @@ export const validateTokenizeRequest = (req: TokenizeRequestInput): void => {
   const scheme = detectScheme(req.pan);
   validateCvv(req.cvv, scheme);
   validateExpiry(req.expiryMonth, req.expiryYear);
-  if (req.cardholderName !== undefined && req.cardholderName.length > 64)
-    fail("invalid_cardholder_name", "Cardholder name max 64 chars", "cardholderName");
 };

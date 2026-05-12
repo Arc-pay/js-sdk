@@ -25,13 +25,13 @@ export const ArcPayProvider: React.FC<ArcPayProviderProps> = ({
   });
 
   React.useEffect(() => {
-    let cancelled = false;
+    let canceled = false;
     ArcPay.load(publishableKey, { apiBase })
       .then((instance) => {
-        if (!cancelled) setState({ status: "ready", instance, error: null });
+        if (!canceled) setState({ status: "ready", instance, error: null });
       })
       .catch((error: unknown) => {
-        if (!cancelled)
+        if (!canceled)
           setState({
             status: "error",
             instance: null,
@@ -39,7 +39,7 @@ export const ArcPayProvider: React.FC<ArcPayProviderProps> = ({
           });
       });
     return () => {
-      cancelled = true;
+      canceled = true;
     };
   }, [publishableKey, apiBase]);
 

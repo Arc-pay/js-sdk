@@ -1,5 +1,9 @@
 export type ArcPayErrorType =
   | "validation_error"
+  | "authentication_error"
+  | "authorization_error"
+  | "state_error"
+  | "rate_limit_error"
   | "api_error"
   | "network_error"
   | "challenge_aborted";
@@ -39,6 +43,14 @@ export class ArcPayError extends Error {
 
 export const isValidationError = (e: unknown): e is ArcPayError =>
   e instanceof ArcPayError && e.type === "validation_error";
+export const isAuthenticationError = (e: unknown): e is ArcPayError =>
+  e instanceof ArcPayError && e.type === "authentication_error";
+export const isAuthorizationError = (e: unknown): e is ArcPayError =>
+  e instanceof ArcPayError && e.type === "authorization_error";
+export const isStateError = (e: unknown): e is ArcPayError =>
+  e instanceof ArcPayError && e.type === "state_error";
+export const isRateLimitError = (e: unknown): e is ArcPayError =>
+  e instanceof ArcPayError && e.type === "rate_limit_error";
 export const isApiError = (e: unknown): e is ArcPayError =>
   e instanceof ArcPayError && e.type === "api_error";
 export const isNetworkError = (e: unknown): e is ArcPayError =>

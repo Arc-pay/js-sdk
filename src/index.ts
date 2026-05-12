@@ -3,6 +3,10 @@ export type { ArcPayInstance, ArcPayLoadOptions } from "./core/arcpay";
 export {
   ArcPayError,
   isValidationError,
+  isAuthenticationError,
+  isAuthorizationError,
+  isStateError,
+  isRateLimitError,
   isApiError,
   isNetworkError,
   isChallengeAborted,

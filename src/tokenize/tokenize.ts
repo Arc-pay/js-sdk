@@ -32,7 +32,6 @@ export const tokenize = async (
     expiry_month: req.expiryMonth,
     expiry_year: req.expiryYear,
   };
-  if (req.cardholderName) body.cardholder_name = req.cardholderName;
 
   const res = await client.post<TokenizeResponseBody>(
     `/v1/payments/${encodeURIComponent(req.paymentId)}/tokenize`,

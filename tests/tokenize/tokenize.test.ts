@@ -57,23 +57,6 @@ describe("raw tokenize transport", () => {
     });
   });
 
-  it("includes cardholder_name if provided", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      ok({
-        card_token_id: "t",
-        card_mask: "x",
-        card_scheme: "visa",
-        card_bin: "42424242",
-        expires_at: "x",
-      }),
-    );
-    globalThis.fetch = fetchMock as unknown as typeof fetch;
-    const client = createClient({ apiBase: "https://api.example.test", publishableKey: "pk_test_x" });
-    await tokenize(client, { ...VALID, cardholderName: "JOHN DOE" });
-    const body = JSON.parse(fetchMock.mock.calls[0]![1].body as string);
-    expect(body.cardholder_name).toBe("JOHN DOE");
-  });
-
   it("rejects invalid PAN before network call", async () => {
     const fetchMock = vi.fn();
     globalThis.fetch = fetchMock as unknown as typeof fetch;

@@ -28,8 +28,13 @@ interface ApiErrorBody {
   };
 }
 
-const isApiErrorTypeString = (t: unknown): t is "validation_error" | "api_error" =>
-  t === "validation_error" || t === "api_error";
+const isApiErrorTypeString = (t: unknown): t is ArcPayError["type"] =>
+  t === "validation_error" ||
+  t === "authentication_error" ||
+  t === "authorization_error" ||
+  t === "state_error" ||
+  t === "rate_limit_error" ||
+  t === "api_error";
 
 const buildHeaders = (
   publishableKey: string,
