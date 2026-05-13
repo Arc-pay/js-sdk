@@ -8,8 +8,8 @@ import type { IframeToParent } from "../../src/elements/postmessage";
 // Helpers
 // ---------------------------------------------------------------------------
 
-const IFRAME_BASE = "https://js.arcpay.space";
-const IFRAME_ORIGIN = "https://js.arcpay.space";
+const IFRAME_BASE = "https://sdk.arcpay.space";
+const IFRAME_ORIGIN = "https://sdk.arcpay.space";
 const PK = "pk_test_abc123";
 const CHANNEL_ID = "channel-test-123";
 

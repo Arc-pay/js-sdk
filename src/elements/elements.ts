@@ -10,7 +10,7 @@ export interface ElementsOptions {
   iframeBase?: string;
 }
 
-const DEFAULT_IFRAME_BASE = "https://js.arcpay.space";
+const DEFAULT_IFRAME_BASE = "https://sdk.arcpay.space";
 
 const createChannelId = (): string => {
   if (!globalThis.crypto?.randomUUID) {
