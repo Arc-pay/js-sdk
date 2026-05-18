@@ -11,7 +11,6 @@ export type {
   PaymentMethod,
   PaymentFlowMode,
   AvailablePaymentMethod,
-  LimitUsage,
   Refund,
   Link,
   CheckoutSession,
@@ -26,5 +25,4 @@ export type {
   CreateCheckoutSessionRequest,
   ListPaymentsQuery,
   ListAvailablePaymentMethodsQuery,
-  GetLimitUsageQuery,
 } from "./client";

@@ -6,7 +6,6 @@ export type PaymentList = components["schemas"]["PaymentList"];
 export type PaymentMethod = components["schemas"]["PaymentMethod"];
 export type PaymentFlowMode = components["schemas"]["PaymentFlowMode"];
 export type AvailablePaymentMethod = components["schemas"]["AvailablePaymentMethod"];
-export type LimitUsage = components["schemas"]["LimitUsage"];
 export type Refund = components["schemas"]["Refund"];
 export type Link = components["schemas"]["Link"];
 export type CheckoutSession = components["schemas"]["CheckoutSession"];
@@ -23,7 +22,6 @@ export type ListPaymentsQuery = NonNullable<operations["listPayments"]["paramete
 export type ListAvailablePaymentMethodsQuery = NonNullable<
   operations["listAvailablePaymentMethods"]["parameters"]["query"]
 >;
-export type GetLimitUsageQuery = NonNullable<operations["getLimitUsage"]["parameters"]["query"]>;
 
 export interface ArcPayClientOptions {
   secretKey: string;
@@ -223,10 +221,6 @@ export class ArcPayClient {
       undefined,
       opts,
     );
-  }
-
-  async getLimitUsage(query: GetLimitUsageQuery, opts: RequestOptions = {}): Promise<LimitUsage> {
-    return this.request<LimitUsage>("GET", appendQuery("/limits/usage", query), undefined, opts);
   }
 
   async createLink(body: CreateLinkRequest, opts: IdempotencyOptions): Promise<Link> {
