@@ -1,27 +1,48 @@
-import type { components, operations } from "@arcpay/api-client/rest";
 import { ArcPayError, type ArcPayErrorType } from "../core/errors";
+import type {
+  AvailablePaymentMethod,
+  CaptureRequest,
+  CheckoutSession,
+  CompleteThreeDSMethodRequest,
+  CreateCheckoutSessionRequest,
+  CreateLinkRequest,
+  CreatePaymentRequest,
+  CreateRefundRequest,
+  ExecutePaymentRequest,
+  ExecutePaymentResponse,
+  Link,
+  ListAvailablePaymentMethodsQuery,
+  ListPaymentsQuery,
+  Payment,
+  PaymentList,
+  Refund,
+  VoidRequest,
+} from "./types";
 
-export type Payment = components["schemas"]["Payment"];
-export type PaymentList = components["schemas"]["PaymentList"];
-export type PaymentMethod = components["schemas"]["PaymentMethod"];
-export type PaymentFlowMode = components["schemas"]["PaymentFlowMode"];
-export type AvailablePaymentMethod = components["schemas"]["AvailablePaymentMethod"];
-export type Refund = components["schemas"]["Refund"];
-export type Link = components["schemas"]["Link"];
-export type CheckoutSession = components["schemas"]["CheckoutSession"];
-export type CreatePaymentRequest = components["schemas"]["CreatePaymentRequest"];
-export type CaptureRequest = components["schemas"]["CaptureRequest"];
-export type VoidRequest = components["schemas"]["VoidRequest"];
-export type CreateRefundRequest = components["schemas"]["CreateRefundRequest"];
-export type ExecutePaymentRequest = components["schemas"]["ExecutePaymentRequest"];
-export type ExecutePaymentResponse = components["schemas"]["ExecutePaymentResponse"];
-export type CompleteThreeDSMethodRequest = components["schemas"]["CompleteThreeDSMethodRequest"];
-export type CreateLinkRequest = components["schemas"]["CreateLinkRequest"];
-export type CreateCheckoutSessionRequest = components["schemas"]["CreateCheckoutSessionRequest"];
-export type ListPaymentsQuery = NonNullable<operations["listPayments"]["parameters"]["query"]>;
-export type ListAvailablePaymentMethodsQuery = NonNullable<
-  operations["listAvailablePaymentMethods"]["parameters"]["query"]
->;
+export type {
+  AvailablePaymentMethod,
+  CaptureMode,
+  CaptureRequest,
+  CheckoutSession,
+  CompleteThreeDSMethodRequest,
+  CreateCheckoutSessionRequest,
+  CreateLinkRequest,
+  CreatePaymentRequest,
+  CreateRefundRequest,
+  Currency,
+  ExecutePaymentRequest,
+  ExecutePaymentResponse,
+  Link,
+  ListAvailablePaymentMethodsQuery,
+  ListPaymentsQuery,
+  Payment,
+  PaymentFlowMode,
+  PaymentList,
+  PaymentMethod,
+  PaymentStatus,
+  Refund,
+  VoidRequest,
+} from "./types";
 
 export interface ArcPayClientOptions {
   secretKey: string;
@@ -74,7 +95,7 @@ const requireIdempotencyKey = (opts: IdempotencyOptions): string => {
   return opts.idempotencyKey;
 };
 
-const appendQuery = (path: string, query?: Record<string, unknown>): string => {
+const appendQuery = (path: string, query?: object): string => {
   if (!query) return path;
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query)) {

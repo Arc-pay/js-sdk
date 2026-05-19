@@ -1,5 +1,5 @@
 {
-  "name": "arc-pay",
+  "name": "@thavguard/arc-pay",
   "version": "0.1.0",
   "description": "Arc Pay browser SDK — publishable-key tokenization, Hosted Fields, and React bindings",
   "private": false,
@@ -34,6 +34,9 @@
     "dist",
     "README.md"
   ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
   "sideEffects": false,
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0"
@@ -42,9 +45,6 @@
     "react": {
       "optional": true
     }
-  },
-  "dependencies": {
-    "@arcpay/api-client": "workspace:*"
   },
   "scripts": {
     "build": "tsup",
