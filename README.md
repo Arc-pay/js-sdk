@@ -5,30 +5,27 @@ Browser and server SDK for Arc Pay integrations.
 ## Install
 
 ```sh
-npm install @arcpay/sdk
+npm install @thavguard/arc-pay
 ```
 
 ## Browser SDK
 
 ```ts
-import { ArcPay } from "@arcpay/sdk";
+import { ArcPay } from "@thavguard/arc-pay";
 
-const arcpay = await ArcPay.load({
-  publishableKey: "pk_test_...",
-  environment: "sandbox",
-});
+const arcpay = await ArcPay.load("pk_test_...");
 ```
 
 ## React Bindings
 
 ```ts
-import { ArcPayProvider, useArcPay } from "@arcpay/sdk/react";
+import { ArcPayProvider, useArcPay } from "@thavguard/arc-pay/react";
 ```
 
 ## Server SDK
 
 ```ts
-import { createArcPayClient } from "@arcpay/sdk/server";
+import { createArcPayClient } from "@thavguard/arc-pay/server";
 
 const client = createArcPayClient({
   secretKey: "sk_test_...",
