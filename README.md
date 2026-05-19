@@ -5,13 +5,13 @@ Browser and server SDK for Arc Pay integrations.
 ## Install
 
 ```sh
-npm install @thavguard/arc-pay
+npm install @arcpay/sdk
 ```
 
 ## Browser SDK
 
 ```ts
-import { ArcPay } from "@thavguard/arc-pay";
+import { ArcPay } from "@arcpay/sdk";
 
 const arcpay = await ArcPay.load({
   publishableKey: "pk_test_...",
@@ -22,13 +22,13 @@ const arcpay = await ArcPay.load({
 ## React Bindings
 
 ```ts
-import { ArcPayProvider, useArcPay } from "@thavguard/arc-pay/react";
+import { ArcPayProvider, useArcPay } from "@arcpay/sdk/react";
 ```
 
 ## Server SDK
 
 ```ts
-import { createArcPayClient } from "@thavguard/arc-pay/server";
+import { createArcPayClient } from "@arcpay/sdk/server";
 
 const client = createArcPayClient({
   secretKey: "sk_test_...",

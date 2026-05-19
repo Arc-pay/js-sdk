@@ -1,5 +1,5 @@
 {
-  "name": "@thavguard/arc-pay",
+  "name": "@arcpay/sdk",
   "version": "0.1.0",
   "description": "Arc Pay browser SDK — publishable-key tokenization, Hosted Fields, and React bindings",
   "private": false,
