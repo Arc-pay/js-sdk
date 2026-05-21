@@ -123,9 +123,14 @@ export interface ExecutePaymentRequest {
 
 export interface ExecutePaymentResponse {
   payment_id: string;
-  status: "authorized" | "captured" | "pending_3ds" | "failed" | "declined";
+  status: "authorized" | "captured" | "pending" | "pending_3ds" | "failed" | "declined";
   authorized_amount?: number;
   payment_mode?: PaymentFlowMode;
+  redirect_url?: string;
+  qr_url?: string;
+  qr_image_base64?: string;
+  qr_content_type?: "image/png" | "image/svg+xml" | string;
+  qr_expires_at?: string;
   liability_shifted?: boolean;
   requires_3ds?: boolean;
   acs_url?: string;
