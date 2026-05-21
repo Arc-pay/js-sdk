@@ -14,6 +14,7 @@ export type PaymentMethod =
 
 export type CaptureMode = "one_stage" | "two_stage";
 export type PaymentFlowMode = "h2h" | "redirect";
+export type Locale = "ru" | "en";
 
 export type PaymentStatus =
   | "created"
@@ -169,6 +170,7 @@ export interface CreateLinkRequest {
   metadata?: Record<string, string>;
   capture_mode: CaptureMode;
   autocompletion_date?: string;
+  locale?: Locale;
   payment_methods: {
     method: PaymentMethod;
     payment_mode: PaymentFlowMode;
@@ -230,6 +232,7 @@ export interface Link {
   metadata?: Record<string, string>;
   capture_mode: CaptureMode;
   autocompletion_date?: string;
+  locale?: Locale;
 }
 
 export interface CreateCheckoutSessionRequest {
@@ -248,6 +251,7 @@ export interface CreateCheckoutSessionRequest {
   external_id?: string;
   metadata?: Record<string, string>;
   autocompletion_date?: string;
+  locale?: Locale;
 }
 
 export interface CheckoutSession {

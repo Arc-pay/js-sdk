@@ -46,6 +46,15 @@ and API connections to `https://api.arcpay.space`. If your Content Security
 Policy also governs telemetry, allow connections to your configured Sentry ingest
 host or disable browser telemetry at your application layer.
 
+Hosted Fields performs a browser settings check against Arc Pay API before
+mounting fields. That check is internal to the SDK; merchants should configure
+CSP for the public origins above, not call the settings endpoint directly.
+
+`@thavguard/arc-pay/server` intentionally does not expose `tokenizeCard()`.
+Tokenization belongs to Hosted Fields or direct browser calls with a
+publishable key. Keep `sk_*` keys on your backend for payment creation,
+execution, capture, void, and refund operations.
+
 ## License
 
 This package is licensed for merchant integration with Arc Pay under the terms in
