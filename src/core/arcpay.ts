@@ -30,7 +30,7 @@ const buildInstance = (publishableKey: string, opts: ArcPayLoadOptions): ArcPayI
     publishableKey,
     apiBase,
     environment: detectEnvironment(publishableKey),
-    elements: (elemOpts) => new Elements({ publishableKey, iframeBase: elemOpts?.iframeBase }),
+    elements: () => new Elements({ publishableKey }),
   };
 };
 

@@ -6,9 +6,7 @@ import type { TokenizeResult } from "../tokenize/tokenize";
 
 export type { TokenizeResult };
 
-export interface ElementsOptions {
-  iframeBase?: string;
-}
+export type ElementsOptions = Record<string, never>;
 
 const DEFAULT_IFRAME_BASE = "https://sdk.arcpay.space";
 

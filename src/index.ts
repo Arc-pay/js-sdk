@@ -13,7 +13,7 @@ export {
 } from "./core/errors";
 export type { ArcPayErrorType } from "./core/errors";
 export type { Environment } from "./core/env";
-export type { TokenizeRequest, TokenizeResult } from "./tokenize/tokenize";
+export type { TokenizeResult } from "./tokenize/tokenize";
 export type { CardScheme } from "./tokenize/scheme";
 export const SDK_VERSION = "0.1.0";
 
