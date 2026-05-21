@@ -57,5 +57,4 @@ execution, capture, void, and refund operations.
 
 ## License
 
-This package is licensed for merchant integration with Arc Pay under the terms in
-the package `LICENSE` file.
+MIT.

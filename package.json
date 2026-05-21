@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Arc Pay browser SDK — publishable-key tokenization, Hosted Fields, and React bindings",
   "private": false,
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "MIT",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
@@ -32,7 +32,8 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
