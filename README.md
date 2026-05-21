@@ -45,3 +45,8 @@ Browser pages using Hosted Fields must allow frames from `https://sdk.arcpay.spa
 and API connections to `https://api.arcpay.space`. If your Content Security
 Policy also governs telemetry, allow connections to your configured Sentry ingest
 host or disable browser telemetry at your application layer.
+
+## License
+
+This package is licensed for merchant integration with Arc Pay under the terms in
+the package `LICENSE` file.

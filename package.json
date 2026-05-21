@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Arc Pay browser SDK — publishable-key tokenization, Hosted Fields, and React bindings",
   "private": false,
-  "license": "UNLICENSED",
+  "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
