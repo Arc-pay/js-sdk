@@ -50,7 +50,8 @@ Hosted Fields performs a browser settings check against Arc Pay API before
 mounting fields. That check is internal to the SDK; merchants should configure
 CSP for the public origins above, not call the settings endpoint directly.
 Tokenization requests are sent from `https://sdk.arcpay.space` to the public API
-with `Authorization`, `Content-Type`, and `Idempotency-Key` headers.
+with `Authorization`, `Content-Type`, `Idempotency-Key`, `sentry-trace`, and
+`baggage` headers.
 
 `@thavguard/arc-pay/server` intentionally does not expose `tokenizeCard()`.
 Tokenization belongs to Hosted Fields or direct browser calls with a
