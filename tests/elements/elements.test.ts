@@ -396,7 +396,9 @@ describe("Elements.tokenize — C2 concurrent-call guard", () => {
     const first = els.tokenize("pay_c2a", "idem-c2-1");
 
     // Second call — must reject immediately with tokenize_in_progress.
-    const err = (await els.tokenize("pay_c2b", "idem-c2-2").catch((e: unknown) => e)) as ArcPayError;
+    const err = (await els
+      .tokenize("pay_c2b", "idem-c2-2")
+      .catch((e: unknown) => e)) as ArcPayError;
     expect(err).toBeInstanceOf(ArcPayError);
     expect(err.code).toBe("tokenize_in_progress");
 

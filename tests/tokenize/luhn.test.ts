@@ -12,13 +12,12 @@ describe("luhnCheck", () => {
     expect(luhnCheck(pan)).toBe(true);
   });
 
-  it.each([
-    "4242424242424241",
-    "0000000000000000",
-    "1111111111111111",
-  ])("fails for invalid PAN %s", (pan) => {
-    expect(luhnCheck(pan)).toBe(false);
-  });
+  it.each(["4242424242424241", "0000000000000000", "1111111111111111"])(
+    "fails for invalid PAN %s",
+    (pan) => {
+      expect(luhnCheck(pan)).toBe(false);
+    },
+  );
 
   it("returns false for non-digit input", () => {
     expect(luhnCheck("4242 4242 4242 4242")).toBe(false);

@@ -37,7 +37,10 @@ describe("raw tokenize transport", () => {
     );
     globalThis.fetch = fetchMock as unknown as typeof fetch;
 
-    const client = createClient({ apiBase: "https://api.example.test", publishableKey: "pk_test_x" });
+    const client = createClient({
+      apiBase: "https://api.example.test",
+      publishableKey: "pk_test_x",
+    });
     const out = await tokenize(client, VALID);
 
     expect(out).toEqual({
@@ -62,10 +65,11 @@ describe("raw tokenize transport", () => {
   it("rejects invalid PAN before network call", async () => {
     const fetchMock = vi.fn();
     globalThis.fetch = fetchMock as unknown as typeof fetch;
-    const client = createClient({ apiBase: "https://api.example.test", publishableKey: "pk_test_x" });
-    await expect(tokenize(client, { ...VALID, pan: "1111111111111111" })).rejects.toThrow(
-      /luhn/i,
-    );
+    const client = createClient({
+      apiBase: "https://api.example.test",
+      publishableKey: "pk_test_x",
+    });
+    await expect(tokenize(client, { ...VALID, pan: "1111111111111111" })).rejects.toThrow(/luhn/i);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

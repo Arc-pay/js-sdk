@@ -23,10 +23,7 @@ interface TokenizeResponseBody {
   expires_at: string;
 }
 
-export const tokenize = async (
-  client: Client,
-  req: TokenizeRequest,
-): Promise<TokenizeResult> => {
+export const tokenize = async (client: Client, req: TokenizeRequest): Promise<TokenizeResult> => {
   validateTokenizeRequest(req);
   const body: Record<string, string> = {
     pan: req.pan,

@@ -75,7 +75,7 @@ const parseErrorResponse = async (res: Response): Promise<ArcPayError> => {
 };
 
 export const createClient = (config: ClientConfig): Client => {
-  const send = async <T,>(
+  const send = async <T>(
     method: "GET" | "POST",
     path: string,
     body: unknown,
@@ -104,8 +104,8 @@ export const createClient = (config: ClientConfig): Client => {
   };
 
   return {
-    post: <T,>(path: string, body: unknown, opts?: RequestOptions) =>
+    post: <T>(path: string, body: unknown, opts?: RequestOptions) =>
       send<T>("POST", path, body, opts),
-    get: <T,>(path: string, opts?: RequestOptions) => send<T>("GET", path, undefined, opts),
+    get: <T>(path: string, opts?: RequestOptions) => send<T>("GET", path, undefined, opts),
   };
 };

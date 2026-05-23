@@ -21,11 +21,15 @@ describe("validateTokenizeRequest", () => {
   });
 
   it("rejects PAN failing Luhn", () => {
-    expect(() => validateTokenizeRequest({ ...valid, pan: "4242424242424241" })).toThrowError(/luhn/i);
+    expect(() => validateTokenizeRequest({ ...valid, pan: "4242424242424241" })).toThrowError(
+      /luhn/i,
+    );
   });
 
   it("rejects PAN with non-digits", () => {
-    expect(() => validateTokenizeRequest({ ...valid, pan: "4242-4242-4242-4242" })).toThrowError(ArcPayError);
+    expect(() => validateTokenizeRequest({ ...valid, pan: "4242-4242-4242-4242" })).toThrowError(
+      ArcPayError,
+    );
   });
 
   it("rejects PAN length < 13 or > 19", () => {
@@ -38,15 +42,21 @@ describe("validateTokenizeRequest", () => {
   });
 
   it("accepts 4-digit CVV for Amex BIN", () => {
-    expect(() => validateTokenizeRequest({ ...valid, pan: "378282246310005", cvv: "1234" })).not.toThrow();
+    expect(() =>
+      validateTokenizeRequest({ ...valid, pan: "378282246310005", cvv: "1234" }),
+    ).not.toThrow();
   });
 
   it("rejects expired card", () => {
-    expect(() => validateTokenizeRequest({ ...valid, expiryMonth: "04", expiryYear: "2026" })).toThrowError(/expir/i);
+    expect(() =>
+      validateTokenizeRequest({ ...valid, expiryMonth: "04", expiryYear: "2026" }),
+    ).toThrowError(/expir/i);
   });
 
   it("accepts current month", () => {
-    expect(() => validateTokenizeRequest({ ...valid, expiryMonth: "05", expiryYear: "2026" })).not.toThrow();
+    expect(() =>
+      validateTokenizeRequest({ ...valid, expiryMonth: "05", expiryYear: "2026" }),
+    ).not.toThrow();
   });
 
   it("rejects expiryYear too far in future (>20yr)", () => {

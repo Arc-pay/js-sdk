@@ -75,7 +75,8 @@ function validateSecretKey(key: unknown): asserts key is string {
     throw new ArcPayError({
       type: "authentication_error",
       code: "invalid_secret_key",
-      message: "Secret key must start with sk_test_ or sk_live_. Publishable keys cannot call server APIs.",
+      message:
+        "Secret key must start with sk_test_ or sk_live_. Publishable keys cannot call server APIs.",
       retryable: false,
     });
   }
@@ -170,7 +171,10 @@ export class ArcPayClient {
     this.fetchImpl = options.fetch ?? fetch;
   }
 
-  async listPayments(query: ListPaymentsQuery = {}, opts: RequestOptions = {}): Promise<PaymentList> {
+  async listPayments(
+    query: ListPaymentsQuery = {},
+    opts: RequestOptions = {},
+  ): Promise<PaymentList> {
     return this.request<PaymentList>("GET", appendQuery("/payments", query), undefined, opts);
   }
 
@@ -179,7 +183,12 @@ export class ArcPayClient {
   }
 
   async getPayment(paymentId: string, opts: RequestOptions = {}): Promise<Payment> {
-    return this.request<Payment>("GET", `/payments/${encodeURIComponent(paymentId)}`, undefined, opts);
+    return this.request<Payment>(
+      "GET",
+      `/payments/${encodeURIComponent(paymentId)}`,
+      undefined,
+      opts,
+    );
   }
 
   async capturePayment(
@@ -187,7 +196,12 @@ export class ArcPayClient {
     body: CaptureRequest,
     opts: IdempotencyOptions,
   ): Promise<Payment> {
-    return this.request<Payment>("POST", `/payments/${encodeURIComponent(paymentId)}/capture`, body, opts);
+    return this.request<Payment>(
+      "POST",
+      `/payments/${encodeURIComponent(paymentId)}/capture`,
+      body,
+      opts,
+    );
   }
 
   async voidPayment(
@@ -195,7 +209,12 @@ export class ArcPayClient {
     body: VoidRequest,
     opts: IdempotencyOptions,
   ): Promise<Payment> {
-    return this.request<Payment>("POST", `/payments/${encodeURIComponent(paymentId)}/void`, body, opts);
+    return this.request<Payment>(
+      "POST",
+      `/payments/${encodeURIComponent(paymentId)}/void`,
+      body,
+      opts,
+    );
   }
 
   async createRefund(
@@ -203,7 +222,12 @@ export class ArcPayClient {
     body: CreateRefundRequest,
     opts: IdempotencyOptions,
   ): Promise<Refund> {
-    return this.request<Refund>("POST", `/payments/${encodeURIComponent(paymentId)}/refunds`, body, opts);
+    return this.request<Refund>(
+      "POST",
+      `/payments/${encodeURIComponent(paymentId)}/refunds`,
+      body,
+      opts,
+    );
   }
 
   async executePayment(

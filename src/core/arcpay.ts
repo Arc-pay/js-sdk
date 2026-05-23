@@ -1,5 +1,9 @@
 import { verifyCspAllowsApiBase } from "./csp";
-import { detectEnvironment, type Environment, validatePublishableKey as _validatePublishableKey } from "./env";
+import {
+  detectEnvironment,
+  type Environment,
+  validatePublishableKey as _validatePublishableKey,
+} from "./env";
 import { showSandboxBanner } from "./sandbox-banner";
 import { Elements, type ElementsOptions } from "../elements/elements";
 

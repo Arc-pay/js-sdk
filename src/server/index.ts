@@ -1,7 +1,4 @@
-export {
-  ArcPayClient,
-  createArcPayClient,
-} from "./client";
+export { ArcPayClient, createArcPayClient } from "./client";
 export type {
   ArcPayClientOptions,
   IdempotencyOptions,

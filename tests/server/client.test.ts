@@ -18,9 +18,9 @@ describe("server ArcPayClient", () => {
   afterEach(() => vi.restoreAllMocks());
 
   it("rejects publishable keys on server APIs", () => {
-    expect(() => createArcPayClient({ secretKey: "pk_test_x", fetch: fetchMock as unknown as typeof fetch })).toThrowError(
-      ArcPayError,
-    );
+    expect(() =>
+      createArcPayClient({ secretKey: "pk_test_x", fetch: fetchMock as unknown as typeof fetch }),
+    ).toThrowError(ArcPayError);
   });
 
   it("creates a payment with secret key, API version, and idempotency key", async () => {
@@ -100,7 +100,9 @@ describe("server ArcPayClient", () => {
       fetch: fetchMock as unknown as typeof fetch,
     });
 
-    await expect(client.capturePayment("pay_1", {}, { idempotencyKey: "cap-1" })).rejects.toMatchObject({
+    await expect(
+      client.capturePayment("pay_1", {}, { idempotencyKey: "cap-1" }),
+    ).rejects.toMatchObject({
       type: "state_error",
       code: "invalid_state",
       requestId: "req_1",
