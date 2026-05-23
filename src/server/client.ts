@@ -55,6 +55,8 @@ export interface IdempotencyOptions {
   signal?: AbortSignal;
 }
 
+type RequestOptionsInput = RequestOptions | IdempotencyOptions | null | undefined;
+
 export interface RequestOptions {
   signal?: AbortSignal;
 }
@@ -84,7 +86,15 @@ function validateSecretKey(key: unknown): asserts key is string {
 
 const normalizeBase = (base: string): string => base.replace(/\/+$/, "");
 
-const requireIdempotencyKey = (opts: IdempotencyOptions): string => {
+interface RequestOptionsWithOptionalIdempotency extends RequestOptions {
+  idempotencyKey?: string;
+}
+
+const normalizeRequestOptions = (
+  opts: RequestOptionsInput,
+): RequestOptionsWithOptionalIdempotency => opts ?? {};
+
+const requireIdempotencyKey = (opts: RequestOptionsWithOptionalIdempotency): string => {
   if (!opts.idempotencyKey) {
     throw new ArcPayError({
       type: "validation_error",
@@ -178,8 +188,9 @@ export class ArcPayClient {
     return this.request<PaymentList>("GET", appendQuery("/payments", query), undefined, opts);
   }
 
-  async createPayment(body: CreatePaymentRequest, opts: IdempotencyOptions): Promise<Payment> {
-    return this.request<Payment>("POST", "/payments", body, opts);
+  async createPayment(body: CreatePaymentRequest, opts: IdempotencyOptions): Promise<Payment>;
+  async createPayment(body: CreatePaymentRequest, opts: RequestOptionsInput): Promise<Payment> {
+    return this.request<Payment>("POST", "/payments", body, opts, true);
   }
 
   async getPayment(paymentId: string, opts: RequestOptions = {}): Promise<Payment> {
@@ -195,12 +206,18 @@ export class ArcPayClient {
     paymentId: string,
     body: CaptureRequest,
     opts: IdempotencyOptions,
+  ): Promise<Payment>;
+  async capturePayment(
+    paymentId: string,
+    body: CaptureRequest,
+    opts: RequestOptionsInput,
   ): Promise<Payment> {
     return this.request<Payment>(
       "POST",
       `/payments/${encodeURIComponent(paymentId)}/capture`,
       body,
       opts,
+      true,
     );
   }
 
@@ -208,12 +225,18 @@ export class ArcPayClient {
     paymentId: string,
     body: VoidRequest,
     opts: IdempotencyOptions,
+  ): Promise<Payment>;
+  async voidPayment(
+    paymentId: string,
+    body: VoidRequest,
+    opts: RequestOptionsInput,
   ): Promise<Payment> {
     return this.request<Payment>(
       "POST",
       `/payments/${encodeURIComponent(paymentId)}/void`,
       body,
       opts,
+      true,
     );
   }
 
@@ -221,12 +244,18 @@ export class ArcPayClient {
     paymentId: string,
     body: CreateRefundRequest,
     opts: IdempotencyOptions,
+  ): Promise<Refund>;
+  async createRefund(
+    paymentId: string,
+    body: CreateRefundRequest,
+    opts: RequestOptionsInput,
   ): Promise<Refund> {
     return this.request<Refund>(
       "POST",
       `/payments/${encodeURIComponent(paymentId)}/refunds`,
       body,
       opts,
+      true,
     );
   }
 
@@ -234,12 +263,18 @@ export class ArcPayClient {
     paymentId: string,
     body: ExecutePaymentRequest,
     opts: IdempotencyOptions,
+  ): Promise<ExecutePaymentResponse>;
+  async executePayment(
+    paymentId: string,
+    body: ExecutePaymentRequest,
+    opts: RequestOptionsInput,
   ): Promise<ExecutePaymentResponse> {
     return this.request<ExecutePaymentResponse>(
       "POST",
       `/payments/${encodeURIComponent(paymentId)}/execute`,
       body,
       opts,
+      true,
     );
   }
 
@@ -268,30 +303,39 @@ export class ArcPayClient {
     );
   }
 
-  async createLink(body: CreateLinkRequest, opts: IdempotencyOptions): Promise<Link> {
-    return this.request<Link>("POST", "/links", body, opts);
+  async createLink(body: CreateLinkRequest, opts: IdempotencyOptions): Promise<Link>;
+  async createLink(body: CreateLinkRequest, opts: RequestOptionsInput): Promise<Link> {
+    return this.request<Link>("POST", "/links", body, opts, true);
   }
 
   async createCheckoutSession(
     body: CreateCheckoutSessionRequest,
     opts: IdempotencyOptions,
+  ): Promise<CheckoutSession>;
+  async createCheckoutSession(
+    body: CreateCheckoutSessionRequest,
+    opts: RequestOptionsInput,
   ): Promise<CheckoutSession> {
-    return this.request<CheckoutSession>("POST", "/checkout/sessions", body, opts);
+    return this.request<CheckoutSession>("POST", "/checkout/sessions", body, opts, true);
   }
 
   private async request<T>(
     method: "GET" | "POST",
     path: string,
     body: unknown,
-    opts: RequestOptions | IdempotencyOptions,
+    opts: RequestOptionsInput = undefined,
+    requireIdempotency = false,
   ): Promise<T> {
+    const requestOpts = normalizeRequestOptions(opts);
     const headers: Record<string, string> = {
       Authorization: `Bearer ${this.secretKey}`,
       "X-Arc-Pay-API-Version": API_VERSION,
       "Content-Type": "application/json",
     };
-    if ("idempotencyKey" in opts) {
-      headers["Idempotency-Key"] = requireIdempotencyKey(opts);
+    if (requireIdempotency) {
+      headers["Idempotency-Key"] = requireIdempotencyKey(requestOpts);
+    } else if (requestOpts.idempotencyKey !== undefined) {
+      headers["Idempotency-Key"] = requireIdempotencyKey(requestOpts);
     }
 
     let res: Response;
@@ -300,7 +344,7 @@ export class ArcPayClient {
         method,
         headers,
         body: body === undefined ? undefined : JSON.stringify(body),
-        signal: opts.signal,
+        signal: requestOpts.signal,
       });
     } catch (err) {
       throw new ArcPayError({

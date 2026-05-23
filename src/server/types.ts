@@ -31,6 +31,8 @@ export type PaymentStatus =
   | "failed"
   | "timeout";
 
+export type PaymentOperation = "create" | "capture" | "refund" | "void" | "execute";
+
 export interface Payment {
   id: string;
   amount: number;
@@ -49,6 +51,7 @@ export interface Payment {
   bank_rrn?: string;
   bank_internal_ref?: string;
   bank_auth_code?: string;
+  card_token_id?: string;
   decline_code?: string;
   card_mask?: string;
   card_scheme?: string;
@@ -156,6 +159,7 @@ export interface AvailablePaymentMethod {
   display_name: string;
   is_active: boolean;
   icon_url?: string;
+  supported_operations?: PaymentOperation[];
 }
 
 export interface CreateLinkRequest {

@@ -60,6 +60,116 @@ describe("server ArcPayClient", () => {
     expect(init.headers["Idempotency-Key"]).toBe("idem-1");
   });
 
+  it("validates required idempotency keys for mandatory operations", async () => {
+    const idempotentClient = new ArcPayClient({
+      secretKey: "sk_test_x",
+      apiBase: "https://api.example.test/v1",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+    if (false) {
+      // @ts-expect-error idempotency options are required at compile time.
+      void idempotentClient.createPayment({
+        amount: 10000,
+        currency: "RUB",
+        payment_method: "bank_card",
+        external_id: "order-typecheck",
+        capture_mode: "one_stage",
+      });
+    }
+
+    const requiredMethods = [
+      {
+        name: "createPayment",
+        invoke: (opts: unknown) =>
+          idempotentClient.createPayment(
+            {
+              amount: 10000,
+              currency: "RUB",
+              payment_method: "bank_card",
+              external_id: "order-1",
+              capture_mode: "one_stage",
+            },
+            opts as any,
+          ),
+      },
+      {
+        name: "createLink",
+        invoke: (opts: unknown) =>
+          idempotentClient.createLink(
+            {
+              link_type: "one_time",
+              amount: 10000,
+              currency: "RUB",
+              capture_mode: "one_stage",
+              payment_methods: [{ method: "bank_card", payment_mode: "h2h" }],
+            },
+            opts as any,
+          ),
+      },
+      {
+        name: "createCheckoutSession",
+        invoke: (opts: unknown) =>
+          idempotentClient.createCheckoutSession(
+            {
+              amount: 10000,
+              currency: "RUB",
+              payment_methods: [{ method: "bank_card", payment_mode: "h2h" }],
+              capture_mode: "one_stage",
+            },
+            opts as any,
+          ),
+      },
+      {
+        name: "capturePayment",
+        invoke: (opts: unknown) =>
+          idempotentClient.capturePayment("pay_1", { amount: 5000 }, opts as any),
+      },
+      {
+        name: "voidPayment",
+        invoke: (opts: unknown) => idempotentClient.voidPayment("pay_1", {}, opts as any),
+      },
+      {
+        name: "createRefund",
+        invoke: (opts: unknown) =>
+          idempotentClient.createRefund("pay_1", { amount: 5000 }, opts as any),
+      },
+      {
+        name: "executePayment",
+        invoke: (opts: unknown) =>
+          idempotentClient.executePayment(
+            "pay_1",
+            {
+              card_token_id: "tok_1",
+              payment_mode: "h2h",
+              browser_info: {
+                accept_header: "",
+                language: "en",
+                screen_width: 390,
+                screen_height: 844,
+                color_depth: 24,
+                timezone_offset_minutes: 0,
+                java_enabled: true,
+                user_agent: "Mozilla/5.0",
+                window_size: "01",
+              },
+            },
+            opts as any,
+          ),
+      },
+    ];
+
+    for (const method of requiredMethods) {
+      await expect(method.invoke(undefined)).rejects.toMatchObject({
+        type: "validation_error",
+        code: "missing_idempotency_key",
+      });
+      await expect(method.invoke(null)).rejects.toMatchObject({
+        type: "validation_error",
+        code: "missing_idempotency_key",
+      });
+    }
+  });
+
   it("serializes list payments query parameters", async () => {
     fetchMock.mockResolvedValue(ok({ payments: [], total: 0, page: 1, page_size: 20 }));
     const client = new ArcPayClient({
