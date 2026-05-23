@@ -135,6 +135,7 @@ export class Elements {
             cardMask: data.cardMask,
             cardScheme: data.cardScheme,
             cardBin: data.cardBin,
+            expiresIn: data.expiresIn,
             expiresAt: data.expiresAt,
           });
         } else if (data.type === "arcpay:tokenize-error") {

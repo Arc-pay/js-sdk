@@ -6,6 +6,7 @@ export interface TokenizeResult {
   cardMask: string;
   cardScheme: string;
   cardBin: string;
+  expiresIn: number;
   expiresAt: string;
 }
 
@@ -18,6 +19,7 @@ interface TokenizeResponseBody {
   card_mask: string;
   card_scheme: string;
   card_bin: string;
+  expires_in: number;
   expires_at: string;
 }
 
@@ -42,6 +44,7 @@ export const tokenize = async (
     cardMask: res.card_mask,
     cardScheme: res.card_scheme,
     cardBin: res.card_bin,
+    expiresIn: res.expires_in,
     expiresAt: res.expires_at,
   };
 };

@@ -211,6 +211,7 @@ describe("Elements.tokenize — happy path", () => {
         cardMask: "427600****1234",
         cardScheme: "visa",
         cardBin: "427600",
+        expiresIn: 300,
         expiresAt: "2028-12-31T23:59:59Z",
       },
       cardNumberMock,
@@ -221,6 +222,7 @@ describe("Elements.tokenize — happy path", () => {
     expect(result.cardMask).toBe("427600****1234");
     expect(result.cardScheme).toBe("visa");
     expect(result.cardBin).toBe("427600");
+    expect(result.expiresIn).toBe(300);
     expect(result.expiresAt).toBe("2028-12-31T23:59:59Z");
     els.destroy();
   });
@@ -277,6 +279,7 @@ describe("Elements.tokenize — happy path", () => {
           cardMask: "...",
           cardScheme: "visa",
           cardBin: "000000",
+          expiresIn: 300,
           expiresAt: "2030-01-01T00:00:00Z",
         },
         origin: "https://evil.example.com",
@@ -291,6 +294,7 @@ describe("Elements.tokenize — happy path", () => {
         cardMask: "427600****5678",
         cardScheme: "visa",
         cardBin: "427600",
+        expiresIn: 300,
         expiresAt: "2029-06-30T23:59:59Z",
       },
       cardNumberMock,
@@ -338,6 +342,7 @@ describe("Elements.tokenize — C1 source guard", () => {
         cardMask: "...",
         cardScheme: "visa",
         cardBin: "000000",
+        expiresIn: 300,
         expiresAt: "2030-01-01T00:00:00Z",
       },
       cardExpiryMock,
@@ -351,6 +356,7 @@ describe("Elements.tokenize — C1 source guard", () => {
         cardMask: "427600****9999",
         cardScheme: "visa",
         cardBin: "427600",
+        expiresIn: 300,
         expiresAt: "2029-06-30T23:59:59Z",
       },
       cardNumberMock,
@@ -402,6 +408,7 @@ describe("Elements.tokenize — C2 concurrent-call guard", () => {
         cardMask: "...",
         cardScheme: "visa",
         cardBin: "427600",
+        expiresIn: 300,
         expiresAt: "2030-01-01T00:00:00Z",
       },
       cardNumberMock,
@@ -428,6 +435,7 @@ describe("Elements.tokenize — C2 concurrent-call guard", () => {
         cardMask: "...",
         cardScheme: "visa",
         cardBin: "427600",
+        expiresIn: 300,
         expiresAt: "2030-01-01T00:00:00Z",
       },
       cardNumberMock,
@@ -443,6 +451,7 @@ describe("Elements.tokenize — C2 concurrent-call guard", () => {
         cardMask: "427600****0001",
         cardScheme: "visa",
         cardBin: "427600",
+        expiresIn: 300,
         expiresAt: "2031-01-01T00:00:00Z",
       },
       cardNumberMock,
@@ -514,6 +523,7 @@ describe("Elements.tokenize — C3 30-second timeout", () => {
         cardMask: "427600****0001",
         cardScheme: "visa",
         cardBin: "427600",
+        expiresIn: 300,
         expiresAt: "2030-01-01T00:00:00Z",
       },
       cardNumberMock,

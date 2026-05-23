@@ -27,6 +27,7 @@ export type IframeToParent =
       cardMask: string;
       cardScheme: string;
       cardBin: string;
+      expiresIn: number;
       expiresAt: string;
     }
   | { type: "arcpay:tokenize-error"; errorType: string; code?: string; message: string };

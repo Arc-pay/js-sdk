@@ -31,6 +31,7 @@ describe("raw tokenize transport", () => {
         card_mask: "424242XXXXXX4242",
         card_scheme: "visa",
         card_bin: "42424242",
+        expires_in: 300,
         expires_at: "2026-05-08T00:05:00Z",
       }),
     );
@@ -44,6 +45,7 @@ describe("raw tokenize transport", () => {
       cardMask: "424242XXXXXX4242",
       cardScheme: "visa",
       cardBin: "42424242",
+      expiresIn: 300,
       expiresAt: "2026-05-08T00:05:00Z",
     });
     const [url, init] = fetchMock.mock.calls[0]!;
