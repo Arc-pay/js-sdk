@@ -1,0 +1,79 @@
+name: Publish SDK to npm
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/publish-npm.yml"
+      - "package.json"
+      - "README.md"
+      - "LICENSE"
+      - "scripts/**"
+      - "src/**"
+      - "tests/**"
+      - "tsconfig.json"
+      - "tsup.config.ts"
+      - "vitest.config.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: npm-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        (
+          !contains(github.event.head_commit.message, '[skip publish]') &&
+          !startsWith(github.event.head_commit.message, 'chore(release): publish @thavguard/arc-pay@')
+        )
+      }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.0.9 --activate
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Prepare release version
+        id: version
+        run: |
+          version="$(node scripts/prepare-release-version.mjs)"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Verify package
+        run: pnpm prepack
+
+      - name: Commit release version
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json src/index.ts src/react/index.ts
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "chore(release): publish @thavguard/arc-pay@${{ steps.version.outputs.version }} [skip ci]"
+          git push origin HEAD:main
+
+      - name: Publish to npm
+        run: npm publish --access public

@@ -4,6 +4,10 @@
   "description": "Arc Pay browser SDK — publishable-key tokenization, Hosted Fields, and React bindings",
   "private": false,
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Arc-pay/js-sdk.git"
+  },
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
