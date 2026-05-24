@@ -1,4 +1,3 @@
-import { verifyCspAllowsApiBase } from "./csp";
 import {
   detectEnvironment,
   type Environment,
@@ -10,44 +9,38 @@ import { Elements, type ElementsOptions } from "../elements/elements";
 const validatePublishableKey: (key: unknown) => asserts key is string = _validatePublishableKey;
 
 export interface ArcPayLoadOptions {
-  apiBase?: string;
+  readonly _reserved?: never;
 }
-
-const DEFAULT_API_BASE = "https://api.arcpay.space";
 
 export interface ArcPayInstance {
   readonly publishableKey: string;
-  readonly apiBase: string;
   readonly environment: Environment;
   elements: (opts?: ElementsOptions) => Elements;
 }
 
 const cache = new Map<string, Promise<ArcPayInstance>>();
 
-const buildInstance = (publishableKey: string, opts: ArcPayLoadOptions): ArcPayInstance => {
-  const apiBase = opts.apiBase ?? DEFAULT_API_BASE;
-  verifyCspAllowsApiBase(apiBase);
+const buildInstance = (publishableKey: string): ArcPayInstance => {
   if (detectEnvironment(publishableKey) === "sandbox") {
     showSandboxBanner();
   }
   return {
     publishableKey,
-    apiBase,
     environment: detectEnvironment(publishableKey),
     elements: () => new Elements({ publishableKey }),
   };
 };
 
-function load(publishableKey: string, opts: ArcPayLoadOptions = {}): Promise<ArcPayInstance> {
+function load(publishableKey: string): Promise<ArcPayInstance> {
   try {
     validatePublishableKey(publishableKey);
   } catch (err) {
     return Promise.reject(err);
   }
-  const key = `${publishableKey}|${opts.apiBase ?? DEFAULT_API_BASE}`;
+  const key = publishableKey;
   const existing = cache.get(key);
   if (existing) return existing;
-  const promise = Promise.resolve(buildInstance(publishableKey, opts));
+  const promise = Promise.resolve(buildInstance(publishableKey));
   cache.set(key, promise);
   return promise;
 }

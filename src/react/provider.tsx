@@ -1,4 +1,4 @@
-import { ArcPay, type ArcPayInstance, type ArcPayLoadOptions } from "../index";
+import { ArcPay, type ArcPayInstance } from "../index";
 import * as React from "react";
 
 export type ArcPayState =
@@ -8,16 +8,12 @@ export type ArcPayState =
 
 const Ctx = React.createContext<ArcPayState | null>(null);
 
-export interface ArcPayProviderProps extends ArcPayLoadOptions {
+export interface ArcPayProviderProps {
   publishableKey: string;
   children: React.ReactNode;
 }
 
-export const ArcPayProvider: React.FC<ArcPayProviderProps> = ({
-  publishableKey,
-  apiBase,
-  children,
-}) => {
+export const ArcPayProvider: React.FC<ArcPayProviderProps> = ({ publishableKey, children }) => {
   const [state, setState] = React.useState<ArcPayState>({
     status: "loading",
     instance: null,
@@ -26,7 +22,7 @@ export const ArcPayProvider: React.FC<ArcPayProviderProps> = ({
 
   React.useEffect(() => {
     let canceled = false;
-    ArcPay.load(publishableKey, { apiBase })
+    ArcPay.load(publishableKey)
       .then((instance) => {
         if (!canceled) setState({ status: "ready", instance, error: null });
       })
@@ -41,7 +37,7 @@ export const ArcPayProvider: React.FC<ArcPayProviderProps> = ({
     return () => {
       canceled = true;
     };
-  }, [publishableKey, apiBase]);
+  }, [publishableKey]);
 
   return <Ctx.Provider value={state}>{children}</Ctx.Provider>;
 };

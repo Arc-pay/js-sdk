@@ -4,11 +4,11 @@ import { ArcPay } from "../../src/core/arcpay";
 describe("ArcPay.load", () => {
   beforeEach(() => ArcPay.__resetForTests());
 
-  it("returns instance with environment and apiBase populated", async () => {
+  it("returns instance with environment populated", async () => {
     const inst = await ArcPay.load("pk_test_abc");
     expect(inst.publishableKey).toBe("pk_test_abc");
     expect(inst.environment).toBe("sandbox");
-    expect(inst.apiBase).toBe("https://api.arcpay.space");
+    expect("apiBase" in inst).toBe(false);
     expect("client" in inst).toBe(false);
   });
 
@@ -26,10 +26,5 @@ describe("ArcPay.load", () => {
 
   it("throws on invalid key (sk_*)", async () => {
     await expect(ArcPay.load("sk_test_x")).rejects.toThrow(/publishable key/i);
-  });
-
-  it("accepts custom apiBase via options", async () => {
-    const inst = await ArcPay.load("pk_test_abc", { apiBase: "https://api.example.test" });
-    expect(inst.apiBase).toBe("https://api.example.test");
   });
 });

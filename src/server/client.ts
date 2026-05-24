@@ -2,6 +2,7 @@ import { ArcPayError, type ArcPayErrorType } from "../core/errors";
 import type {
   AvailablePaymentMethod,
   CaptureRequest,
+  ChargeSavedCardRequest,
   CheckoutSession,
   CompleteThreeDSMethodRequest,
   CreateCheckoutSessionRequest,
@@ -23,6 +24,7 @@ export type {
   AvailablePaymentMethod,
   CaptureMode,
   CaptureRequest,
+  ChargeSavedCardRequest,
   CheckoutSession,
   CompleteThreeDSMethodRequest,
   CreateCheckoutSessionRequest,
@@ -259,6 +261,17 @@ export class ArcPayClient {
     );
   }
 
+  async chargeSavedCard(
+    body: ChargeSavedCardRequest,
+    opts: IdempotencyOptions,
+  ): Promise<ExecutePaymentResponse>;
+  async chargeSavedCard(
+    body: ChargeSavedCardRequest,
+    opts: RequestOptionsInput,
+  ): Promise<ExecutePaymentResponse> {
+    return this.request<ExecutePaymentResponse>("POST", "/payments/saved-card", body, opts, true);
+  }
+
   async executePayment(
     paymentId: string,
     body: ExecutePaymentRequest,
@@ -308,6 +321,14 @@ export class ArcPayClient {
     return this.request<Link>("POST", "/links", body, opts, true);
   }
 
+  async getLink(linkId: string, opts: RequestOptions = {}): Promise<Link> {
+    return this.request<Link>("GET", `/links/${encodeURIComponent(linkId)}`, undefined, opts);
+  }
+
+  async cancelLink(linkId: string, opts: RequestOptions = {}): Promise<Link> {
+    return this.request<Link>("DELETE", `/links/${encodeURIComponent(linkId)}`, undefined, opts);
+  }
+
   async createCheckoutSession(
     body: CreateCheckoutSessionRequest,
     opts: IdempotencyOptions,
@@ -320,7 +341,7 @@ export class ArcPayClient {
   }
 
   private async request<T>(
-    method: "GET" | "POST",
+    method: "GET" | "POST" | "DELETE",
     path: string,
     body: unknown,
     opts: RequestOptionsInput = undefined,

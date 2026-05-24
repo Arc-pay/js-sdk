@@ -11,6 +11,7 @@ export type {
   Refund,
   Link,
   CheckoutSession,
+  ChargeSavedCardRequest,
   CreatePaymentRequest,
   CaptureRequest,
   VoidRequest,

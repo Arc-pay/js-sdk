@@ -13,15 +13,14 @@ npm install @thavguard/arc-pay
 ```ts
 import { ArcPay } from "@thavguard/arc-pay/js";
 
-const arcpay = await ArcPay.load("pk_test_...", {
-  apiBase: "https://api.arcpay.space",
-});
+const arcpay = await ArcPay.load("pk_test_...");
 const elements = arcpay.elements();
 ```
 
 `ArcPay.load()` takes the publishable key as the first argument. Sandbox/live is
-inferred from the key prefix (`pk_test_` or `pk_live_`); pass `apiBase` only when
-testing against a non-default API host.
+inferred from the key prefix (`pk_test_` or `pk_live_`). Hosted Fields are served
+from `https://sdk.arcpay.space` and tokenize against the Arc Pay public API
+configured for that iframe app.
 
 ## React Bindings
 
@@ -58,7 +57,12 @@ may use either `Authorization: Bearer <pk_...>` or `X-Api-Key: pk_...` for
 `@thavguard/arc-pay/server` intentionally does not expose `tokenizeCard()`.
 Tokenization belongs to Hosted Fields or direct browser calls with a
 publishable key. Keep `sk_*` keys on your backend for payment creation,
-execution, capture, void, and refund operations.
+execution, capture, void, refund, saved-card charges, payment links, and
+checkout sessions.
+
+The server client accepts an optional `apiBase` only for local or isolated test
+environments. Production integrations should use the default
+`https://api.arcpay.space/v1`; sandbox/live is selected by the key prefix.
 
 ## License
 

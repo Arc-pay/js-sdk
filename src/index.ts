@@ -15,7 +15,7 @@ export type { ArcPayErrorType } from "./core/errors";
 export type { Environment } from "./core/env";
 export type { TokenizeResult } from "./tokenize/tokenize";
 export type { CardScheme } from "./tokenize/scheme";
-export const SDK_VERSION = "0.1.0";
+export const SDK_VERSION = "0.1.1";
 
 // Hosted Fields postMessage protocol
 export type {

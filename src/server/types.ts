@@ -76,6 +76,8 @@ export interface CreatePaymentRequest {
   payment_method: PaymentMethod;
   external_id: string;
   capture_mode: CaptureMode;
+  save_card?: boolean;
+  customer_id?: string;
   description?: string;
   success_url?: string;
   fail_url?: string;
@@ -148,6 +150,22 @@ export interface ExecutePaymentResponse {
   decline_message?: string;
 }
 
+export interface ChargeSavedCardRequest {
+  amount: number;
+  currency: Currency;
+  card_token_id: string;
+  customer_id: string;
+  external_id?: string;
+  description?: string;
+  metadata?: Record<string, string>;
+  fiscal_items?: {
+    name: string;
+    quantity: number;
+    unit_price: number;
+    vat_rate: "no_vat" | "vat0" | "vat10" | "vat20";
+  }[];
+}
+
 export interface CompleteThreeDSMethodRequest {
   completion_indicator: "Y" | "N" | "U";
   three_ds_server_trans_id: string;
@@ -158,8 +176,13 @@ export interface AvailablePaymentMethod {
   payment_mode: PaymentFlowMode;
   display_name: string;
   is_active: boolean;
+  unavailable_reason?: string;
   icon_url?: string;
-  supported_operations?: PaymentOperation[];
+  supported_currencies?: Currency[];
+  supported_countries?: string[];
+  min_amount?: number;
+  max_amount?: number;
+  sandbox_requirements?: string;
 }
 
 export interface CreateLinkRequest {
@@ -171,6 +194,7 @@ export interface CreateLinkRequest {
   max_uses?: number;
   expires_at?: string;
   customer_name?: string;
+  customer_id?: string;
   customer_email?: string;
   due_date?: string;
   redirect_url?: string;
@@ -216,6 +240,7 @@ export interface Link {
   uses_count?: number;
   expires_at?: string;
   customer_name?: string;
+  customer_id?: string;
   customer_email?: string;
   due_date?: string;
   external_order_id?: string;
@@ -257,6 +282,7 @@ export interface CreateCheckoutSessionRequest {
   fail_url?: string;
   cancel_url?: string;
   customer_email?: string;
+  customer_id?: string;
   external_id?: string;
   metadata?: Record<string, string>;
   autocompletion_date?: string;
