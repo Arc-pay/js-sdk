@@ -138,6 +138,12 @@ const isPublicErrorType = (value: unknown): value is ArcPayErrorType =>
   value === "rate_limit_error" ||
   value === "api_error";
 
+const isRetryableError = (type: ArcPayErrorType, status: number, code?: string): boolean => {
+  if (type === "rate_limit_error") return true;
+  if (code === "timeout") return false;
+  return type === "api_error" && status >= 500;
+};
+
 const parseErrorResponse = async (res: Response): Promise<ArcPayError> => {
   let body: APIErrorBody = {};
   try {
@@ -158,7 +164,7 @@ const parseErrorResponse = async (res: Response): Promise<ArcPayError> => {
     param: detail.param,
     requestId: detail.request_id,
     declineCode: detail.decline_code,
-    retryable: type === "api_error" || type === "rate_limit_error",
+    retryable: isRetryableError(type, res.status, detail.code),
   });
 };
 

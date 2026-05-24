@@ -219,6 +219,34 @@ describe("server ArcPayClient", () => {
     });
   });
 
+  it("marks payment timeout responses as non-retryable", async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: {
+            type: "api_error",
+            code: "timeout",
+            message: "processing timeout; poll payment status",
+            request_id: "req_timeout",
+          },
+        }),
+        { status: 504, headers: { "content-type": "application/json" } },
+      ),
+    );
+    const client = new ArcPayClient({
+      secretKey: "sk_test_x",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+
+    await expect(
+      client.executePayment("pay_1", { card_token_id: "tok_1" }, { idempotencyKey: "exec-1" }),
+    ).rejects.toMatchObject({
+      type: "api_error",
+      code: "timeout",
+      retryable: false,
+    });
+  });
+
   it("creates a checkout session with an idempotency key", async () => {
     fetchMock.mockResolvedValue(
       ok({
