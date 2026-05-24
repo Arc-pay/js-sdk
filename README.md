@@ -62,6 +62,12 @@ controls before live traffic. Keep `sk_*` keys on your backend for payment
 creation, execution, capture, void, refund, saved-card charges, payment links,
 and checkout sessions.
 
+Mutating server-client methods require an explicit `{ idempotencyKey }`:
+`createPayment`, `executePayment`, `capturePayment`, `voidPayment`,
+`createRefund`, `chargeSavedCard`, `createLink`, and
+`createCheckoutSession`. Missing idempotency raises `ArcPayError` with
+`code="missing_idempotency_key"` before any HTTP request is sent.
+
 The server client accepts an optional `apiBase` only for local or isolated test
 environments. Production integrations should use the default
 `https://api.arcpay.space/v1`; sandbox/live is selected by the key prefix.

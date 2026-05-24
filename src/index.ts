@@ -15,7 +15,7 @@ export type { ArcPayErrorType } from "./core/errors";
 export type { Environment } from "./core/env";
 export type { TokenizeResult } from "./tokenize/tokenize";
 export type { CardScheme } from "./tokenize/scheme";
-export const SDK_VERSION = "0.1.2";
+export const SDK_VERSION = "0.1.3";
 
 export type { FieldType } from "./elements/postmessage";
 export type { ElementOptions, ElementEvent } from "./elements/element";
