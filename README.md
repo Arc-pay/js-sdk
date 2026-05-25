@@ -68,6 +68,12 @@ Mutating server-client methods require an explicit `{ idempotencyKey }`:
 `createCheckoutSession`. Missing idempotency raises `ArcPayError` with
 `code="missing_idempotency_key"` before any HTTP request is sent.
 
+H2H card payments require HTTPS `success_url` and `fail_url` on
+`createPayment`. Arc Pay stores those URLs on the payment and redirects the
+buyer back to the stored merchant URL after ACS authentication. Treat the browser
+return as navigation only; confirm the final status through webhooks or
+`GET /payments/{id}`.
+
 H2H card execution returns a standardized `next_action` when the buyer must do
 something in the browser. The SDK helper turns that action into the POST form
 descriptor you render in a hidden iframe or visible browser page:

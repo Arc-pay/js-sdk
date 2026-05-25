@@ -79,8 +79,8 @@ export interface CreatePaymentRequest {
   save_card?: boolean;
   customer_id?: string;
   description?: string;
-  success_url?: string;
-  fail_url?: string;
+  success_url: string;
+  fail_url: string;
   callback_url?: string;
   customer_email?: string;
   customer_phone?: string;
