@@ -15,9 +15,15 @@ export type { ArcPayErrorType } from "./core/errors";
 export type { Environment } from "./core/env";
 export type { TokenizeResult } from "./tokenize/tokenize";
 export type { CardScheme } from "./tokenize/scheme";
-export { buildThreeDSBrowserForm, getThreeDSAction } from "./three-ds";
+export {
+  buildThreeDSAutoSubmitHtml,
+  buildThreeDSBrowserForm,
+  getThreeDSAction,
+  isThreeDSChallengeAction,
+  isThreeDSMethodAction,
+} from "./three-ds";
 export type { BrowserFormField, BrowserPostForm, ThreeDSAction } from "./three-ds";
-export const SDK_VERSION = "0.1.6";
+export const SDK_VERSION = "0.1.8";
 
 export type { FieldType } from "./elements/postmessage";
 export type { ElementOptions, ElementEvent } from "./elements/element";

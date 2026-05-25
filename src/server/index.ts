@@ -25,5 +25,11 @@ export type {
   ListPaymentsQuery,
   ListAvailablePaymentMethodsQuery,
 } from "./client";
-export { buildThreeDSBrowserForm, getThreeDSAction } from "../three-ds";
+export {
+  buildThreeDSAutoSubmitHtml,
+  buildThreeDSBrowserForm,
+  getThreeDSAction,
+  isThreeDSChallengeAction,
+  isThreeDSMethodAction,
+} from "../three-ds";
 export type { BrowserFormField, BrowserPostForm, ThreeDSAction } from "../three-ds";
