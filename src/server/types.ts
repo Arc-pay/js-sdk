@@ -137,17 +137,25 @@ export interface ExecutePaymentResponse {
   qr_content_type?: "image/png" | "image/svg+xml" | string;
   qr_expires_at?: string;
   liability_shifted?: boolean;
-  requires_3ds?: boolean;
-  acs_url?: string;
-  c_req?: string;
-  pa_req?: string;
-  md?: string;
-  term_url?: string;
-  three_ds_method_url?: string;
-  three_ds_method_data?: string;
-  three_ds_server_trans_id?: string;
+  next_action?: PaymentNextAction;
   decline_code?: string;
   decline_message?: string;
+}
+
+export interface PaymentNextAction {
+  type: "three_ds_method" | "three_ds_challenge";
+  three_ds: {
+    version: "1" | "2";
+    phase: "method" | "challenge";
+    three_ds_server_trans_id?: string;
+    completion_endpoint?: string;
+    submit: {
+      method: "POST";
+      url: string;
+      target: "hidden_iframe" | "browser";
+      fields: { name: string; value: string }[];
+    };
+  };
 }
 
 export interface ChargeSavedCardRequest {

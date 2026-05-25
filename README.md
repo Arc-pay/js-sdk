@@ -68,6 +68,27 @@ Mutating server-client methods require an explicit `{ idempotencyKey }`:
 `createCheckoutSession`. Missing idempotency raises `ArcPayError` with
 `code="missing_idempotency_key"` before any HTTP request is sent.
 
+H2H card execution returns a standardized `next_action` when the buyer must do
+something in the browser. The SDK helper turns that action into the POST form
+descriptor you render in a hidden iframe or visible browser page:
+
+```ts
+import { buildThreeDSBrowserForm, getThreeDSAction } from "@thavguard/arc-pay/server";
+
+const result = await client.executePayment(paymentId, body, { idempotencyKey });
+const action = getThreeDSAction(result.next_action);
+
+if (action) {
+  const form = buildThreeDSBrowserForm(action);
+  // Render POST form using form.action, form.method, form.target, form.fields.
+  // For action.type === "three_ds_method", call completeThreeDSMethod from your
+  // backend after the hidden iframe finishes or times out.
+}
+```
+
+Do not branch on bank-specific 3DS fields. Arc Pay normalizes 3DS 1.x and 2.x
+into `next_action.three_ds.submit`.
+
 The server client accepts an optional `apiBase` only for local or isolated test
 environments. Production integrations should use the default
 `https://api.arcpay.space/v1`; sandbox/live is selected by the key prefix.

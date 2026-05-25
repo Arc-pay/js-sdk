@@ -18,9 +18,15 @@ export type {
   CreateRefundRequest,
   ExecutePaymentRequest,
   ExecutePaymentResponse,
+  PaymentNextAction,
   CompleteThreeDSMethodRequest,
   CreateLinkRequest,
   CreateCheckoutSessionRequest,
   ListPaymentsQuery,
   ListAvailablePaymentMethodsQuery,
 } from "./client";
+export {
+  buildThreeDSBrowserForm,
+  getThreeDSAction,
+} from "../three-ds";
+export type { BrowserFormField, BrowserPostForm, ThreeDSAction } from "../three-ds";
