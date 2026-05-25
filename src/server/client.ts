@@ -16,6 +16,7 @@ import type {
   ListPaymentsQuery,
   Payment,
   PaymentList,
+  PaymentNextAction,
   Refund,
   VoidRequest,
 } from "./types";
@@ -34,6 +35,7 @@ export type {
   Currency,
   ExecutePaymentRequest,
   ExecutePaymentResponse,
+  PaymentNextAction,
   Link,
   ListAvailablePaymentMethodsQuery,
   ListPaymentsQuery,
