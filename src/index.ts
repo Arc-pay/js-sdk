@@ -20,7 +20,7 @@ export {
   getThreeDSAction,
 } from "./three-ds";
 export type { BrowserFormField, BrowserPostForm, ThreeDSAction } from "./three-ds";
-export const SDK_VERSION = "0.1.5";
+export const SDK_VERSION = "0.1.6";
 
 export type { FieldType } from "./elements/postmessage";
 export type { ElementOptions, ElementEvent } from "./elements/element";
