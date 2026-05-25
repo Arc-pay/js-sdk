@@ -2,10 +2,27 @@
 <html>
   <body>
     <script>
+      let parentOrigin = "";
+
+      function verifiedParentOrigin(event, data) {
+        if (typeof data.origin !== "string") return "";
+        const requestedOrigin = new URL(data.origin).origin;
+        if (
+          event.origin !== requestedOrigin &&
+          event.origin !== window.location.origin &&
+          event.origin !== "null"
+        ) {
+          return "";
+        }
+        return requestedOrigin;
+      }
+
       window.addEventListener("message", (event) => {
         const data = event.data || {};
         if (data.type === "arcpay:hello") {
-          window.parent.postMessage({ type: "arcpay:ready" }, data.origin);
+          parentOrigin = verifiedParentOrigin(event, data);
+          if (!parentOrigin) return;
+          window.parent.postMessage({ type: "arcpay:ready" }, parentOrigin);
         }
       });
     </script>

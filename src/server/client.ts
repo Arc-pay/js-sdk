@@ -86,7 +86,13 @@ function validateSecretKey(key: unknown): asserts key is string {
   }
 }
 
-const normalizeBase = (base: string): string => base.replace(/\/+$/, "");
+const normalizeBase = (base: string): string => {
+  let end = base.length;
+  while (end > 0 && base.charCodeAt(end - 1) === 47) {
+    end -= 1;
+  }
+  return base.slice(0, end);
+};
 
 interface RequestOptionsWithOptionalIdempotency extends RequestOptions {
   idempotencyKey?: string;

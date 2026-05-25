@@ -66,16 +66,16 @@ describe("server ArcPayClient", () => {
       apiBase: "https://api.example.test/v1",
       fetch: fetchMock as unknown as typeof fetch,
     });
-    if (false) {
+    const createPaymentWithoutIdempotencyOptions = () =>
       // @ts-expect-error idempotency options are required at compile time.
-      void idempotentClient.createPayment({
+      idempotentClient.createPayment({
         amount: 10000,
         currency: "RUB",
         payment_method: "bank_card",
         external_id: "order-typecheck",
         capture_mode: "one_stage",
       });
-    }
+    void createPaymentWithoutIdempotencyOptions;
 
     const requiredMethods = [
       {

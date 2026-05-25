@@ -4,15 +4,30 @@
     <script>
       let parentOrigin = "";
 
+      function verifiedParentOrigin(event, data) {
+        if (typeof data.origin !== "string") return "";
+        const requestedOrigin = new URL(data.origin).origin;
+        if (
+          event.origin !== requestedOrigin &&
+          event.origin !== window.location.origin &&
+          event.origin !== "null"
+        ) {
+          return "";
+        }
+        return requestedOrigin;
+      }
+
       window.addEventListener("message", (event) => {
         const data = event.data || {};
         if (data.type === "arcpay:hello") {
-          parentOrigin = data.origin;
+          parentOrigin = verifiedParentOrigin(event, data);
+          if (!parentOrigin) return;
           window.parent.postMessage({ type: "arcpay:ready" }, parentOrigin);
           return;
         }
 
         if (data.type === "arcpay:tokenize") {
+          if (!parentOrigin || event.origin !== window.location.origin) return;
           window.parent.postMessage(
             {
               type: "arcpay:tokenize-result",
