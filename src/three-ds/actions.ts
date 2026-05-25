@@ -1,6 +1,8 @@
 import type { PaymentNextAction } from "../server/types";
+import type { ExecutePaymentRequest } from "../server/types";
 
 export type ThreeDSAction = PaymentNextAction;
+export type BrowserInfo = ExecutePaymentRequest["browser_info"];
 
 export interface BrowserFormField {
   name: string;
@@ -13,6 +15,44 @@ export interface BrowserPostForm {
   target: "hidden_iframe" | "browser";
   fields: BrowserFormField[];
 }
+
+const supportedColorDepths = [1, 4, 8, 15, 16, 24, 32, 48] as const;
+
+const normalizeColorDepth = (value: number): BrowserInfo["color_depth"] =>
+  supportedColorDepths.includes(value as BrowserInfo["color_depth"])
+    ? (value as BrowserInfo["color_depth"])
+    : 24;
+
+const resolveWindowSize = (width: number): NonNullable<BrowserInfo["window_size"]> => {
+  if (width >= 1000) return "05";
+  if (width >= 600) return "04";
+  if (width >= 500) return "03";
+  if (width >= 390) return "02";
+  return "01";
+};
+
+export const collectBrowserInfo = (
+  acceptHeader = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+): BrowserInfo => {
+  if (
+    typeof window === "undefined" ||
+    typeof navigator === "undefined" ||
+    typeof screen === "undefined"
+  ) {
+    throw new Error("collectBrowserInfo must be called in a browser environment");
+  }
+  return {
+    accept_header: acceptHeader,
+    language: navigator.language || "en",
+    screen_width: screen.width,
+    screen_height: screen.height,
+    color_depth: normalizeColorDepth(screen.colorDepth),
+    timezone_offset_minutes: new Date().getTimezoneOffset(),
+    java_enabled: false,
+    user_agent: navigator.userAgent,
+    window_size: resolveWindowSize(window.innerWidth || screen.width),
+  };
+};
 
 export const getThreeDSAction = (nextAction?: PaymentNextAction): PaymentNextAction | null => {
   return nextAction ?? null;

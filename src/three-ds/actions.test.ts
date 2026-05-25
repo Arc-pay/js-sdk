@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildThreeDSAutoSubmitHtml,
   buildThreeDSBrowserForm,
+  collectBrowserInfo,
   isThreeDSChallengeAction,
   isThreeDSMethodAction,
 } from "./actions";
@@ -61,5 +62,28 @@ describe("3DS helpers", () => {
     expect(html).toContain('name="threeDSMethodData"');
     expect(html).toContain('value="abc&amp;&lt;&gt;"');
     expect(html).toContain("document.forms[0].submit()");
+  });
+
+  it("collects normalized browser info", () => {
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024 });
+    Object.defineProperty(window.screen, "width", { configurable: true, value: 1440 });
+    Object.defineProperty(window.screen, "height", { configurable: true, value: 900 });
+    Object.defineProperty(window.screen, "colorDepth", { configurable: true, value: 30 });
+    Object.defineProperty(window.navigator, "language", { configurable: true, value: "ru-RU" });
+    Object.defineProperty(window.navigator, "userAgent", {
+      configurable: true,
+      value: "test-agent",
+    });
+
+    expect(collectBrowserInfo("text/html")).toMatchObject({
+      accept_header: "text/html",
+      language: "ru-RU",
+      screen_width: 1440,
+      screen_height: 900,
+      color_depth: 24,
+      java_enabled: false,
+      user_agent: "test-agent",
+      window_size: "05",
+    });
   });
 });

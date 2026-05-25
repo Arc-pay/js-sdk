@@ -104,12 +104,23 @@ const normalizeRequestOptions = (
   opts: RequestOptionsInput,
 ): RequestOptionsWithOptionalIdempotency => opts ?? {};
 
+const IDEMPOTENCY_KEY_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 const requireIdempotencyKey = (opts: RequestOptionsWithOptionalIdempotency): string => {
   if (!opts.idempotencyKey) {
     throw new ArcPayError({
       type: "validation_error",
       code: "missing_idempotency_key",
       message: "idempotencyKey is required for this operation",
+      retryable: false,
+    });
+  }
+  if (!IDEMPOTENCY_KEY_RE.test(opts.idempotencyKey)) {
+    throw new ArcPayError({
+      type: "validation_error",
+      code: "invalid_idempotency_key",
+      message: "idempotencyKey must be a valid UUID",
       retryable: false,
     });
   }

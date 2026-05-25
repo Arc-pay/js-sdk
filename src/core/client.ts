@@ -45,7 +45,21 @@ const buildHeaders = (
     "X-Arc-Pay-API-Version": API_VERSION,
     "Content-Type": "application/json",
   };
-  if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
+  if (idempotencyKey) {
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        idempotencyKey,
+      )
+    ) {
+      throw new ArcPayError({
+        type: "validation_error",
+        code: "invalid_idempotency_key",
+        message: "idempotencyKey must be a valid UUID",
+        retryable: false,
+      });
+    }
+    headers["Idempotency-Key"] = idempotencyKey;
+  }
   return headers;
 };
 

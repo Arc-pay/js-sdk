@@ -2,6 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ArcPayClient, createArcPayClient } from "../../src/server";
 import { ArcPayError } from "../../src/core/errors";
 
+const IDEMPOTENCY_KEY = "018f2f6a-4f53-7b9b-8f7b-2f0d9f6f2a31";
+const CAPTURE_IDEMPOTENCY_KEY = "018f2f6a-4f53-7b9b-8f7b-2f0d9f6f2a32";
+const EXECUTE_IDEMPOTENCY_KEY = "018f2f6a-4f53-7b9b-8f7b-2f0d9f6f2a33";
+const CHECKOUT_IDEMPOTENCY_KEY = "018f2f6a-4f53-7b9b-8f7b-2f0d9f6f2a34";
+
 const ok = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), {
     status,
@@ -49,7 +54,7 @@ describe("server ArcPayClient", () => {
         external_id: "order-1",
         capture_mode: "one_stage",
       },
-      { idempotencyKey: "idem-1" },
+      { idempotencyKey: IDEMPOTENCY_KEY },
     );
 
     const [url, init] = fetchMock.mock.calls[0]!;
@@ -57,7 +62,7 @@ describe("server ArcPayClient", () => {
     expect(init.method).toBe("POST");
     expect(init.headers.Authorization).toBe("Bearer sk_test_x");
     expect(init.headers["X-Arc-Pay-API-Version"]).toBe("2026-05-06");
-    expect(init.headers["Idempotency-Key"]).toBe("idem-1");
+    expect(init.headers["Idempotency-Key"]).toBe(IDEMPOTENCY_KEY);
   });
 
   it("validates required idempotency keys for mandatory operations", async () => {
@@ -167,6 +172,10 @@ describe("server ArcPayClient", () => {
         type: "validation_error",
         code: "missing_idempotency_key",
       });
+      await expect(method.invoke({ idempotencyKey: "not-a-uuid" })).rejects.toMatchObject({
+        type: "validation_error",
+        code: "invalid_idempotency_key",
+      });
     }
   });
 
@@ -211,7 +220,7 @@ describe("server ArcPayClient", () => {
     });
 
     await expect(
-      client.capturePayment("pay_1", {}, { idempotencyKey: "cap-1" }),
+      client.capturePayment("pay_1", {}, { idempotencyKey: CAPTURE_IDEMPOTENCY_KEY }),
     ).rejects.toMatchObject({
       type: "state_error",
       code: "invalid_state",
@@ -240,7 +249,7 @@ describe("server ArcPayClient", () => {
 
     await expect(
       client.executePayment("pay_1", { card_token_id: "tok_1" } as any, {
-        idempotencyKey: "exec-1",
+        idempotencyKey: EXECUTE_IDEMPOTENCY_KEY,
       }),
     ).rejects.toMatchObject({
       type: "api_error",
@@ -276,12 +285,12 @@ describe("server ArcPayClient", () => {
         success_url: "https://shop.example/success",
         fail_url: "https://shop.example/fail",
       },
-      { idempotencyKey: "checkout-1" },
+      { idempotencyKey: CHECKOUT_IDEMPOTENCY_KEY },
     );
 
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe("https://api.example.test/v1/checkout/sessions");
     expect(init.method).toBe("POST");
-    expect(init.headers["Idempotency-Key"]).toBe("checkout-1");
+    expect(init.headers["Idempotency-Key"]).toBe(CHECKOUT_IDEMPOTENCY_KEY);
   });
 });

@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createClient } from "../../src/core/client";
 import { ArcPayError } from "../../src/core/errors";
 
+const IDEMPOTENCY_KEY = "018f2f6a-4f53-7b9b-8f7b-2f0d9f6f2a31";
+
 const ok = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), {
     status,
@@ -36,10 +38,22 @@ describe("client", () => {
     await c.post(
       "/v1/payments/pay_123/execute",
       { card_token_id: "t" },
-      { idempotencyKey: "uuid-v7-here" },
+      { idempotencyKey: IDEMPOTENCY_KEY },
     );
     const [, init] = fetchMock.mock.calls[0]!;
-    expect(init.headers["Idempotency-Key"]).toBe("uuid-v7-here");
+    expect(init.headers["Idempotency-Key"]).toBe(IDEMPOTENCY_KEY);
+  });
+
+  it("rejects non-UUID idempotency keys before sending", async () => {
+    const c = createClient({ apiBase: "https://api.arcpay.space", publishableKey: "pk_test_x" });
+
+    await expect(
+      c.post("/v1/payments/pay_123/execute", {}, { idempotencyKey: "exec-1" }),
+    ).rejects.toMatchObject({
+      type: "validation_error",
+      code: "invalid_idempotency_key",
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("parses RFC 7807-shaped error into ArcPayError", async () => {
