@@ -239,11 +239,18 @@ describe("server ArcPayClient", () => {
     });
 
     await expect(
-      client.executePayment("pay_1", { card_token_id: "tok_1" }, { idempotencyKey: "exec-1" }),
+      client.executePayment("pay_1", { card_token_id: "tok_1" } as any, {
+        idempotencyKey: "exec-1",
+      }),
     ).rejects.toMatchObject({
       type: "api_error",
       code: "timeout",
       retryable: false,
+    });
+    const [, init] = fetchMock.mock.calls[0]!;
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      card_token_id: "tok_1",
+      payment_mode: "h2h",
     });
   });
 

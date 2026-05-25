@@ -114,6 +114,27 @@ const requireIdempotencyKey = (opts: RequestOptionsWithOptionalIdempotency): str
   return opts.idempotencyKey;
 };
 
+const normalizeExecutePaymentRequest = (body: ExecutePaymentRequest): ExecutePaymentRequest => {
+  if (!body || !body.card_token_id) {
+    throw new ArcPayError({
+      type: "validation_error",
+      code: "missing_card_token_id",
+      message: "card_token_id is required",
+      retryable: false,
+    });
+  }
+  const paymentMode = body.payment_mode ?? "h2h";
+  if (paymentMode !== "h2h") {
+    throw new ArcPayError({
+      type: "validation_error",
+      code: "invalid_payment_mode",
+      message: "payment_mode must be h2h for executePayment",
+      retryable: false,
+    });
+  }
+  return { ...body, payment_mode: paymentMode };
+};
+
 const appendQuery = (path: string, query?: object): string => {
   if (!query) return path;
   const params = new URLSearchParams();
@@ -294,10 +315,11 @@ export class ArcPayClient {
     body: ExecutePaymentRequest,
     opts: RequestOptionsInput,
   ): Promise<ExecutePaymentResponse> {
+    const requestBody = normalizeExecutePaymentRequest(body);
     return this.request<ExecutePaymentResponse>(
       "POST",
       `/payments/${encodeURIComponent(paymentId)}/execute`,
-      body,
+      requestBody,
       opts,
       true,
     );
