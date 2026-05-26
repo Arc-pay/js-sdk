@@ -70,6 +70,18 @@ export interface PaymentList {
   page_size: number;
 }
 
+export type FiscalVatRate = "no_vat" | "vat0" | "vat10" | "vat110" | "vat120" | "vat20";
+
+export interface FiscalItem {
+  name: string;
+  quantity: string;
+  unit_price: number;
+  vat_rate: FiscalVatRate;
+  payment_object: string;
+  payment_method: string;
+  measure: string;
+}
+
 export interface CreatePaymentRequest {
   amount: number;
   currency: Currency;
@@ -84,7 +96,9 @@ export interface CreatePaymentRequest {
   callback_url?: string;
   customer_email?: string;
   customer_phone?: string;
+  merchant_inn?: string;
   metadata?: Record<string, string>;
+  fiscal_items?: FiscalItem[];
 }
 
 export interface CreateCardSetupRequest {
@@ -177,12 +191,8 @@ export interface ChargeSavedCardRequest {
   external_id?: string;
   description?: string;
   metadata?: Record<string, string>;
-  fiscal_items?: {
-    name: string;
-    quantity: number;
-    unit_price: number;
-    vat_rate: "no_vat" | "vat0" | "vat10" | "vat20";
-  }[];
+  merchant_inn?: string;
+  fiscal_items?: FiscalItem[];
 }
 
 export interface CompleteThreeDSMethodRequest {
