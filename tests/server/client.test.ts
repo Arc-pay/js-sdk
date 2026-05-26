@@ -65,6 +65,40 @@ describe("server ArcPayClient", () => {
     expect(init.headers["Idempotency-Key"]).toBe(IDEMPOTENCY_KEY);
   });
 
+  it("creates a card setup intent", async () => {
+    fetchMock.mockResolvedValue(
+      ok({
+        id: "11111111-1111-1111-1111-111111111112",
+        amount: 0,
+        currency: "RUB",
+        payment_method: "bank_card",
+        status: "created",
+        created_at: "2026-05-12T09:00:00Z",
+        updated_at: "2026-05-12T09:00:00Z",
+      }),
+    );
+    const client = new ArcPayClient({
+      secretKey: "sk_test_x",
+      apiBase: "https://api.example.test/v1/",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+
+    await client.createCardSetup(
+      {
+        currency: "RUB",
+        customer_id: "cust-42",
+        success_url: "https://merchant.example.com/success",
+        fail_url: "https://merchant.example.com/fail",
+      },
+      { idempotencyKey: IDEMPOTENCY_KEY },
+    );
+
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe("https://api.example.test/v1/cards/setup");
+    expect(init.method).toBe("POST");
+    expect(init.headers["Idempotency-Key"]).toBe(IDEMPOTENCY_KEY);
+  });
+
   it("validates required idempotency keys for mandatory operations", async () => {
     const idempotentClient = new ArcPayClient({
       secretKey: "sk_test_x",
@@ -93,6 +127,19 @@ describe("server ArcPayClient", () => {
               payment_method: "bank_card",
               external_id: "order-1",
               capture_mode: "one_stage",
+            },
+            opts as any,
+          ),
+      },
+      {
+        name: "createCardSetup",
+        invoke: (opts: unknown) =>
+          idempotentClient.createCardSetup(
+            {
+              currency: "RUB",
+              customer_id: "cust-42",
+              success_url: "https://merchant.example.com/success",
+              fail_url: "https://merchant.example.com/fail",
             },
             opts as any,
           ),

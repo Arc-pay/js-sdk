@@ -87,6 +87,16 @@ export interface CreatePaymentRequest {
   metadata?: Record<string, string>;
 }
 
+export interface CreateCardSetupRequest {
+  currency: Currency;
+  customer_id: string;
+  external_id?: string;
+  success_url: string;
+  fail_url: string;
+  callback_url?: string;
+  metadata?: Record<string, string>;
+}
+
 export interface CaptureRequest {
   amount?: number;
 }
@@ -137,6 +147,7 @@ export interface ExecutePaymentResponse {
   qr_content_type?: "image/png" | "image/svg+xml" | string;
   qr_expires_at?: string;
   liability_shifted?: boolean;
+  card_token_id?: string;
   next_action?: PaymentNextAction;
   decline_code?: string;
   decline_message?: string;

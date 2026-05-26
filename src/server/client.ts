@@ -6,6 +6,7 @@ import type {
   CheckoutSession,
   CompleteThreeDSMethodRequest,
   CreateCheckoutSessionRequest,
+  CreateCardSetupRequest,
   CreateLinkRequest,
   CreatePaymentRequest,
   CreateRefundRequest,
@@ -29,6 +30,7 @@ export type {
   CheckoutSession,
   CompleteThreeDSMethodRequest,
   CreateCheckoutSessionRequest,
+  CreateCardSetupRequest,
   CreateLinkRequest,
   CreatePaymentRequest,
   CreateRefundRequest,
@@ -239,6 +241,11 @@ export class ArcPayClient {
   async createPayment(body: CreatePaymentRequest, opts: IdempotencyOptions): Promise<Payment>;
   async createPayment(body: CreatePaymentRequest, opts: RequestOptionsInput): Promise<Payment> {
     return this.request<Payment>("POST", "/payments", body, opts, true);
+  }
+
+  async createCardSetup(body: CreateCardSetupRequest, opts: IdempotencyOptions): Promise<Payment>;
+  async createCardSetup(body: CreateCardSetupRequest, opts: RequestOptionsInput): Promise<Payment> {
+    return this.request<Payment>("POST", "/cards/setup", body, opts, true);
   }
 
   async getPayment(paymentId: string, opts: RequestOptions = {}): Promise<Payment> {
