@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildThreeDSBrowserForm, getThreeDSAction } from "../../src/three-ds";
+import {
+  buildThreeDSBrowserForm,
+  buildThreeDSBrowserStep,
+  buildThreeDSMethodCompletion,
+  getThreeDSAction,
+} from "../../src/three-ds";
 import type { PaymentNextAction } from "../../src/server";
 
 describe("3DS next action helpers", () => {
@@ -30,6 +35,22 @@ describe("3DS next action helpers", () => {
       method: "POST",
       target: "hidden_iframe",
       fields: [{ name: "threeDSMethodData", value: "method-data" }],
+    });
+    expect(buildThreeDSBrowserStep(action)).toEqual({
+      kind: "method",
+      protocolVersion: "2",
+      completionEndpoint: "/v1/payments/pay_1/complete-3ds-method",
+      threeDSServerTransId: "trans-id",
+      form: {
+        action: "https://method.bank.example",
+        method: "POST",
+        target: "hidden_iframe",
+        fields: [{ name: "threeDSMethodData", value: "method-data" }],
+      },
+    });
+    expect(buildThreeDSMethodCompletion(action, "N")).toEqual({
+      completion_indicator: "N",
+      three_ds_server_trans_id: "trans-id",
     });
   });
 

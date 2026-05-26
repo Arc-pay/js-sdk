@@ -19,7 +19,9 @@ import type {
   PaymentList,
   PaymentNextAction,
   Refund,
+  TerminalPaymentStatus,
   VoidRequest,
+  WaitForPaymentOptions,
 } from "./types";
 
 export type {
@@ -46,8 +48,10 @@ export type {
   PaymentList,
   PaymentMethod,
   PaymentStatus,
+  TerminalPaymentStatus,
   Refund,
   VoidRequest,
+  WaitForPaymentOptions,
 } from "./types";
 
 export interface ArcPayClientOptions {
@@ -69,6 +73,19 @@ export interface RequestOptions {
 
 const DEFAULT_API_BASE = "https://api.arcpay.space/v1";
 const API_VERSION = "2026-05-06";
+const DEFAULT_POLL_INTERVAL_MS = 1500;
+const DEFAULT_POLL_TIMEOUT_MS = 60_000;
+const DEFAULT_TERMINAL_PAYMENT_STATUSES: readonly TerminalPaymentStatus[] = [
+  "authorized",
+  "captured",
+  "settled",
+  "voided",
+  "expired",
+  "refunded",
+  "chargeback",
+  "declined",
+  "failed",
+];
 
 function validateSecretKey(key: unknown): asserts key is string {
   if (typeof key !== "string" || key.length === 0) {
@@ -159,6 +176,36 @@ const appendQuery = (path: string, query?: object): string => {
   }
   const encoded = params.toString();
   return encoded ? `${path}?${encoded}` : path;
+};
+
+const sleep = (ms: number, signal?: AbortSignal): Promise<void> =>
+  new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException("The operation was aborted", "AbortError"));
+      return;
+    }
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        reject(new DOMException("The operation was aborted", "AbortError"));
+      },
+      { once: true },
+    );
+  });
+
+const normalizePollMs = (value: number | undefined, fallback: number): number => {
+  if (value === undefined) return fallback;
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new ArcPayError({
+      type: "validation_error",
+      code: "invalid_poll_options",
+      message: "Polling intervals and timeouts must be positive finite numbers",
+      retryable: false,
+    });
+  }
+  return value;
 };
 
 interface APIErrorBody {
@@ -255,6 +302,32 @@ export class ArcPayClient {
       undefined,
       opts,
     );
+  }
+
+  async waitForPaymentTerminal(
+    paymentId: string,
+    opts: WaitForPaymentOptions = {},
+  ): Promise<Payment> {
+    const intervalMs = normalizePollMs(opts.intervalMs, DEFAULT_POLL_INTERVAL_MS);
+    const timeoutMs = normalizePollMs(opts.timeoutMs, DEFAULT_POLL_TIMEOUT_MS);
+    const terminalStatuses = new Set(opts.terminalStatuses ?? DEFAULT_TERMINAL_PAYMENT_STATUSES);
+    const startedAt = Date.now();
+
+    for (;;) {
+      const payment = await this.getPayment(paymentId, { signal: opts.signal });
+      if (terminalStatuses.has(payment.status as TerminalPaymentStatus)) {
+        return payment;
+      }
+      if (Date.now() - startedAt >= timeoutMs) {
+        throw new ArcPayError({
+          type: "api_error",
+          code: "payment_poll_timeout",
+          message: `Payment ${paymentId} did not reach a terminal status within ${timeoutMs}ms`,
+          retryable: true,
+        });
+      }
+      await sleep(intervalMs, opts.signal);
+    }
   }
 
   async capturePayment(

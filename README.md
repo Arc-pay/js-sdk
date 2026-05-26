@@ -63,7 +63,7 @@ creation, execution, capture, void, refund, saved-card charges, payment links,
 and checkout sessions.
 
 Mutating server-client methods require an explicit `{ idempotencyKey }`:
-`createPayment`, `executePayment`, `capturePayment`, `voidPayment`,
+`createPayment`, `createCardSetup`, `executePayment`, `capturePayment`, `voidPayment`,
 `createRefund`, `chargeSavedCard`, `createLink`, and
 `createCheckoutSession`. Missing idempotency raises `ArcPayError` with
 `code="missing_idempotency_key"` before any HTTP request is sent.
@@ -79,21 +79,39 @@ something in the browser. The SDK helper turns that action into the POST form
 descriptor you render in a hidden iframe or visible browser page:
 
 ```ts
-import { buildThreeDSBrowserForm, getThreeDSAction } from "@thavguard/arc-pay/server";
+import {
+  buildThreeDSBrowserStep,
+  buildThreeDSMethodCompletion,
+  getThreeDSAction,
+} from "@thavguard/arc-pay/server";
 
 const result = await client.executePayment(paymentId, body, { idempotencyKey });
 const action = getThreeDSAction(result.next_action);
 
 if (action) {
-  const form = buildThreeDSBrowserForm(action);
-  // Render POST form using form.action, form.method, form.target, form.fields.
-  // For action.type === "three_ds_method", call completeThreeDSMethod from your
-  // backend after the hidden iframe finishes or times out.
+  const step = buildThreeDSBrowserStep(action);
+  // Render step.form using form.action, form.method, form.target, form.fields.
+  // For step.kind === "method", call completeThreeDSMethod from your backend
+  // after the hidden iframe finishes or times out.
+  const completeBody = buildThreeDSMethodCompletion(action, "Y");
+  const afterMethod = await client.completeThreeDSMethod(paymentId, completeBody);
+  // If afterMethod.next_action is a challenge, render the returned browser step.
 }
 ```
 
 Do not branch on bank-specific 3DS fields. Arc Pay normalizes 3DS 1.x and 2.x
 into `next_action.three_ds.submit`.
+
+After the browser step redirects or the customer returns to your order page,
+use `waitForPaymentTerminal(paymentId)` or your own webhook/status loop. The
+helper polls `GET /payments/{id}` and stops at terminal Arc Pay statuses; it
+does not attempt to automate issuer ACS challenge pages.
+
+For saved cards and subscriptions, create a setup intent with
+`createCardSetup()`, tokenize through Hosted Fields, execute the setup payment,
+complete any returned 3DS browser step, and wait for a terminal payment that
+contains `card_token_id`. Later merchant-initiated charges use
+`chargeSavedCard()`.
 
 The server client accepts an optional `apiBase` only for local or isolated test
 environments. Production integrations should use the default

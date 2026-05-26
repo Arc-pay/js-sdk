@@ -16,6 +16,14 @@ export interface BrowserPostForm {
   fields: BrowserFormField[];
 }
 
+export interface ThreeDSBrowserStep {
+  kind: "method" | "challenge";
+  protocolVersion: "1" | "2";
+  form: BrowserPostForm;
+  completionEndpoint?: string;
+  threeDSServerTransId?: string;
+}
+
 const supportedColorDepths = [1, 4, 8, 15, 16, 24, 32, 48] as const;
 
 const normalizeColorDepth = (value: number): BrowserInfo["color_depth"] =>
@@ -72,6 +80,33 @@ export const buildThreeDSBrowserForm = (nextAction: PaymentNextAction): BrowserP
   target: nextAction.three_ds.submit.target,
   fields: nextAction.three_ds.submit.fields,
 });
+
+export const buildThreeDSBrowserStep = (
+  nextAction?: PaymentNextAction,
+): ThreeDSBrowserStep | null => {
+  const action = getThreeDSAction(nextAction);
+  if (!action) return null;
+  return {
+    kind: action.three_ds.phase,
+    protocolVersion: action.three_ds.version,
+    form: buildThreeDSBrowserForm(action),
+    completionEndpoint: action.three_ds.completion_endpoint,
+    threeDSServerTransId: action.three_ds.three_ds_server_trans_id,
+  };
+};
+
+export const buildThreeDSMethodCompletion = (
+  nextAction: PaymentNextAction,
+  completionIndicator: "Y" | "N" | "U" = "Y",
+): { completion_indicator: "Y" | "N" | "U"; three_ds_server_trans_id: string } => {
+  if (!isThreeDSMethodAction(nextAction) || !nextAction.three_ds.three_ds_server_trans_id) {
+    throw new Error("nextAction must be a three_ds_method action with three_ds_server_trans_id");
+  }
+  return {
+    completion_indicator: completionIndicator,
+    three_ds_server_trans_id: nextAction.three_ds.three_ds_server_trans_id,
+  };
+};
 
 const htmlEscape = (value: string): string =>
   value

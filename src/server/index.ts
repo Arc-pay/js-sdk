@@ -28,8 +28,15 @@ export type {
 export {
   buildThreeDSAutoSubmitHtml,
   buildThreeDSBrowserForm,
+  buildThreeDSBrowserStep,
+  buildThreeDSMethodCompletion,
   getThreeDSAction,
   isThreeDSChallengeAction,
   isThreeDSMethodAction,
 } from "../three-ds";
-export type { BrowserFormField, BrowserPostForm, ThreeDSAction } from "../three-ds";
+export type {
+  BrowserFormField,
+  BrowserPostForm,
+  ThreeDSAction,
+  ThreeDSBrowserStep,
+} from "../three-ds";

@@ -247,6 +247,46 @@ describe("server ArcPayClient", () => {
     expect(init.method).toBe("GET");
   });
 
+  it("polls payment status until a terminal state", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        ok({
+          id: "pay_1",
+          amount: 10000,
+          currency: "RUB",
+          payment_method: "bank_card",
+          status: "pending_3ds",
+          created_at: "2026-05-12T09:00:00Z",
+          updated_at: "2026-05-12T09:00:00Z",
+        }),
+      )
+      .mockResolvedValueOnce(
+        ok({
+          id: "pay_1",
+          amount: 10000,
+          currency: "RUB",
+          payment_method: "bank_card",
+          status: "captured",
+          created_at: "2026-05-12T09:00:00Z",
+          updated_at: "2026-05-12T09:00:02Z",
+        }),
+      );
+    const client = new ArcPayClient({
+      secretKey: "sk_live_x",
+      apiBase: "https://api.example.test/v1",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+
+    const payment = await client.waitForPaymentTerminal("pay_1", {
+      intervalMs: 1,
+      timeoutMs: 100,
+    });
+
+    expect(payment.status).toBe("captured");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.example.test/v1/payments/pay_1");
+  });
+
   it("maps public API error envelopes into ArcPayError", async () => {
     fetchMock.mockResolvedValue(
       new Response(

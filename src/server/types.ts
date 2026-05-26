@@ -32,6 +32,16 @@ export type PaymentStatus =
   | "timeout";
 
 export type PaymentOperation = "create" | "capture" | "refund" | "void" | "execute";
+export type TerminalPaymentStatus =
+  | "authorized"
+  | "captured"
+  | "settled"
+  | "voided"
+  | "expired"
+  | "refunded"
+  | "chargeback"
+  | "declined"
+  | "failed";
 
 export interface Payment {
   id: string;
@@ -198,6 +208,13 @@ export interface ChargeSavedCardRequest {
 export interface CompleteThreeDSMethodRequest {
   completion_indicator: "Y" | "N" | "U";
   three_ds_server_trans_id: string;
+}
+
+export interface WaitForPaymentOptions {
+  intervalMs?: number;
+  timeoutMs?: number;
+  terminalStatuses?: readonly TerminalPaymentStatus[];
+  signal?: AbortSignal;
 }
 
 export interface AvailablePaymentMethod {
