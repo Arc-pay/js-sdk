@@ -98,7 +98,6 @@ export interface CreatePaymentRequest {
   payment_method: PaymentMethod;
   external_id: string;
   capture_mode: CaptureMode;
-  save_card?: boolean;
   customer_id?: string;
   description?: string;
   success_url: string;
@@ -165,11 +164,6 @@ export interface ExecutePaymentResponse {
   status: "authorized" | "captured" | "pending" | "pending_3ds" | "failed" | "declined";
   authorized_amount?: number;
   payment_mode?: PaymentFlowMode;
-  redirect_url?: string;
-  qr_url?: string;
-  qr_image_base64?: string;
-  qr_content_type?: "image/png" | "image/svg+xml" | string;
-  qr_expires_at?: string;
   liability_shifted?: boolean;
   card_token_id?: string;
   next_action?: PaymentNextAction;

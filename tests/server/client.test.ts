@@ -99,6 +99,25 @@ describe("server ArcPayClient", () => {
     expect(init.headers["Idempotency-Key"]).toBe(IDEMPOTENCY_KEY);
   });
 
+  it("does not expose paid save_card in createPayment request typing", () => {
+    const request = {
+      amount: 10000,
+      currency: "RUB",
+      payment_method: "bank_card",
+      external_id: "order-card-setup",
+      capture_mode: "one_stage",
+      success_url: "https://merchant.example/success",
+      fail_url: "https://merchant.example/fail",
+    } satisfies Parameters<ArcPayClient["createPayment"]>[0];
+
+    // @ts-expect-error Saved-card setup is only POST /cards/setup.
+    const legacyRequest: Parameters<ArcPayClient["createPayment"]>[0] = {
+      ...request,
+      save_card: true,
+    };
+    expect(legacyRequest).toBeDefined();
+  });
+
   it("validates required idempotency keys for mandatory operations", async () => {
     const idempotentClient = new ArcPayClient({
       secretKey: "sk_test_x",
