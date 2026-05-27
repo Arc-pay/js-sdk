@@ -147,11 +147,19 @@ const requireIdempotencyKey = (opts: RequestOptionsWithOptionalIdempotency): str
 };
 
 const normalizeExecutePaymentRequest = (body: ExecutePaymentRequest): ExecutePaymentRequest => {
-  if (!body || !body.card_token_id) {
+  if (!body || !body.payment_method) {
+    throw new ArcPayError({
+      type: "validation_error",
+      code: "invalid_request",
+      message: "payment_method is required",
+      retryable: false,
+    });
+  }
+  if (body.payment_method === "bank_card" && !body.card_token_id) {
     throw new ArcPayError({
       type: "validation_error",
       code: "missing_card_token_id",
-      message: "card_token_id is required",
+      message: "card_token_id is required for bank_card executePayment",
       retryable: false,
     });
   }
@@ -163,6 +171,24 @@ const normalizeExecutePaymentRequest = (body: ExecutePaymentRequest): ExecutePay
       message: "payment_mode must be h2h for executePayment",
       retryable: false,
     });
+  }
+  if (body.payment_method !== "bank_card") {
+    if (!body.wallet_interaction) {
+      throw new ArcPayError({
+        type: "validation_error",
+        code: "invalid_request",
+        message: "wallet_interaction is required for wallet executePayment",
+        retryable: false,
+      });
+    }
+    if (body.wallet_interaction.provider !== body.payment_method) {
+      throw new ArcPayError({
+        type: "validation_error",
+        code: "invalid_request",
+        message: "wallet_interaction.provider must match payment_method",
+        retryable: false,
+      });
+    }
   }
   return { ...body, payment_mode: paymentMode };
 };

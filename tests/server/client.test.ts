@@ -210,6 +210,7 @@ describe("server ArcPayClient", () => {
           idempotentClient.executePayment(
             "pay_1",
             {
+              payment_method: "bank_card",
               card_token_id: "tok_1",
               payment_mode: "h2h",
               browser_info: {
@@ -354,9 +355,16 @@ describe("server ArcPayClient", () => {
     });
 
     await expect(
-      client.executePayment("pay_1", { card_token_id: "tok_1" } as any, {
-        idempotencyKey: EXECUTE_IDEMPOTENCY_KEY,
-      }),
+      client.executePayment(
+        "pay_1",
+        {
+          payment_method: "bank_card",
+          card_token_id: "tok_1",
+          payment_mode: "h2h",
+          browser_info: {},
+        } as any,
+        { idempotencyKey: EXECUTE_IDEMPOTENCY_KEY },
+      ),
     ).rejects.toMatchObject({
       type: "api_error",
       code: "timeout",
@@ -364,8 +372,54 @@ describe("server ArcPayClient", () => {
     });
     const [, init] = fetchMock.mock.calls[0]!;
     expect(JSON.parse(init.body as string)).toMatchObject({
+      payment_method: "bank_card",
       card_token_id: "tok_1",
       payment_mode: "h2h",
+    });
+  });
+
+  it("executes a wallet payment request", async () => {
+    fetchMock.mockResolvedValue(
+      ok({
+        payment_id: "pay_1",
+        status: "pending",
+        payment_mode: "h2h",
+        wallet_action: {
+          provider: "sberpay",
+          action: "qr",
+          qr_url: "https://bank.example/sberpay/qr/123",
+        },
+      }),
+    );
+    const client = new ArcPayClient({
+      secretKey: "sk_test_x",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+
+    const result = await client.executePayment(
+      "pay_1",
+      {
+        payment_method: "sberpay",
+        payment_mode: "h2h",
+        wallet_interaction: {
+          provider: "sberpay",
+          surface: "merchant_web",
+          action: "qr",
+        },
+      },
+      { idempotencyKey: EXECUTE_IDEMPOTENCY_KEY },
+    );
+
+    expect(result.wallet_action?.provider).toBe("sberpay");
+    const [, init] = fetchMock.mock.calls[0]!;
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      payment_method: "sberpay",
+      payment_mode: "h2h",
+      wallet_interaction: {
+        provider: "sberpay",
+        surface: "merchant_web",
+        action: "qr",
+      },
     });
   });
 

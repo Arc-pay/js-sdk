@@ -1,8 +1,7 @@
-import type { PaymentNextAction } from "../server/types";
-import type { ExecutePaymentRequest } from "../server/types";
+import type { CardBrowserInfo, PaymentNextAction } from "../server/types";
 
 export type ThreeDSAction = PaymentNextAction;
-export type BrowserInfo = ExecutePaymentRequest["browser_info"];
+export type BrowserInfo = CardBrowserInfo;
 
 export interface BrowserFormField {
   name: string;

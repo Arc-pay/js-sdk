@@ -143,21 +143,57 @@ export interface Refund {
   created_at: string;
 }
 
-export interface ExecutePaymentRequest {
+export type WalletInteractionAction = "redirect" | "deeplink" | "qr" | "sdk" | "phone_push";
+export type WalletInteractionSurface = "merchant_web" | "merchant_app" | "native_app";
+
+export interface WalletInteraction {
+  provider: PaymentMethod;
+  surface: WalletInteractionSurface;
+  action: WalletInteractionAction;
+  back_url?: string;
+  app_deep_link?: string;
+  phone?: string;
+}
+
+export interface WalletAction {
+  provider: PaymentMethod;
+  action: WalletInteractionAction;
+  sdk?: string;
+  url?: string;
+  qr_url?: string;
+  qr_image_base64?: string;
+  qr_content_type?: "image/png" | "image/svg+xml";
+  bank_invoice_id?: string;
+  back_url?: string;
+  params?: Record<string, string>;
+}
+
+export interface CardBrowserInfo {
+  accept_header: string;
+  language: string;
+  screen_width: number;
+  screen_height: number;
+  color_depth: 1 | 4 | 8 | 15 | 16 | 24 | 32 | 48;
+  timezone_offset_minutes: number;
+  java_enabled?: boolean;
+  user_agent: string;
+  window_size?: "01" | "02" | "03" | "04" | "05";
+}
+
+export interface CardExecutePaymentRequest {
+  payment_method: "bank_card";
   card_token_id: string;
   payment_mode: "h2h";
-  browser_info: {
-    accept_header: string;
-    language: string;
-    screen_width: number;
-    screen_height: number;
-    color_depth: 1 | 4 | 8 | 15 | 16 | 24 | 32 | 48;
-    timezone_offset_minutes: number;
-    java_enabled?: boolean;
-    user_agent: string;
-    window_size?: "01" | "02" | "03" | "04" | "05";
-  };
+  browser_info: CardBrowserInfo;
 }
+
+export interface WalletExecutePaymentRequest {
+  payment_method: Exclude<PaymentMethod, "bank_card">;
+  payment_mode: "h2h";
+  wallet_interaction: WalletInteraction;
+}
+
+export type ExecutePaymentRequest = CardExecutePaymentRequest | WalletExecutePaymentRequest;
 
 export interface ExecutePaymentResponse {
   payment_id: string;
@@ -166,6 +202,7 @@ export interface ExecutePaymentResponse {
   payment_mode?: PaymentFlowMode;
   liability_shifted?: boolean;
   card_token_id?: string;
+  wallet_action?: WalletAction;
   next_action?: PaymentNextAction;
   decline_code?: string;
   decline_message?: string;
