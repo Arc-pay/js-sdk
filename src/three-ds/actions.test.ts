@@ -6,6 +6,8 @@ import {
   collectBrowserInfo,
   isThreeDSChallengeAction,
   isThreeDSMethodAction,
+  mountThreeDSBrowserForm,
+  runThreeDSBrowserFlow,
 } from "./actions";
 import type { PaymentNextAction } from "../server/types";
 
@@ -62,6 +64,53 @@ describe("3DS helpers", () => {
     expect(html).toContain('name="threeDSMethodData"');
     expect(html).toContain('value="abc&amp;&lt;&gt;"');
     expect(html).toContain("document.forms[0].submit()");
+  });
+
+  it("mounts and submits hidden method forms", () => {
+    const submitted: string[] = [];
+    const mounted = mountThreeDSBrowserForm(methodAction, {
+      submitter: (form) => submitted.push(form.target),
+    });
+
+    mounted.submit();
+
+    expect(submitted).toHaveLength(1);
+    expect(submitted[0]).toMatch(/^arcpay-three-ds-method-/);
+    expect(mounted.iframe?.name).toBe(submitted[0]);
+    expect(document.querySelectorAll("form")).toHaveLength(1);
+
+    mounted.remove();
+    expect(document.querySelectorAll("form")).toHaveLength(0);
+    expect(document.querySelectorAll("iframe")).toHaveLength(0);
+  });
+
+  it("runs method completion and submits returned challenge", async () => {
+    const submitted: string[] = [];
+    const resultPromise = runThreeDSBrowserFlow(methodAction, {
+      methodTimeoutMs: 1000,
+      submitter: (form) => submitted.push(form.action),
+      completeThreeDSMethod: async (completion) => {
+        expect(completion).toEqual({
+          completion_indicator: "Y",
+          three_ds_server_trans_id: "trans-1",
+        });
+        return {
+          payment_id: "pay-1",
+          status: "pending_3ds",
+          next_action: challengeAction,
+        };
+      },
+    });
+
+    const iframe = document.querySelector("iframe");
+    iframe?.dispatchEvent(new Event("load"));
+    const result = await resultPromise;
+
+    expect(result.status).toBe("challenge_submitted");
+    expect(submitted).toEqual(["https://acs.example/method", "https://acs.example/challenge"]);
+    if (result.status === "challenge_submitted") {
+      result.mounted.remove();
+    }
   });
 
   it("collects normalized browser info", () => {

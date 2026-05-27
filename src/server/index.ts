@@ -33,10 +33,16 @@ export {
   getThreeDSAction,
   isThreeDSChallengeAction,
   isThreeDSMethodAction,
+  mountThreeDSBrowserForm,
+  runThreeDSBrowserFlow,
 } from "../three-ds";
 export type {
   BrowserFormField,
   BrowserPostForm,
+  MountedThreeDSForm,
+  RunThreeDSBrowserFlowOptions,
   ThreeDSAction,
   ThreeDSBrowserStep,
+  ThreeDSBrowserFlowResult,
+  ThreeDSMountOptions,
 } from "../three-ds";

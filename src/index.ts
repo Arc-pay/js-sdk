@@ -24,15 +24,21 @@ export {
   getThreeDSAction,
   isThreeDSChallengeAction,
   isThreeDSMethodAction,
+  mountThreeDSBrowserForm,
+  runThreeDSBrowserFlow,
 } from "./three-ds";
 export type {
   BrowserFormField,
   BrowserInfo,
   BrowserPostForm,
+  MountedThreeDSForm,
+  RunThreeDSBrowserFlowOptions,
   ThreeDSAction,
   ThreeDSBrowserStep,
+  ThreeDSBrowserFlowResult,
+  ThreeDSMountOptions,
 } from "./three-ds";
-export const SDK_VERSION = "0.1.13";
+export const SDK_VERSION = "0.1.15";
 
 export type { FieldType } from "./elements/postmessage";
 export type { ElementOptions, ElementEvent } from "./elements/element";

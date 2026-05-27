@@ -1,4 +1,4 @@
-import type { CardBrowserInfo, PaymentNextAction } from "../server/types";
+import type { CardBrowserInfo, ExecutePaymentResponse, PaymentNextAction } from "../server/types";
 
 export type ThreeDSAction = PaymentNextAction;
 export type BrowserInfo = CardBrowserInfo;
@@ -22,6 +22,46 @@ export interface ThreeDSBrowserStep {
   completionEndpoint?: string;
   threeDSServerTransId?: string;
 }
+
+export interface MountedThreeDSForm {
+  form: HTMLFormElement;
+  iframe?: HTMLIFrameElement;
+  submit: () => void;
+  remove: () => void;
+}
+
+export interface ThreeDSMountOptions {
+  document?: Document;
+  container?: HTMLElement;
+  challengeTarget?: string;
+  submitter?: (form: HTMLFormElement) => void;
+}
+
+export interface RunThreeDSBrowserFlowOptions extends ThreeDSMountOptions {
+  completeThreeDSMethod: (
+    completion: ReturnType<typeof buildThreeDSMethodCompletion>,
+    nextAction: PaymentNextAction,
+  ) => Promise<ExecutePaymentResponse>;
+  methodCompletionIndicator?: "Y" | "N" | "U";
+  methodTimeoutMs?: number;
+  signal?: AbortSignal;
+}
+
+export type ThreeDSBrowserFlowResult =
+  | {
+      status: "no_action";
+      response?: ExecutePaymentResponse;
+    }
+  | {
+      status: "method_completed";
+      response: ExecutePaymentResponse;
+    }
+  | {
+      status: "challenge_submitted";
+      action: PaymentNextAction;
+      response?: ExecutePaymentResponse;
+      mounted: MountedThreeDSForm;
+    };
 
 const supportedColorDepths = [1, 4, 8, 15, 16, 24, 32, 48] as const;
 
@@ -105,6 +145,151 @@ export const buildThreeDSMethodCompletion = (
     completion_indicator: completionIndicator,
     three_ds_server_trans_id: nextAction.three_ds.three_ds_server_trans_id,
   };
+};
+
+const requireDocument = (explicitDocument?: Document): Document => {
+  if (explicitDocument) return explicitDocument;
+  if (typeof document === "undefined") {
+    throw new Error("3DS browser helpers must be called in a browser environment");
+  }
+  return document;
+};
+
+const defaultSubmitter = (form: HTMLFormElement): void => {
+  form.submit();
+};
+
+export const mountThreeDSBrowserForm = (
+  nextAction: PaymentNextAction,
+  options: ThreeDSMountOptions = {},
+): MountedThreeDSForm => {
+  const doc = requireDocument(options.document);
+  const container = options.container ?? doc.body;
+  const formDescriptor = buildThreeDSBrowserForm(nextAction);
+  const form = doc.createElement("form");
+  const target =
+    formDescriptor.target === "hidden_iframe"
+      ? `arcpay-three-ds-method-${Math.random().toString(36).slice(2)}`
+      : (options.challengeTarget ?? "_self");
+  let iframe: HTMLIFrameElement | undefined;
+
+  form.method = formDescriptor.method;
+  form.action = formDescriptor.action;
+  form.target = target;
+  form.hidden = true;
+
+  for (const field of formDescriptor.fields) {
+    const input = doc.createElement("input");
+    input.type = "hidden";
+    input.name = field.name;
+    input.value = field.value;
+    form.append(input);
+  }
+
+  if (formDescriptor.target === "hidden_iframe") {
+    iframe = doc.createElement("iframe");
+    iframe.name = target;
+    iframe.title = "3-D Secure method";
+    iframe.hidden = true;
+    container.append(iframe);
+  }
+
+  container.append(form);
+
+  return {
+    form,
+    iframe,
+    submit: () => (options.submitter ?? defaultSubmitter)(form),
+    remove: () => {
+      form.remove();
+      iframe?.remove();
+    },
+  };
+};
+
+const waitForMethodFrame = (
+  mounted: MountedThreeDSForm,
+  timeoutMs: number,
+  signal?: AbortSignal,
+): Promise<"loaded" | "timeout"> =>
+  new Promise((resolve, reject) => {
+    if (!mounted.iframe) {
+      resolve("loaded");
+      return;
+    }
+    if (signal?.aborted) {
+      reject(new DOMException("The operation was aborted", "AbortError"));
+      return;
+    }
+
+    let settled = false;
+    const cleanup = () => {
+      mounted.iframe?.removeEventListener("load", onLoad);
+      signal?.removeEventListener("abort", onAbort);
+      clearTimeout(timer);
+    };
+    const settle = (result: "loaded" | "timeout") => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(result);
+    };
+    const onLoad = () => settle("loaded");
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new DOMException("The operation was aborted", "AbortError"));
+    };
+    const timer = setTimeout(() => settle("timeout"), timeoutMs);
+
+    mounted.iframe.addEventListener("load", onLoad, { once: true });
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+
+export const runThreeDSBrowserFlow = async (
+  nextAction: PaymentNextAction | undefined,
+  options: RunThreeDSBrowserFlowOptions,
+): Promise<ThreeDSBrowserFlowResult> => {
+  if (!nextAction) return { status: "no_action" };
+
+  if (isThreeDSChallengeAction(nextAction)) {
+    const mounted = mountThreeDSBrowserForm(nextAction, options);
+    mounted.submit();
+    return { status: "challenge_submitted", action: nextAction, mounted };
+  }
+
+  if (!isThreeDSMethodAction(nextAction)) return { status: "no_action" };
+
+  const mounted = mountThreeDSBrowserForm(nextAction, options);
+  try {
+    mounted.submit();
+    const methodResult = await waitForMethodFrame(
+      mounted,
+      options.methodTimeoutMs ?? 10_000,
+      options.signal,
+    );
+    const indicator =
+      options.methodCompletionIndicator ?? (methodResult === "loaded" ? "Y" : "N");
+    const response = await options.completeThreeDSMethod(
+      buildThreeDSMethodCompletion(nextAction, indicator),
+      nextAction,
+    );
+    const followUpAction = getThreeDSAction(response.next_action);
+    if (followUpAction && isThreeDSChallengeAction(followUpAction)) {
+      const challengeMounted = mountThreeDSBrowserForm(followUpAction, options);
+      challengeMounted.submit();
+      return {
+        status: "challenge_submitted",
+        action: followUpAction,
+        response,
+        mounted: challengeMounted,
+      };
+    }
+    return { status: "method_completed", response };
+  } finally {
+    mounted.remove();
+  }
 };
 
 const htmlEscape = (value: string): string =>

@@ -75,28 +75,25 @@ return as navigation only; confirm the final status through webhooks or
 `GET /payments/{id}`.
 
 H2H card execution returns a standardized `next_action` when the buyer must do
-something in the browser. The SDK helper turns that action into the POST form
-descriptor you render in a hidden iframe or visible browser page:
+something in the browser. Use `runThreeDSBrowserFlow()` to run the 3DS Method
+hidden iframe, call your backend completion proxy, and submit any returned ACS
+challenge form:
 
 ```ts
-import {
-  buildThreeDSBrowserStep,
-  buildThreeDSMethodCompletion,
-  getThreeDSAction,
-} from "@thavguard/arc-pay/server";
+import { runThreeDSBrowserFlow } from "@thavguard/arc-pay/js";
 
 const result = await client.executePayment(paymentId, body, { idempotencyKey });
-const action = getThreeDSAction(result.next_action);
-
-if (action) {
-  const step = buildThreeDSBrowserStep(action);
-  // Render step.form using form.action, form.method, form.target, form.fields.
-  // For step.kind === "method", call completeThreeDSMethod from your backend
-  // after the hidden iframe finishes or times out.
-  const completeBody = buildThreeDSMethodCompletion(action, "Y");
-  const afterMethod = await client.completeThreeDSMethod(paymentId, completeBody);
-  // If afterMethod.next_action is a challenge, render the returned browser step.
-}
+await runThreeDSBrowserFlow(result.next_action, {
+  async completeThreeDSMethod(completion) {
+    const response = await fetch(`/api/payments/${paymentId}/complete-3ds-method`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(completion),
+    });
+    if (!response.ok) throw new Error("3DS Method completion failed");
+    return response.json();
+  },
+});
 ```
 
 Do not branch on bank-specific 3DS fields. Arc Pay normalizes 3DS 1.x and 2.x
@@ -104,8 +101,9 @@ into `next_action.three_ds.submit`.
 
 After the browser step redirects or the customer returns to your order page,
 use `waitForPaymentTerminal(paymentId)` or your own webhook/status loop. The
-helper polls `GET /payments/{id}` and stops at terminal Arc Pay statuses; it
-does not attempt to automate issuer ACS challenge pages.
+server helper polls `GET /payments/{id}` and stops at terminal Arc Pay statuses.
+The browser helper automates the merchant-owned handoff, but the issuer ACS page
+still belongs to the bank after the challenge form is submitted.
 
 For saved cards and subscriptions, create a setup intent with
 `createCardSetup()`, tokenize through Hosted Fields, execute the setup payment,
