@@ -154,13 +154,11 @@ describe("3DS next action helpers", () => {
     const resultPromise = runThreeDSBrowserFlow(methodAction, {
       methodTimeoutMs: 1000,
       submitter: (form) => submitted.push(form.action),
-      methodCompletionIdempotencyKey: "019e6b4e-ae3b-7776-8a56-7c0f8db5e202",
-      completeThreeDSMethod: async (completion, _nextAction, opts) => {
+      completeThreeDSMethod: async (completion) => {
         expect(completion).toEqual({
           completion_indicator: "Y",
           three_ds_server_trans_id: "trans-id",
         });
-        expect(opts.idempotencyKey).toBe("019e6b4e-ae3b-7776-8a56-7c0f8db5e202");
         return {
           payment_id: "pay_1",
           status: "pending_3ds",
