@@ -38,7 +38,7 @@ export type {
   ThreeDSBrowserFlowResult,
   ThreeDSMountOptions,
 } from "./three-ds";
-export const SDK_VERSION = "0.1.15";
+export const SDK_VERSION = "0.1.16";
 
 export type { FieldType } from "./elements/postmessage";
 export type { ElementOptions, ElementEvent } from "./elements/element";
