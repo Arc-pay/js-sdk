@@ -288,7 +288,10 @@ export interface CreateLinkRequest {
     name: string;
     quantity: string;
     unit_price: number;
-    vat_rate?: number;
+    vat_rate: 0 | 10 | 20;
+    payment_object: string;
+    payment_method: string;
+    measure: string;
   }[];
   billing_config?: {
     interval_type?: "day" | "week" | "month" | "year";

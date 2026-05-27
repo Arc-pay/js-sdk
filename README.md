@@ -75,14 +75,23 @@ return as navigation only; confirm the final status through webhooks or
 `GET /payments/{id}`.
 
 H2H card execution returns a standardized `next_action` when the buyer must do
-something in the browser. Use `runThreeDSBrowserFlow()` to run the 3DS Method
-hidden iframe, call your backend completion proxy, and submit any returned ACS
-challenge form:
+something in the browser. Run `executePayment` only on your backend with a
+secret key, then pass its response to your browser. In the browser, use
+`runThreeDSBrowserFlow()` to run the 3DS Method hidden iframe, call your backend
+completion proxy, and submit any returned ACS challenge form:
 
 ```ts
 import { runThreeDSBrowserFlow } from "@thavguard/arc-pay/js";
 
-const result = await client.executePayment(paymentId, body, { idempotencyKey });
+const result = await fetch(`/api/payments/${paymentId}/execute`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ card_token_id: cardTokenId }),
+}).then((response) => {
+  if (!response.ok) throw new Error("Payment execution failed");
+  return response.json();
+});
+
 await runThreeDSBrowserFlow(result.next_action, {
   async completeThreeDSMethod(completion) {
     const response = await fetch(`/api/payments/${paymentId}/complete-3ds-method`, {
