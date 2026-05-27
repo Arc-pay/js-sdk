@@ -1,4 +1,4 @@
-export type Currency = "RUB" | "KZT" | "UZS";
+export type Currency = "RUB" | "KZT" | "UZS" | "USD" | "EUR";
 
 export type PaymentMethod =
   | "bank_card"
@@ -76,7 +76,7 @@ export interface Payment {
 export interface PaymentList {
   payments: Payment[];
   total: number;
-  page: number;
+  next_cursor: string;
   page_size: number;
 }
 
@@ -364,6 +364,7 @@ export interface CreateCheckoutSessionRequest {
   customer_id?: string;
   external_id?: string;
   metadata?: Record<string, string>;
+  fiscal_items?: FiscalItem[];
   autocompletion_date?: string;
   locale?: Locale;
 }
@@ -374,7 +375,7 @@ export interface CheckoutSession {
 }
 
 export interface ListPaymentsQuery {
-  page?: number;
+  cursor?: string;
   page_size?: number;
   status?: PaymentStatus;
   payment_method?: PaymentMethod;

@@ -141,13 +141,15 @@ export class Elements {
         } else if (data.type === "arcpay:tokenize-error") {
           clearTimeout(timer);
           window.removeEventListener("message", onMessage);
-          const errType =
-            data.errorType === "validation_error" || data.errorType === "api_error"
-              ? data.errorType
-              : "api_error";
           reject(
             new ArcPayError({
-              type: errType,
+              type:
+                data.errorType === "validation_error" ||
+                data.errorType === "configuration_error" ||
+                data.errorType === "network_error" ||
+                data.errorType === "api_error"
+                  ? data.errorType
+                  : "api_error",
               code: data.code,
               message: data.message,
               retryable: false,

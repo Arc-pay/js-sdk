@@ -104,6 +104,13 @@ export class Element {
       if (this.options.style) {
         this.send({ type: "arcpay:style", payload: sanitizeStyle(this.options.style) });
       }
+      if (this.options.placeholder) {
+        this.send({
+          type: "arcpay:placeholder",
+          field: this.field,
+          placeholder: this.options.placeholder,
+        });
+      }
       this.emit({ type: "ready" });
     } else if (data.type === "arcpay:rejected") {
       this.status = "error";
@@ -119,9 +126,16 @@ export class Element {
     // arcpay:tokenize-result / arcpay:tokenize-error handled by Elements factory (Task 9).
   }
 
-  update(options: { style?: StyleSubset }): void {
+  update(options: { style?: StyleSubset; placeholder?: string }): void {
     if (options.style) {
       this.send({ type: "arcpay:style", payload: sanitizeStyle(options.style) });
+    }
+    if (options.placeholder) {
+      this.send({
+        type: "arcpay:placeholder",
+        field: this.field,
+        placeholder: options.placeholder,
+      });
     }
   }
 

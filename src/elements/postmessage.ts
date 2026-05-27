@@ -6,6 +6,7 @@ export type FieldType = "cardNumber" | "cardExpiry" | "cardCvv";
 export type ParentToIframe =
   | { type: "arcpay:hello"; origin: string; publishableKey: string; channelId: string }
   | { type: "arcpay:style"; payload: StyleSubset }
+  | { type: "arcpay:placeholder"; field: FieldType; placeholder: string }
   | { type: "arcpay:focus" }
   | { type: "arcpay:clear" }
   | { type: "arcpay:tokenize"; paymentId: string; idempotencyKey: string };
@@ -37,6 +38,12 @@ export interface StyleSubset {
   invalid?: Record<string, string>;
   focus?: Record<string, string>;
 }
+
+export type TokenizeErrorType =
+  | "validation_error"
+  | "configuration_error"
+  | "network_error"
+  | "api_error";
 
 const ARCPAY_TYPE_PREFIX = "arcpay:";
 
