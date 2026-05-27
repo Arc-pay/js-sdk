@@ -163,8 +163,7 @@ const normalizeExecutePaymentRequest = (body: ExecutePaymentRequest): ExecutePay
       retryable: false,
     });
   }
-  const paymentMode = body.payment_mode ?? "h2h";
-  if (paymentMode !== "h2h") {
+  if (body.payment_mode !== "h2h") {
     throw new ArcPayError({
       type: "validation_error",
       code: "invalid_payment_mode",
@@ -190,7 +189,7 @@ const normalizeExecutePaymentRequest = (body: ExecutePaymentRequest): ExecutePay
       });
     }
   }
-  return { ...body, payment_mode: paymentMode };
+  return body;
 };
 
 const appendQuery = (path: string, query?: object): string => {
@@ -447,14 +446,13 @@ export class ArcPayClient {
   async completeThreeDSMethod(
     paymentId: string,
     body: CompleteThreeDSMethodRequest,
-    opts: IdempotencyOptions,
+    opts: RequestOptions = {},
   ): Promise<ExecutePaymentResponse> {
     return this.request<ExecutePaymentResponse>(
       "POST",
       `/payments/${encodeURIComponent(paymentId)}/complete-3ds-method`,
       body,
       opts,
-      true,
     );
   }
 

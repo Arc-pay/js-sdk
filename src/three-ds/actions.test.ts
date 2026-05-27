@@ -89,13 +89,11 @@ describe("3DS helpers", () => {
     const resultPromise = runThreeDSBrowserFlow(methodAction, {
       methodTimeoutMs: 1000,
       submitter: (form) => submitted.push(form.action),
-      methodCompletionIdempotencyKey: "019e6b4e-ae3b-7776-8a56-7c0f8db5e101",
-      completeThreeDSMethod: async (completion, _nextAction, opts) => {
+      completeThreeDSMethod: async (completion) => {
         expect(completion).toEqual({
           completion_indicator: "Y",
           three_ds_server_trans_id: "trans-1",
         });
-        expect(opts.idempotencyKey).toBe("019e6b4e-ae3b-7776-8a56-7c0f8db5e101");
         return {
           payment_id: "pay-1",
           status: "pending_3ds",
@@ -112,6 +110,34 @@ describe("3DS helpers", () => {
     expect(submitted).toEqual(["https://acs.example/method", "https://acs.example/challenge"]);
     if (result.status === "challenge_submitted") {
       expect(result.methodResult).toBe("loaded");
+      result.mounted.remove();
+    }
+  });
+
+  it("submits direct challenge actions without a method completion callback", async () => {
+    const submitted: string[] = [];
+
+    const result = await runThreeDSBrowserFlow(challengeAction, {
+      submitter: (form) => submitted.push(form.action),
+    });
+
+    expect(result.status).toBe("challenge_submitted");
+    expect(submitted).toEqual(["https://acs.example/challenge"]);
+    if (result.status === "challenge_submitted") {
+      result.mounted.remove();
+    }
+  });
+
+  it("submits direct challenge actions without a method completion callback", async () => {
+    const submitted: string[] = [];
+
+    const result = await runThreeDSBrowserFlow(challengeAction, {
+      submitter: (form) => submitted.push(form.action),
+    });
+
+    expect(result.status).toBe("challenge_submitted");
+    expect(submitted).toEqual(["https://acs.example/challenge"]);
+    if (result.status === "challenge_submitted") {
       result.mounted.remove();
     }
   });

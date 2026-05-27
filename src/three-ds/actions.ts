@@ -38,11 +38,9 @@ export interface ThreeDSMountOptions {
 }
 
 export interface RunThreeDSBrowserFlowOptions extends ThreeDSMountOptions {
-  methodCompletionIdempotencyKey: string;
-  completeThreeDSMethod: (
+  completeThreeDSMethod?: (
     completion: ReturnType<typeof buildThreeDSMethodCompletion>,
     nextAction: PaymentNextAction,
-    opts: { idempotencyKey: string },
   ) => Promise<ExecutePaymentResponse>;
   methodCompletionIndicator?: "Y" | "N" | "U";
   methodTimeoutMs?: number;
@@ -277,8 +275,9 @@ export const runThreeDSBrowserFlow = async (
   }
 
   if (!isThreeDSMethodAction(nextAction)) return { status: "no_action" };
-  if (!options.methodCompletionIdempotencyKey) {
-    throw new Error("methodCompletionIdempotencyKey is required for 3DS Method completion");
+  const completeThreeDSMethod = options.completeThreeDSMethod;
+  if (!completeThreeDSMethod) {
+    throw new Error("completeThreeDSMethod is required for 3DS Method actions");
   }
 
   const mounted = mountThreeDSBrowserForm(nextAction, options);
@@ -290,10 +289,9 @@ export const runThreeDSBrowserFlow = async (
       options.signal,
     );
     const indicator = options.methodCompletionIndicator ?? (methodResult === "loaded" ? "Y" : "N");
-    const response = await options.completeThreeDSMethod(
+    const response = await completeThreeDSMethod(
       buildThreeDSMethodCompletion(nextAction, indicator),
       nextAction,
-      { idempotencyKey: options.methodCompletionIdempotencyKey },
     );
     const followUpAction = getThreeDSAction(response.next_action);
     if (followUpAction && isThreeDSChallengeAction(followUpAction)) {

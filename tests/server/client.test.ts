@@ -228,18 +228,6 @@ describe("server ArcPayClient", () => {
             opts as any,
           ),
       },
-      {
-        name: "completeThreeDSMethod",
-        invoke: (opts: unknown) =>
-          idempotentClient.completeThreeDSMethod(
-            "pay_1",
-            {
-              completion_indicator: "Y",
-              three_ds_server_trans_id: "019e6b4e-ae3b-7776-8a56-7c0f8db5e303",
-            },
-            opts as any,
-          ),
-      },
     ];
 
     for (const method of requiredMethods) {
@@ -433,6 +421,51 @@ describe("server ArcPayClient", () => {
         action: "qr",
       },
     });
+  });
+
+  it("rejects executePayment requests without explicit h2h payment_mode", async () => {
+    const client = new ArcPayClient({
+      secretKey: "sk_test_x",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+
+    await expect(
+      client.executePayment(
+        "pay_1",
+        {
+          payment_method: "bank_card",
+          card_token_id: "tok_1",
+          browser_info: {},
+        } as any,
+        { idempotencyKey: EXECUTE_IDEMPOTENCY_KEY },
+      ),
+    ).rejects.toMatchObject({
+      type: "validation_error",
+      code: "invalid_payment_mode",
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("completes 3DS Method with a required idempotency key", async () => {
+    fetchMock.mockResolvedValue(ok({ payment_id: "pay_1", status: "pending_3ds" }));
+    const client = new ArcPayClient({
+      secretKey: "sk_test_x",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+
+    await client.completeThreeDSMethod(
+      "pay_1",
+      {
+        completion_indicator: "Y",
+        three_ds_server_trans_id: "019e6b4e-ae3b-7776-8a56-7c0f8db5e303",
+      },
+      {
+        idempotencyKey: "019e6b4e-ae3b-7776-8a56-7c0f8db5e304",
+      },
+    );
+
+    const [, init] = fetchMock.mock.calls[0]!;
+    expect(init.headers["Idempotency-Key"]).toBe("019e6b4e-ae3b-7776-8a56-7c0f8db5e304");
   });
 
   it("creates a checkout session with an idempotency key", async () => {

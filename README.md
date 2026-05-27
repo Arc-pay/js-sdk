@@ -84,13 +84,11 @@ import { runThreeDSBrowserFlow } from "@thavguard/arc-pay/js";
 
 const result = await client.executePayment(paymentId, body, { idempotencyKey });
 await runThreeDSBrowserFlow(result.next_action, {
-  methodCompletionIdempotencyKey: crypto.randomUUID(),
-  async completeThreeDSMethod(completion, _nextAction, opts) {
+  async completeThreeDSMethod(completion) {
     const response = await fetch(`/api/payments/${paymentId}/complete-3ds-method`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Idempotency-Key": opts.idempotencyKey,
       },
       body: JSON.stringify(completion),
     });
