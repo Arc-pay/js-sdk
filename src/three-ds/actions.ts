@@ -289,8 +289,7 @@ export const runThreeDSBrowserFlow = async (
       options.methodTimeoutMs ?? 10_000,
       options.signal,
     );
-    const indicator =
-      options.methodCompletionIndicator ?? (methodResult === "loaded" ? "Y" : "N");
+    const indicator = options.methodCompletionIndicator ?? (methodResult === "loaded" ? "Y" : "N");
     const response = await options.completeThreeDSMethod(
       buildThreeDSMethodCompletion(nextAction, indicator),
       nextAction,
