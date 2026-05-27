@@ -89,11 +89,13 @@ describe("3DS helpers", () => {
     const resultPromise = runThreeDSBrowserFlow(methodAction, {
       methodTimeoutMs: 1000,
       submitter: (form) => submitted.push(form.action),
-      completeThreeDSMethod: async (completion) => {
+      methodCompletionIdempotencyKey: "019e6b4e-ae3b-7776-8a56-7c0f8db5e101",
+      completeThreeDSMethod: async (completion, _nextAction, opts) => {
         expect(completion).toEqual({
           completion_indicator: "Y",
           three_ds_server_trans_id: "trans-1",
         });
+        expect(opts.idempotencyKey).toBe("019e6b4e-ae3b-7776-8a56-7c0f8db5e101");
         return {
           payment_id: "pay-1",
           status: "pending_3ds",
@@ -109,8 +111,21 @@ describe("3DS helpers", () => {
     expect(result.status).toBe("challenge_submitted");
     expect(submitted).toEqual(["https://acs.example/method", "https://acs.example/challenge"]);
     if (result.status === "challenge_submitted") {
+      expect(result.methodResult).toBe("loaded");
       result.mounted.remove();
     }
+  });
+
+  it("rejects non-HTTPS 3DS form actions", () => {
+    expect(() =>
+      mountThreeDSBrowserForm({
+        ...challengeAction,
+        three_ds: {
+          ...challengeAction.three_ds,
+          submit: { ...challengeAction.three_ds.submit, url: "http://acs.example/challenge" },
+        },
+      }),
+    ).toThrow("HTTPS");
   });
 
   it("collects normalized browser info", () => {

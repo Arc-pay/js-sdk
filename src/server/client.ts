@@ -447,13 +447,14 @@ export class ArcPayClient {
   async completeThreeDSMethod(
     paymentId: string,
     body: CompleteThreeDSMethodRequest,
-    opts: RequestOptions = {},
+    opts: IdempotencyOptions,
   ): Promise<ExecutePaymentResponse> {
     return this.request<ExecutePaymentResponse>(
       "POST",
       `/payments/${encodeURIComponent(paymentId)}/complete-3ds-method`,
       body,
       opts,
+      true,
     );
   }
 

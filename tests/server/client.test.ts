@@ -228,6 +228,18 @@ describe("server ArcPayClient", () => {
             opts as any,
           ),
       },
+      {
+        name: "completeThreeDSMethod",
+        invoke: (opts: unknown) =>
+          idempotentClient.completeThreeDSMethod(
+            "pay_1",
+            {
+              completion_indicator: "Y",
+              three_ds_server_trans_id: "019e6b4e-ae3b-7776-8a56-7c0f8db5e303",
+            },
+            opts as any,
+          ),
+      },
     ];
 
     for (const method of requiredMethods) {

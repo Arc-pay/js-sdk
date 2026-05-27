@@ -154,11 +154,13 @@ describe("3DS next action helpers", () => {
     const resultPromise = runThreeDSBrowserFlow(methodAction, {
       methodTimeoutMs: 1000,
       submitter: (form) => submitted.push(form.action),
-      completeThreeDSMethod: async (completion) => {
+      methodCompletionIdempotencyKey: "019e6b4e-ae3b-7776-8a56-7c0f8db5e202",
+      completeThreeDSMethod: async (completion, _nextAction, opts) => {
         expect(completion).toEqual({
           completion_indicator: "Y",
           three_ds_server_trans_id: "trans-id",
         });
+        expect(opts.idempotencyKey).toBe("019e6b4e-ae3b-7776-8a56-7c0f8db5e202");
         return {
           payment_id: "pay_1",
           status: "pending_3ds",
@@ -173,6 +175,7 @@ describe("3DS next action helpers", () => {
     expect(result.status).toBe("challenge_submitted");
     expect(submitted).toEqual(["https://method.bank.example/", "https://acs.bank.example/"]);
     if (result.status === "challenge_submitted") {
+      expect(result.methodResult).toBe("loaded");
       result.mounted.remove();
     }
   });

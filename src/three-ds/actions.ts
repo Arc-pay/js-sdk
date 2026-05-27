@@ -33,14 +33,16 @@ export interface MountedThreeDSForm {
 export interface ThreeDSMountOptions {
   document?: Document;
   container?: HTMLElement;
-  challengeTarget?: string;
+  challengeTarget?: "_self";
   submitter?: (form: HTMLFormElement) => void;
 }
 
 export interface RunThreeDSBrowserFlowOptions extends ThreeDSMountOptions {
+  methodCompletionIdempotencyKey: string;
   completeThreeDSMethod: (
     completion: ReturnType<typeof buildThreeDSMethodCompletion>,
     nextAction: PaymentNextAction,
+    opts: { idempotencyKey: string },
   ) => Promise<ExecutePaymentResponse>;
   methodCompletionIndicator?: "Y" | "N" | "U";
   methodTimeoutMs?: number;
@@ -55,12 +57,14 @@ export type ThreeDSBrowserFlowResult =
   | {
       status: "method_completed";
       response: ExecutePaymentResponse;
+      methodResult: "loaded" | "timeout";
     }
   | {
       status: "challenge_submitted";
       action: PaymentNextAction;
       response?: ExecutePaymentResponse;
       mounted: MountedThreeDSForm;
+      methodResult?: "loaded" | "timeout";
     };
 
 const supportedColorDepths = [1, 4, 8, 15, 16, 24, 32, 48] as const;
@@ -120,6 +124,18 @@ export const buildThreeDSBrowserForm = (nextAction: PaymentNextAction): BrowserP
   fields: nextAction.three_ds.submit.fields,
 });
 
+const assertHTTPSActionURL = (action: string): void => {
+  let parsed: URL;
+  try {
+    parsed = new URL(action);
+  } catch {
+    throw new Error("3DS form action must be an absolute HTTPS URL");
+  }
+  if (parsed.protocol !== "https:") {
+    throw new Error("3DS form action must use HTTPS");
+  }
+};
+
 export const buildThreeDSBrowserStep = (
   nextAction?: PaymentNextAction,
 ): ThreeDSBrowserStep | null => {
@@ -166,6 +182,7 @@ export const mountThreeDSBrowserForm = (
   const doc = requireDocument(options.document);
   const container = options.container ?? doc.body;
   const formDescriptor = buildThreeDSBrowserForm(nextAction);
+  assertHTTPSActionURL(formDescriptor.action);
   const form = doc.createElement("form");
   const target =
     formDescriptor.target === "hidden_iframe"
@@ -260,6 +277,9 @@ export const runThreeDSBrowserFlow = async (
   }
 
   if (!isThreeDSMethodAction(nextAction)) return { status: "no_action" };
+  if (!options.methodCompletionIdempotencyKey) {
+    throw new Error("methodCompletionIdempotencyKey is required for 3DS Method completion");
+  }
 
   const mounted = mountThreeDSBrowserForm(nextAction, options);
   try {
@@ -274,6 +294,7 @@ export const runThreeDSBrowserFlow = async (
     const response = await options.completeThreeDSMethod(
       buildThreeDSMethodCompletion(nextAction, indicator),
       nextAction,
+      { idempotencyKey: options.methodCompletionIdempotencyKey },
     );
     const followUpAction = getThreeDSAction(response.next_action);
     if (followUpAction && isThreeDSChallengeAction(followUpAction)) {
@@ -284,9 +305,10 @@ export const runThreeDSBrowserFlow = async (
         action: followUpAction,
         response,
         mounted: challengeMounted,
+        methodResult,
       };
     }
-    return { status: "method_completed", response };
+    return { status: "method_completed", response, methodResult };
   } finally {
     mounted.remove();
   }
@@ -302,6 +324,7 @@ const htmlEscape = (value: string): string =>
 
 export const buildThreeDSAutoSubmitHtml = (nextAction: PaymentNextAction): string => {
   const form = buildThreeDSBrowserForm(nextAction);
+  assertHTTPSActionURL(form.action);
   const target = form.target === "hidden_iframe" ? "arcpay-three-ds-method" : "_self";
   const inputs = form.fields
     .map(
