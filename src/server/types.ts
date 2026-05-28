@@ -1,4 +1,4 @@
-export type Currency = "RUB" | "KZT" | "UZS" | "USD" | "EUR";
+export type Currency = "RUB" | "KZT" | "UZS";
 
 export type PaymentMethod =
   | "bank_card"
