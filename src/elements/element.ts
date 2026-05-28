@@ -21,6 +21,7 @@ export type ElementEvent =
   | { type: "error"; reason: string };
 
 type Listener = (event: ElementEvent) => void;
+type ElementEventName = ElementEvent["type"];
 
 export interface ElementContext {
   iframeBase: string;
@@ -30,7 +31,11 @@ export interface ElementContext {
 
 export class Element {
   private iframe: HTMLIFrameElement | null = null;
-  private readonly listeners = new Set<Listener>();
+  private readonly listeners: Record<ElementEventName, Set<Listener>> = {
+    ready: new Set<Listener>(),
+    change: new Set<Listener>(),
+    error: new Set<Listener>(),
+  };
   private status: "pending" | "ready" | "error" = "pending";
   private messageHandler: ((e: MessageEvent) => void) | null = null;
 
@@ -148,13 +153,15 @@ export class Element {
       window.removeEventListener("message", this.messageHandler);
       this.messageHandler = null;
     }
-    this.listeners.clear();
+    for (const listeners of Object.values(this.listeners)) {
+      listeners.clear();
+    }
     this.status = "pending";
   }
 
-  on(_event: "ready" | "change" | "error", callback: Listener): () => void {
-    this.listeners.add(callback);
-    return () => this.listeners.delete(callback);
+  on(event: ElementEventName, callback: Listener): () => void {
+    this.listeners[event].add(callback);
+    return () => this.listeners[event].delete(callback);
   }
 
   focus(): void {
@@ -192,7 +199,7 @@ export class Element {
   }
 
   private emit(event: ElementEvent): void {
-    for (const listener of this.listeners) {
+    for (const listener of this.listeners[event.type]) {
       listener(event);
     }
   }

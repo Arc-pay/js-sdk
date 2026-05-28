@@ -211,6 +211,43 @@ describe("Element events — arcpay:ready", () => {
     expect(el.isReady()).toBe(false);
     el.destroy();
   });
+
+  it("delivers events only to listeners registered for that event name", () => {
+    const el = new Element("cardNumber", {}, makeContext());
+    el.mount(container);
+    const iframe = getIframe();
+    const cw = mockIframeContentWindow(iframe);
+
+    const ready = vi.fn();
+    const change = vi.fn();
+    const error = vi.fn();
+    el.on("ready", ready);
+    el.on("change", change);
+    el.on("error", error);
+
+    dispatchFromIframe({ type: "arcpay:ready" }, cw);
+    expect(ready).toHaveBeenCalledOnce();
+    expect(change).not.toHaveBeenCalled();
+    expect(error).not.toHaveBeenCalled();
+
+    dispatchFromIframe(
+      {
+        type: "arcpay:change",
+        field: "cardNumber",
+        isValid: true,
+      },
+      cw,
+    );
+    expect(change).toHaveBeenCalledOnce();
+    expect(ready).toHaveBeenCalledOnce();
+    expect(error).not.toHaveBeenCalled();
+
+    dispatchFromIframe({ type: "arcpay:rejected", reason: "domain not authorized" }, cw);
+    expect(error).toHaveBeenCalledOnce();
+    expect(ready).toHaveBeenCalledOnce();
+    expect(change).toHaveBeenCalledOnce();
+    el.destroy();
+  });
 });
 
 // ---------------------------------------------------------------------------
