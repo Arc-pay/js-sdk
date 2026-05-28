@@ -184,7 +184,7 @@ export const mountThreeDSBrowserForm = (
   const form = doc.createElement("form");
   const target =
     formDescriptor.target === "hidden_iframe"
-      ? `arcpay-three-ds-method-${Math.random().toString(36).slice(2)}`
+      ? `arcpay-three-ds-method-${crypto.randomUUID()}`
       : (options.challengeTarget ?? "_self");
   let iframe: HTMLIFrameElement | undefined;
 
