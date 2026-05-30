@@ -111,6 +111,8 @@ describe("Element.mount", () => {
     const iframe = getIframe();
     expect(iframe.getAttribute("allow")).toBe("payment");
     expect(iframe.getAttribute("data-arcpay-element")).toBe("cardCvv");
+    expect(iframe.getAttribute("title")).toBe("Arc Pay card security code");
+    expect(iframe.getAttribute("aria-label")).toBe("Arc Pay card security code");
     el.destroy();
   });
 

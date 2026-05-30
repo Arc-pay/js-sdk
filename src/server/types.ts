@@ -31,7 +31,7 @@ export type PaymentStatus =
   | "failed"
   | "timeout";
 
-export type PaymentOperation = "create" | "capture" | "refund" | "void" | "execute";
+type PaymentOperation = "create" | "capture" | "refund" | "void" | "execute";
 export type TerminalPaymentStatus =
   | "authorized"
   | "captured"

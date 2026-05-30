@@ -1,8 +1,8 @@
 import { ArcPayError } from "./errors";
 
-export const API_VERSION = "2026-05-06";
+const API_VERSION = "2026-05-06";
 
-export interface ClientConfig {
+interface ClientConfig {
   apiBase: string;
   publishableKey: string;
 }

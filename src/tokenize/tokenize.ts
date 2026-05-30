@@ -10,7 +10,7 @@ export interface TokenizeResult {
   expiresAt: string;
 }
 
-export interface TokenizeRequest extends TokenizeRequestInput {
+interface TokenizeRequest extends TokenizeRequestInput {
   paymentId: string;
 }
 
