@@ -9,7 +9,7 @@ export type ArcPayErrorType =
   | "network_error"
   | "challenge_aborted";
 
-export interface ArcPayErrorInit {
+interface ArcPayErrorInit {
   type: ArcPayErrorType;
   message: string;
   code?: string;
@@ -44,7 +44,7 @@ export class ArcPayError extends Error {
 
 export const isValidationError = (e: unknown): e is ArcPayError =>
   e instanceof ArcPayError && e.type === "validation_error";
-export const isConfigurationError = (e: unknown): e is ArcPayError =>
+const isConfigurationError = (e: unknown): e is ArcPayError =>
   e instanceof ArcPayError && e.type === "configuration_error";
 export const isAuthenticationError = (e: unknown): e is ArcPayError =>
   e instanceof ArcPayError && e.type === "authentication_error";

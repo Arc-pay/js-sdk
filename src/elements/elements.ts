@@ -4,7 +4,7 @@ import type { FieldType, IframeToParent } from "./postmessage";
 import { parseIncoming } from "./postmessage";
 import type { TokenizeResult } from "../tokenize/tokenize";
 
-export type { TokenizeResult };
+export type {};
 
 export type ElementsOptions = Record<string, never>;
 

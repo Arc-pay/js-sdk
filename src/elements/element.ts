@@ -23,6 +23,12 @@ export type ElementEvent =
 type Listener = (event: ElementEvent) => void;
 type ElementEventName = ElementEvent["type"];
 
+const FIELD_TITLES: Record<FieldType, string> = {
+  cardNumber: "Arc Pay card number",
+  cardExpiry: "Arc Pay card expiration date",
+  cardCvv: "Arc Pay card security code",
+};
+
 export interface ElementContext {
   iframeBase: string;
   publishableKey: string;
@@ -69,6 +75,8 @@ export class Element {
     iframe.style.cssText = "border:0;width:100%;height:100%;display:block;";
     iframe.setAttribute("allow", "payment");
     iframe.setAttribute("data-arcpay-element", this.field);
+    iframe.setAttribute("title", FIELD_TITLES[this.field]);
+    iframe.setAttribute("aria-label", FIELD_TITLES[this.field]);
     container.appendChild(iframe);
     this.iframe = iframe;
 

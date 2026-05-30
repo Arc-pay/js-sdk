@@ -26,17 +26,14 @@ import type {
 
 export type {
   AvailablePaymentMethod,
-  CaptureMode,
   CaptureRequest,
   ChargeSavedCardRequest,
   CheckoutSession,
   CompleteThreeDSMethodRequest,
   CreateCheckoutSessionRequest,
-  CreateCardSetupRequest,
   CreateLinkRequest,
   CreatePaymentRequest,
   CreateRefundRequest,
-  Currency,
   ExecutePaymentRequest,
   ExecutePaymentResponse,
   PaymentNextAction,
@@ -47,11 +44,8 @@ export type {
   PaymentFlowMode,
   PaymentList,
   PaymentMethod,
-  PaymentStatus,
-  TerminalPaymentStatus,
   Refund,
   VoidRequest,
-  WaitForPaymentOptions,
 } from "./types";
 
 export interface ArcPayClientOptions {

@@ -39,11 +39,7 @@ export interface StyleSubset {
   focus?: Record<string, string>;
 }
 
-export type TokenizeErrorType =
-  | "validation_error"
-  | "configuration_error"
-  | "network_error"
-  | "api_error";
+type TokenizeErrorType = "validation_error" | "configuration_error" | "network_error" | "api_error";
 
 const ARCPAY_TYPE_PREFIX = "arcpay:";
 
