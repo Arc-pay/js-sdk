@@ -1,4 +1,5 @@
 import type { StyleSubset } from "./postmessage";
+import { ArcPayError } from "../core/errors";
 
 export type HostedFieldsTheme = "none" | "arcpay";
 
@@ -83,6 +84,16 @@ const setIfPresent = (
   if (value !== undefined) block[key] = value;
 };
 
+const assertKnownTheme = (theme: HostedFieldsTheme | undefined): void => {
+  if (theme === undefined || theme === "none" || theme === "arcpay") return;
+  throw new ArcPayError({
+    type: "validation_error",
+    code: "invalid_hosted_fields_theme",
+    message: `Unsupported Hosted Fields appearance theme: ${String(theme)}`,
+    retryable: false,
+  });
+};
+
 const sanitizeBlock = (block: Record<string, string>): Record<string, string> => {
   const out: Record<string, string> = {};
   for (const [key, value] of Object.entries(block)) {
@@ -105,6 +116,7 @@ export const sanitizeStyle = (style: StyleSubset): StyleSubset => {
 };
 
 export const buildStyleFromAppearance = (appearance?: HostedFieldsAppearance): StyleSubset => {
+  assertKnownTheme(appearance?.theme);
   const themeStyle: StyleSubset = appearance?.theme === "arcpay" ? ARCPAY_THEME : { base: {} };
   const variableStyle: StyleSubset = { base: {} };
   const variables = appearance?.variables;

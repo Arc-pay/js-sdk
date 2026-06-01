@@ -26,6 +26,11 @@
           return;
         }
 
+        if (data.type === "arcpay:style") {
+          window.__lastArcPayStyle = data.payload;
+          return;
+        }
+
         if (data.type === "arcpay:tokenize") {
           if (!parentOrigin || event.origin !== window.location.origin) return;
           window.parent.postMessage(
