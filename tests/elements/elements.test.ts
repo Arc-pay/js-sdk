@@ -96,6 +96,7 @@ function simulateAllReady(): void {
 describe("Elements.create", () => {
   afterEach(() => {
     document.body.replaceChildren();
+    vi.restoreAllMocks();
   });
 
   it("returns an Element instance for each field", () => {
@@ -121,6 +122,44 @@ describe("Elements.create", () => {
       }
     })() as ArcPayError;
     expect(err.code).toBe("duplicate_element");
+    els.destroy();
+  });
+
+  it("applies factory appearance to created elements unless an element overrides it", () => {
+    const els = new Elements({
+      publishableKey: PK,
+      iframeBase: IFRAME_BASE,
+      appearance: {
+        variables: {
+          colorText: "#111827",
+        },
+      },
+    });
+    const divs = makeMountDivs();
+    const cardNumber = els.create("cardNumber");
+    const cardExpiry = els.create("cardExpiry", {
+      appearance: {
+        variables: {
+          colorText: "#0f766e",
+        },
+      },
+    });
+
+    cardNumber.mount(divs.cn);
+    cardExpiry.mount(divs.ce);
+    const mocks = mockAllIframeContentWindows();
+
+    dispatchFromIframe({ type: "arcpay:ready" }, mocks[0]);
+    dispatchFromIframe({ type: "arcpay:ready" }, mocks[1]);
+
+    expect(mocks[0].postMessage).toHaveBeenCalledWith(
+      { type: "arcpay:style", payload: { base: { color: "#111827" } } },
+      IFRAME_ORIGIN,
+    );
+    expect(mocks[1].postMessage).toHaveBeenCalledWith(
+      { type: "arcpay:style", payload: { base: { color: "#0f766e" } } },
+      IFRAME_ORIGIN,
+    );
     els.destroy();
   });
 });

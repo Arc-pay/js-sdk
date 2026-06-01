@@ -19,6 +19,8 @@ export type IframeToParent =
       type: "arcpay:change";
       field: FieldType;
       isValid: boolean;
+      isEmpty: boolean;
+      isComplete: boolean;
       brand?: string;
       lastFour?: string;
     }
@@ -37,6 +39,8 @@ export interface StyleSubset {
   base: Record<string, string>;
   invalid?: Record<string, string>;
   focus?: Record<string, string>;
+  complete?: Record<string, string>;
+  empty?: Record<string, string>;
 }
 
 type TokenizeErrorType = "validation_error" | "configuration_error" | "network_error" | "api_error";

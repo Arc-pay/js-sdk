@@ -237,6 +237,8 @@ describe("Element events — arcpay:ready", () => {
         type: "arcpay:change",
         field: "cardNumber",
         isValid: true,
+        isEmpty: false,
+        isComplete: true,
       },
       cw,
     );
@@ -281,6 +283,8 @@ describe("Element events — arcpay:change", () => {
         type: "arcpay:change",
         field: "cardNumber",
         isValid: true,
+        isEmpty: false,
+        isComplete: true,
         brand: "visa",
         lastFour: "1234",
       },
@@ -291,6 +295,8 @@ describe("Element events — arcpay:change", () => {
     expect(listener).toHaveBeenCalledWith({
       type: "change",
       isValid: true,
+      isEmpty: false,
+      isComplete: true,
       brand: "visa",
       lastFour: "1234",
     });
@@ -311,6 +317,8 @@ describe("Element events — arcpay:change", () => {
         type: "arcpay:change",
         field: "cardExpiry",
         isValid: false,
+        isEmpty: false,
+        isComplete: false,
       },
       cw,
     );
@@ -334,11 +342,95 @@ describe("Element events — arcpay:change", () => {
         type: "arcpay:change",
         field: "cardNumber",
         isValid: true,
+        isEmpty: false,
+        isComplete: true,
       },
       cw,
     );
 
     expect(listener).not.toHaveBeenCalled();
+    el.destroy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+describe("Element appearance", () => {
+  let container: HTMLDivElement;
+
+  beforeEach(() => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+  });
+
+  afterEach(() => {
+    document.body.replaceChildren();
+    vi.restoreAllMocks();
+  });
+
+  it("sends normalized appearance to the iframe after ready", () => {
+    const el = new Element(
+      "cardNumber",
+      {
+        appearance: {
+          variables: {
+            fontFamily: "Inter, system-ui, sans-serif",
+            colorText: "#111827",
+            colorPlaceholder: "#9ca3af",
+          },
+          rules: {
+            base: { border: "1px solid red" },
+            focus: { "font-weight": "600" },
+          },
+        },
+      },
+      makeContext(),
+    );
+    el.mount(container);
+    const iframe = getIframe();
+    const cw = mockIframeContentWindow(iframe);
+
+    dispatchFromIframe({ type: "arcpay:ready" }, cw);
+
+    expect(cw.postMessage).toHaveBeenCalledWith(
+      {
+        type: "arcpay:style",
+        payload: {
+          base: {
+            "font-family": "Inter, system-ui, sans-serif",
+            color: "#111827",
+            "--arcpay-placeholder-color": "#9ca3af",
+          },
+          focus: { "font-weight": "600" },
+        },
+      },
+      IFRAME_ORIGIN,
+    );
+    el.destroy();
+  });
+
+  it("update() sends normalized appearance without accepting container CSS", () => {
+    const el = new Element("cardNumber", {}, makeContext());
+    el.mount(container);
+    const iframe = getIframe();
+    const cw = mockIframeContentWindow(iframe);
+
+    el.update({
+      appearance: {
+        rules: {
+          base: {
+            color: "#0f172a",
+            padding: "12px",
+            "box-shadow": "0 0 0 1px red",
+          },
+        },
+      },
+    });
+
+    expect(cw.postMessage).toHaveBeenCalledWith(
+      { type: "arcpay:style", payload: { base: { color: "#0f172a" } } },
+      IFRAME_ORIGIN,
+    );
     el.destroy();
   });
 });
