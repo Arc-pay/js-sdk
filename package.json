@@ -58,7 +58,7 @@
     "dev": "tsup --watch",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.typecheck.json",
     "size": "node ./scripts/check-bundle-size.mjs",
     "prepack": "pnpm typecheck && pnpm test && pnpm build:all && pnpm size",
     "prepublishOnly": "pnpm prepack",

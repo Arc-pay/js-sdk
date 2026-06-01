@@ -80,7 +80,12 @@ export const postToIframe = (
 
 export const postToParent = (message: IframeToParent, targetOrigin: string): void => {
   if (targetOrigin === "*") {
-    throw new Error("postToParent: targetOrigin cannot be '*'");
+    throw new ArcPayError({
+      type: "validation_error",
+      code: "wildcard_origin_forbidden",
+      message: "postToParent: targetOrigin cannot be '*'",
+      retryable: false,
+    });
   }
   window.parent.postMessage(message, targetOrigin);
 };

@@ -116,6 +116,7 @@ describe("postToParent", () => {
 
   it("throws when targetOrigin is '*'", () => {
     const msg = { type: "arcpay:ready" as const };
+    expect(() => postToParent(msg, "*")).toThrowError(ArcPayError);
     expect(() => postToParent(msg, "*")).toThrow(/cannot be '\*'/);
   });
 });

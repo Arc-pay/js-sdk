@@ -21,13 +21,31 @@ export interface HostedFieldsAppearanceVariables {
 
 export type HostedFieldsAppearanceRule = "base" | "focus" | "invalid" | "complete" | "empty";
 
+export type HostedFieldsStyleProperty =
+  | "--arcpay-placeholder-color"
+  | "background-color"
+  | "caret-color"
+  | "color"
+  | "font-family"
+  | "font-size"
+  | "font-style"
+  | "font-weight"
+  | "letter-spacing"
+  | "line-height"
+  | "opacity"
+  | "text-align"
+  | "text-decoration"
+  | "text-transform";
+
+export type HostedFieldsStyleBlock = Partial<Record<HostedFieldsStyleProperty, string>>;
+
 export interface HostedFieldsAppearance {
   theme?: HostedFieldsTheme;
   variables?: HostedFieldsAppearanceVariables;
-  rules?: Partial<Record<HostedFieldsAppearanceRule, Record<string, string>>>;
+  rules?: Partial<Record<HostedFieldsAppearanceRule, HostedFieldsStyleBlock>>;
 }
 
-const ALLOWED_PROPERTIES = new Set([
+const ALLOWED_PROPERTIES = new Set<HostedFieldsStyleProperty>([
   "--arcpay-placeholder-color",
   "background-color",
   "caret-color",
@@ -43,6 +61,9 @@ const ALLOWED_PROPERTIES = new Set([
   "text-decoration",
   "text-transform",
 ]);
+
+const isAllowedProperty = (property: string): property is HostedFieldsStyleProperty =>
+  ALLOWED_PROPERTIES.has(property as HostedFieldsStyleProperty);
 
 const ARCPAY_THEME: StyleSubset = {
   base: {
@@ -98,7 +119,7 @@ const sanitizeBlock = (block: Record<string, string>): Record<string, string> =>
   const out: Record<string, string> = {};
   for (const [key, value] of Object.entries(block)) {
     const normalizedKey = key.toLowerCase();
-    if (!ALLOWED_PROPERTIES.has(normalizedKey)) {
+    if (!isAllowedProperty(normalizedKey)) {
       continue;
     }
     out[normalizedKey] = value;

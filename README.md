@@ -103,8 +103,10 @@ merchant checkout pages. `theme: "arcpay"` is available for demos and quick
 starts. Supported iframe properties are limited to text, color, caret,
 placeholder, opacity, and `background-color`; container CSS such as border,
 padding, margin, shadow, position, transform, and z-index is intentionally
-dropped. Use element `change` events (`isEmpty`, `isComplete`, `isValid`,
-`brand`, `lastFour`) to style your own wrappers.
+dropped. The exported `HostedFieldsStyleProperty` and `HostedFieldsStyleBlock`
+types expose the same allowlist to TypeScript integrations. Use element `change`
+events (`isEmpty`, `isComplete`, `isValid`, `brand`, `lastFour`) to style your
+own wrappers.
 
 `@thavguard/arc-pay/server` intentionally does not expose `tokenizeCard()`.
 Tokenization belongs to Hosted Fields. Direct browser calls with a publishable

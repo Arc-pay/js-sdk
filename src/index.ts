@@ -47,6 +47,8 @@ export type { ElementsOptions } from "./elements/elements";
 export type {
   HostedFieldsAppearance,
   HostedFieldsAppearanceRule,
+  HostedFieldsStyleBlock,
+  HostedFieldsStyleProperty,
   HostedFieldsAppearanceVariables,
   HostedFieldsTheme,
 } from "./elements/style";
