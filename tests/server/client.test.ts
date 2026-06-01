@@ -134,6 +134,17 @@ describe("server ArcPayClient", () => {
         capture_mode: "one_stage",
       });
     void createPaymentWithoutIdempotencyOptions;
+    const completeThreeDSMethodWithoutIdempotencyOptions = () =>
+      // @ts-expect-error idempotency options are required at compile time.
+      idempotentClient.completeThreeDSMethod("pay_1", {
+        completion_indicator: "Y",
+        three_ds_server_trans_id: "019e6b4e-ae3b-7776-8a56-7c0f8db5e303",
+      });
+    void completeThreeDSMethodWithoutIdempotencyOptions;
+    const cancelLinkWithoutIdempotencyOptions = () =>
+      // @ts-expect-error idempotency options are required at compile time.
+      idempotentClient.cancelLink("link_1");
+    void cancelLinkWithoutIdempotencyOptions;
 
     const requiredMethods = [
       {
@@ -227,6 +238,22 @@ describe("server ArcPayClient", () => {
             },
             opts as any,
           ),
+      },
+      {
+        name: "completeThreeDSMethod",
+        invoke: (opts: unknown) =>
+          idempotentClient.completeThreeDSMethod(
+            "pay_1",
+            {
+              completion_indicator: "Y",
+              three_ds_server_trans_id: "019e6b4e-ae3b-7776-8a56-7c0f8db5e303",
+            },
+            opts as any,
+          ),
+      },
+      {
+        name: "cancelLink",
+        invoke: (opts: unknown) => idempotentClient.cancelLink("link_1", opts as any),
       },
     ];
 
@@ -466,6 +493,18 @@ describe("server ArcPayClient", () => {
 
     const [, init] = fetchMock.mock.calls[0]!;
     expect(init.headers["Idempotency-Key"]).toBe("019e6b4e-ae3b-7776-8a56-7c0f8db5e304");
+  });
+
+  it("parses empty successful responses as undefined", async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
+    const client = new ArcPayClient({
+      secretKey: "sk_test_x",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+
+    await expect(
+      client.cancelLink("link_1", { idempotencyKey: "019e6b4e-ae3b-7776-8a56-7c0f8db5e305" }),
+    ).resolves.toBeUndefined();
   });
 
   it("creates a checkout session with an idempotency key", async () => {

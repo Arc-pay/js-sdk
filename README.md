@@ -116,9 +116,10 @@ and checkout sessions.
 
 Mutating server-client methods require an explicit `{ idempotencyKey }`:
 `createPayment`, `createCardSetup`, `executePayment`, `capturePayment`, `voidPayment`,
-`createRefund`, `chargeSavedCard`, `createLink`, and
-`createCheckoutSession`. Missing idempotency raises `ArcPayError` with
-`code="missing_idempotency_key"` before any HTTP request is sent.
+`createRefund`, `chargeSavedCard`, `completeThreeDSMethod`, `createLink`,
+`cancelLink`, and `createCheckoutSession`. Missing idempotency raises
+`ArcPayError` with `code="missing_idempotency_key"` before any HTTP request is
+sent.
 
 H2H card payments require HTTPS `success_url` and `fail_url` on
 `createPayment`. Arc Pay stores those URLs on the payment and redirects the
@@ -146,10 +147,12 @@ const result = await fetch(`/api/payments/${paymentId}/execute`, {
 
 await runThreeDSBrowserFlow(result.next_action, {
   async completeThreeDSMethod(completion) {
+    const idempotencyKey = crypto.randomUUID();
     const response = await fetch(`/api/payments/${paymentId}/complete-3ds-method`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
       },
       body: JSON.stringify(completion),
     });

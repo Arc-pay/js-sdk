@@ -276,6 +276,17 @@ const parseErrorResponse = async (res: Response): Promise<ArcPayError> => {
   });
 };
 
+const parseSuccessResponse = async <T>(res: Response): Promise<T> => {
+  if (res.status === 204 || res.headers.get("content-length") === "0") {
+    return undefined as T;
+  }
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!contentType.toLowerCase().includes("application/json")) {
+    return undefined as T;
+  }
+  return (await res.json()) as T;
+};
+
 export class ArcPayClient {
   private readonly secretKey: string;
   private readonly apiBase: string;
@@ -440,13 +451,14 @@ export class ArcPayClient {
   async completeThreeDSMethod(
     paymentId: string,
     body: CompleteThreeDSMethodRequest,
-    opts: RequestOptions = {},
+    opts: IdempotencyOptions,
   ): Promise<ExecutePaymentResponse> {
     return this.request<ExecutePaymentResponse>(
       "POST",
       `/payments/${encodeURIComponent(paymentId)}/complete-3ds-method`,
       body,
       opts,
+      true,
     );
   }
 
@@ -471,8 +483,15 @@ export class ArcPayClient {
     return this.request<Link>("GET", `/links/${encodeURIComponent(linkId)}`, undefined, opts);
   }
 
-  async cancelLink(linkId: string, opts: RequestOptions = {}): Promise<Link> {
-    return this.request<Link>("DELETE", `/links/${encodeURIComponent(linkId)}`, undefined, opts);
+  async cancelLink(linkId: string, opts: IdempotencyOptions): Promise<Link>;
+  async cancelLink(linkId: string, opts: RequestOptionsInput): Promise<Link> {
+    return this.request<Link>(
+      "DELETE",
+      `/links/${encodeURIComponent(linkId)}`,
+      undefined,
+      opts,
+      true,
+    );
   }
 
   async createCheckoutSession(
@@ -521,7 +540,7 @@ export class ArcPayClient {
       });
     }
     if (!res.ok) throw await parseErrorResponse(res);
-    return (await res.json()) as T;
+    return parseSuccessResponse<T>(res);
   }
 }
 

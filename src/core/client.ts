@@ -88,6 +88,17 @@ const parseErrorResponse = async (res: Response): Promise<ArcPayError> => {
   });
 };
 
+const parseSuccessResponse = async <T>(res: Response): Promise<T> => {
+  if (res.status === 204 || res.headers.get("content-length") === "0") {
+    return undefined as T;
+  }
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!contentType.toLowerCase().includes("application/json")) {
+    return undefined as T;
+  }
+  return (await res.json()) as T;
+};
+
 export const createClient = (config: ClientConfig): Client => {
   const send = async <T>(
     method: "GET" | "POST",
@@ -114,7 +125,7 @@ export const createClient = (config: ClientConfig): Client => {
       });
     }
     if (!res.ok) throw await parseErrorResponse(res);
-    return (await res.json()) as T;
+    return parseSuccessResponse<T>(res);
   };
 
   return {
