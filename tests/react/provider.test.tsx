@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { ArcPay } from "../../src";
 import { ArcPayProvider, useArcPay } from "../../src/react";
 
@@ -13,6 +13,10 @@ const Probe = () => {
 describe("ArcPayProvider + useArcPay", () => {
   beforeEach(() => {
     ArcPay.__resetForTests();
+  });
+
+  afterEach(() => {
+    cleanup();
   });
 
   it("loads instance and exposes via hook", async () => {
