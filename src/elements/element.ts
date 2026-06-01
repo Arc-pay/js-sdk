@@ -3,21 +3,27 @@ import {
   type FieldType,
   type ParentToIframe,
   type IframeToParent,
-  type StyleSubset,
   postToIframe,
   parseIncoming,
 } from "./postmessage";
-import { sanitizeStyle } from "./style";
+import { buildStyleFromAppearance, type HostedFieldsAppearance } from "./style";
 
 export interface ElementOptions {
-  /** StyleSubset applied via arcpay:style postMessage. */
-  style?: StyleSubset;
+  /** Iframe-safe input appearance. Container layout remains merchant-owned CSS. */
+  appearance?: HostedFieldsAppearance;
   placeholder?: string;
 }
 
 export type ElementEvent =
   | { type: "ready" }
-  | { type: "change"; isValid: boolean; brand?: string; lastFour?: string }
+  | {
+      type: "change";
+      isValid: boolean;
+      isEmpty: boolean;
+      isComplete: boolean;
+      brand?: string;
+      lastFour?: string;
+    }
   | { type: "error"; reason: string };
 
 type Listener = (event: ElementEvent) => void;
@@ -113,9 +119,11 @@ export class Element {
   private handleMessage(data: IframeToParent): void {
     if (data.type === "arcpay:ready") {
       this.status = "ready";
-      // Apply initial style if provided at construction time.
-      if (this.options.style) {
-        this.send({ type: "arcpay:style", payload: sanitizeStyle(this.options.style) });
+      if (this.options.appearance) {
+        this.send({
+          type: "arcpay:style",
+          payload: buildStyleFromAppearance(this.options.appearance),
+        });
       }
       if (this.options.placeholder) {
         this.send({
@@ -132,6 +140,8 @@ export class Element {
       this.emit({
         type: "change",
         isValid: data.isValid,
+        isEmpty: data.isEmpty,
+        isComplete: data.isComplete,
         brand: data.brand,
         lastFour: data.lastFour,
       });
@@ -139,9 +149,12 @@ export class Element {
     // arcpay:tokenize-result / arcpay:tokenize-error handled by Elements factory (Task 9).
   }
 
-  update(options: { style?: StyleSubset; placeholder?: string }): void {
-    if (options.style) {
-      this.send({ type: "arcpay:style", payload: sanitizeStyle(options.style) });
+  update(options: { appearance?: HostedFieldsAppearance; placeholder?: string }): void {
+    if (options.appearance) {
+      this.send({
+        type: "arcpay:style",
+        payload: buildStyleFromAppearance(options.appearance),
+      });
     }
     if (options.placeholder) {
       this.send({

@@ -3,10 +3,14 @@ import { Element, type ElementContext, type ElementOptions } from "./element";
 import type { FieldType, IframeToParent } from "./postmessage";
 import { parseIncoming } from "./postmessage";
 import type { TokenizeResult } from "../tokenize/tokenize";
+import type { HostedFieldsAppearance } from "./style";
 
 export type {};
 
-export type ElementsOptions = Record<string, never>;
+export interface ElementsOptions {
+  /** Default iframe-safe input appearance applied to elements created by this factory. */
+  appearance?: HostedFieldsAppearance;
+}
 
 const DEFAULT_IFRAME_BASE = "https://sdk.arcpay.space";
 
@@ -28,11 +32,17 @@ export class Elements {
   private readonly publishableKey: string;
   private readonly channelId: string;
   private tokenizeInFlight = false;
+  private readonly appearance?: HostedFieldsAppearance;
 
-  constructor(opts: { publishableKey: string; iframeBase?: string }) {
+  constructor(opts: {
+    publishableKey: string;
+    iframeBase?: string;
+    appearance?: HostedFieldsAppearance;
+  }) {
     this.publishableKey = opts.publishableKey;
     this.iframeBase = opts.iframeBase ?? DEFAULT_IFRAME_BASE;
     this.channelId = createChannelId();
+    this.appearance = opts.appearance;
   }
 
   create(field: FieldType, options: ElementOptions = {}): Element {
@@ -49,7 +59,14 @@ export class Elements {
       publishableKey: this.publishableKey,
       channelId: this.channelId,
     };
-    const element = new Element(field, options, ctx);
+    const element = new Element(
+      field,
+      {
+        ...options,
+        appearance: options.appearance ?? this.appearance,
+      },
+      ctx,
+    );
     this.elementMap.set(field, element);
     return element;
   }

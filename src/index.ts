@@ -44,3 +44,9 @@ export type { FieldType } from "./elements/postmessage";
 export type { ElementOptions, ElementEvent } from "./elements/element";
 export { Elements } from "./elements/elements";
 export type { ElementsOptions } from "./elements/elements";
+export type {
+  HostedFieldsAppearance,
+  HostedFieldsAppearanceRule,
+  HostedFieldsAppearanceVariables,
+  HostedFieldsTheme,
+} from "./elements/style";

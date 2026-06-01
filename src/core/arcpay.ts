@@ -27,7 +27,7 @@ const buildInstance = (publishableKey: string): ArcPayInstance => {
   return {
     publishableKey,
     environment: detectEnvironment(publishableKey),
-    elements: () => new Elements({ publishableKey }),
+    elements: (opts = {}) => new Elements({ publishableKey, ...opts }),
   };
 };
 

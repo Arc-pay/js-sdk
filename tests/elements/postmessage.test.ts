@@ -163,6 +163,8 @@ describe("parseIncoming", () => {
       type: "arcpay:change" as const,
       field: "cardNumber" as const,
       isValid: true,
+      isEmpty: false,
+      isComplete: true,
       brand: "visa",
       lastFour: "1234",
     };

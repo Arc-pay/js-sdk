@@ -54,6 +54,58 @@ with `Authorization: Bearer <pk_...>`, `Content-Type`, optional
 may use either `Authorization: Bearer <pk_...>` or `X-Api-Key: pk_...` for
 `/payments/{id}/tokenize`.
 
+### Hosted Fields appearance
+
+Hosted Fields are secure iframe inputs. The merchant page owns layout and
+container styling: labels, wrappers, spacing, borders, shadows, error text, and
+the submit button should be regular merchant CSS. Arc Pay only styles the input
+text inside each iframe through a typed, allowlisted `appearance` contract.
+
+```ts
+const elements = arcpay.elements({
+  appearance: {
+    variables: {
+      fontFamily: "Inter, system-ui, sans-serif",
+      fontSize: "16px",
+      lineHeight: "24px",
+      colorText: "#111827",
+      colorPlaceholder: "#9ca3af",
+      colorDanger: "#dc2626",
+      caretColor: "#111827",
+    },
+    rules: {
+      focus: { "font-weight": "600" },
+      invalid: { color: "#dc2626" },
+      complete: { color: "#047857" },
+    },
+  },
+});
+
+const number = elements.create("cardNumber", {
+  placeholder: "1234 1234 1234 1234",
+});
+const expiry = elements.create("cardExpiry");
+const cvc = elements.create("cardCvv", {
+  appearance: {
+    rules: {
+      base: { "text-align": "center" },
+    },
+  },
+});
+
+number.mount("#card-number");
+expiry.mount("#card-expiry");
+cvc.mount("#card-cvv");
+```
+
+`appearance.theme` defaults to `"none"` so Arc Pay branding is not imposed on
+merchant checkout pages. `theme: "arcpay"` is available for demos and quick
+starts. Supported iframe properties are limited to text, color, caret,
+placeholder, opacity, and `background-color`; container CSS such as border,
+padding, margin, shadow, position, transform, and z-index is intentionally
+dropped. Use element `change` events (`isEmpty`, `isComplete`, `isValid`,
+`brand`, `lastFour`) to style your own wrappers.
+
 `@thavguard/arc-pay/server` intentionally does not expose `tokenizeCard()`.
 Tokenization belongs to Hosted Fields. Direct browser calls with a publishable
 key are only for explicitly approved raw-card forms; those forms handle
