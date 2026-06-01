@@ -160,6 +160,21 @@ describe("buildStyleFromAppearance", () => {
     });
   });
 
+  it("lets appearance variables override Arc Pay preset state colors", () => {
+    const out = buildStyleFromAppearance({
+      theme: "arcpay",
+      variables: {
+        colorText: "#123456",
+      },
+    });
+
+    expect(out.base.color).toBe("#123456");
+    expect(out.focus?.color).toBe("#123456");
+    expect(out.empty?.color).toBe("#123456");
+    expect(out.complete?.color).toBe("#123456");
+    expect(out.invalid?.color).toBe("#123456");
+  });
+
   it("rejects unknown themes instead of silently falling back", () => {
     expect(() => buildStyleFromAppearance({ theme: "legacy" as "none" | "arcpay" })).toThrowError(
       ArcPayError,
