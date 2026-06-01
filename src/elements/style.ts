@@ -157,7 +157,6 @@ export const buildStyleFromAppearance = (appearance?: HostedFieldsAppearance): S
 
     if (variables.colorText !== undefined && appearance?.theme === "arcpay") {
       variableStyle.focus = { color: variables.colorText };
-      variableStyle.invalid = { color: variables.colorText };
       variableStyle.complete = { color: variables.colorText };
       variableStyle.empty = { color: variables.colorText };
     }
