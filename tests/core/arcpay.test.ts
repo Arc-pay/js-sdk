@@ -46,7 +46,7 @@ describe("ArcPay.load", () => {
     window.dispatchEvent(event);
 
     expect(contentWindow.postMessage).toHaveBeenCalledWith(
-      { type: "arcpay:style", payload: { base: { color: "#111827" } } },
+      { type: "arcpay:configure", field: "cardNumber", payload: { base: { color: "#111827" } } },
       "https://sdk.arcpay.space",
     );
     elements.destroy();

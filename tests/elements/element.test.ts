@@ -179,7 +179,7 @@ describe("Element events — arcpay:ready", () => {
     vi.restoreAllMocks();
   });
 
-  it("emits ready event and sets isReady() = true on arcpay:ready", () => {
+  it("emits ready once after iframe confirms configuration", () => {
     const el = new Element("cardNumber", {}, makeContext());
     el.mount(container);
     const iframe = getIframe();
@@ -190,10 +190,18 @@ describe("Element events — arcpay:ready", () => {
 
     expect(el.isReady()).toBe(false);
     dispatchFromIframe({ type: "arcpay:ready" }, cw);
+    expect(listener).not.toHaveBeenCalled();
+    expect(el.isReady()).toBe(false);
+
+    dispatchFromIframe({ type: "arcpay:configured" }, cw);
 
     expect(listener).toHaveBeenCalledOnce();
     expect(listener).toHaveBeenCalledWith({ type: "ready" });
     expect(el.isReady()).toBe(true);
+
+    dispatchFromIframe({ type: "arcpay:ready" }, cw);
+    dispatchFromIframe({ type: "arcpay:configured" }, cw);
+    expect(listener).toHaveBeenCalledOnce();
     el.destroy();
   });
 
@@ -228,6 +236,7 @@ describe("Element events — arcpay:ready", () => {
     el.on("error", error);
 
     dispatchFromIframe({ type: "arcpay:ready" }, cw);
+    dispatchFromIframe({ type: "arcpay:configured" }, cw);
     expect(ready).toHaveBeenCalledOnce();
     expect(change).not.toHaveBeenCalled();
     expect(error).not.toHaveBeenCalled();
@@ -394,7 +403,8 @@ describe("Element appearance", () => {
 
     expect(cw.postMessage).toHaveBeenCalledWith(
       {
-        type: "arcpay:style",
+        type: "arcpay:configure",
+        field: "cardNumber",
         payload: {
           base: {
             "font-family": "Inter, system-ui, sans-serif",
@@ -403,6 +413,26 @@ describe("Element appearance", () => {
           },
           focus: { "font-weight": "600" },
         },
+      },
+      IFRAME_ORIGIN,
+    );
+    el.destroy();
+  });
+
+  it("initial configuration preserves an explicit empty placeholder", () => {
+    const el = new Element("cardNumber", { placeholder: "" }, makeContext());
+    el.mount(container);
+    const iframe = getIframe();
+    const cw = mockIframeContentWindow(iframe);
+
+    dispatchFromIframe({ type: "arcpay:ready" }, cw);
+
+    expect(cw.postMessage).toHaveBeenCalledWith(
+      {
+        type: "arcpay:configure",
+        field: "cardNumber",
+        payload: { base: {} },
+        placeholder: "",
       },
       IFRAME_ORIGIN,
     );
@@ -429,6 +459,21 @@ describe("Element appearance", () => {
 
     expect(cw.postMessage).toHaveBeenCalledWith(
       { type: "arcpay:style", payload: { base: { color: "#0f172a" } } },
+      IFRAME_ORIGIN,
+    );
+    el.destroy();
+  });
+
+  it("update() can clear placeholder explicitly", () => {
+    const el = new Element("cardNumber", { placeholder: "PAN" }, makeContext());
+    el.mount(container);
+    const iframe = getIframe();
+    const cw = mockIframeContentWindow(iframe);
+
+    el.update({ placeholder: "" });
+
+    expect(cw.postMessage).toHaveBeenCalledWith(
+      { type: "arcpay:placeholder", field: "cardNumber", placeholder: "" },
       IFRAME_ORIGIN,
     );
     el.destroy();
@@ -534,6 +579,7 @@ describe("Element.destroy", () => {
     const cw = mockIframeContentWindow(iframe);
 
     dispatchFromIframe({ type: "arcpay:ready" }, cw);
+    dispatchFromIframe({ type: "arcpay:configured" }, cw);
     expect(el.isReady()).toBe(true);
 
     el.destroy();

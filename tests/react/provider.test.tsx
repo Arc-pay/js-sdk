@@ -33,6 +33,24 @@ describe("ArcPayProvider + useArcPay", () => {
     await waitFor(() => expect(screen.getByTestId("key")).toBeTruthy());
   });
 
+  it("returns to loading when publishable key changes", async () => {
+    const { rerender } = render(
+      <ArcPayProvider publishableKey="pk_test_x">
+        <Probe />
+      </ArcPayProvider>,
+    );
+    expect(await screen.findByTestId("key")).toHaveTextContent("pk_test_x");
+
+    rerender(
+      <ArcPayProvider publishableKey="pk_test_y">
+        <Probe />
+      </ArcPayProvider>,
+    );
+
+    expect(screen.getByText("loading")).toBeTruthy();
+    expect(await screen.findByTestId("key")).toHaveTextContent("pk_test_y");
+  });
+
   it("useArcPay throws when used outside provider", () => {
     const Bad = () => {
       useArcPay();

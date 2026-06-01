@@ -82,10 +82,11 @@ function simulateAllReady(): void {
   for (const iframe of iframes) {
     iframe.dispatchEvent(new Event("load"));
   }
-  // Each iframe sends arcpay:ready after handshake; simulate per-iframe.
+  // Each iframe sends arcpay:ready after handshake, then confirms configuration.
   for (const iframe of iframes) {
     const cw = (iframe as HTMLIFrameElement).contentWindow;
     dispatchFromIframe({ type: "arcpay:ready" }, cw);
+    dispatchFromIframe({ type: "arcpay:configured" }, cw);
   }
 }
 
@@ -153,11 +154,11 @@ describe("Elements.create", () => {
     dispatchFromIframe({ type: "arcpay:ready" }, mocks[1]);
 
     expect(mocks[0].postMessage).toHaveBeenCalledWith(
-      { type: "arcpay:style", payload: { base: { color: "#111827" } } },
+      { type: "arcpay:configure", field: "cardNumber", payload: { base: { color: "#111827" } } },
       IFRAME_ORIGIN,
     );
     expect(mocks[1].postMessage).toHaveBeenCalledWith(
-      { type: "arcpay:style", payload: { base: { color: "#0f766e" } } },
+      { type: "arcpay:configure", field: "cardExpiry", payload: { base: { color: "#0f766e" } } },
       IFRAME_ORIGIN,
     );
     els.destroy();

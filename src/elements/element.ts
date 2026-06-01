@@ -118,20 +118,16 @@ export class Element {
 
   private handleMessage(data: IframeToParent): void {
     if (data.type === "arcpay:ready") {
+      if (this.status !== "pending") return;
+      this.send({
+        type: "arcpay:configure",
+        field: this.field,
+        payload: buildStyleFromAppearance(this.options.appearance),
+        ...("placeholder" in this.options ? { placeholder: this.options.placeholder ?? "" } : {}),
+      });
+    } else if (data.type === "arcpay:configured") {
+      if (this.status !== "pending") return;
       this.status = "ready";
-      if (this.options.appearance) {
-        this.send({
-          type: "arcpay:style",
-          payload: buildStyleFromAppearance(this.options.appearance),
-        });
-      }
-      if (this.options.placeholder) {
-        this.send({
-          type: "arcpay:placeholder",
-          field: this.field,
-          placeholder: this.options.placeholder,
-        });
-      }
       this.emit({ type: "ready" });
     } else if (data.type === "arcpay:rejected") {
       this.status = "error";
@@ -150,17 +146,17 @@ export class Element {
   }
 
   update(options: { appearance?: HostedFieldsAppearance; placeholder?: string }): void {
-    if (options.appearance) {
+    if ("appearance" in options) {
       this.send({
         type: "arcpay:style",
         payload: buildStyleFromAppearance(options.appearance),
       });
     }
-    if (options.placeholder) {
+    if ("placeholder" in options) {
       this.send({
         type: "arcpay:placeholder",
         field: this.field,
-        placeholder: options.placeholder,
+        placeholder: options.placeholder ?? "",
       });
     }
   }

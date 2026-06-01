@@ -22,6 +22,7 @@ export const ArcPayProvider: React.FC<ArcPayProviderProps> = ({ publishableKey, 
 
   React.useEffect(() => {
     let canceled = false;
+    setState({ status: "loading", instance: null, error: null });
     ArcPay.load(publishableKey)
       .then((instance) => {
         if (!canceled) setState({ status: "ready", instance, error: null });

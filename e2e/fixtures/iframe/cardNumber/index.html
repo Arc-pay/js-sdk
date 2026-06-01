@@ -31,6 +31,12 @@
           return;
         }
 
+        if (data.type === "arcpay:configure") {
+          window.__lastArcPayStyle = data.payload;
+          window.parent.postMessage({ type: "arcpay:configured" }, parentOrigin);
+          return;
+        }
+
         if (data.type === "arcpay:tokenize") {
           if (!parentOrigin || event.origin !== window.location.origin) return;
           window.parent.postMessage(

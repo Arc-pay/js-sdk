@@ -23,6 +23,11 @@
           parentOrigin = verifiedParentOrigin(event, data);
           if (!parentOrigin) return;
           window.parent.postMessage({ type: "arcpay:ready" }, parentOrigin);
+          return;
+        }
+
+        if (data.type === "arcpay:configure") {
+          window.parent.postMessage({ type: "arcpay:configured" }, parentOrigin);
         }
       });
     </script>
