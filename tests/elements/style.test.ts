@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildStyleFromAppearance, sanitizeStyle } from "../../src/elements/style";
+import { ArcPayError } from "../../src/core/errors";
 
 describe("sanitizeStyle", () => {
   it("preserves allowed properties", () => {
@@ -157,5 +158,11 @@ describe("buildStyleFromAppearance", () => {
       "font-size": "16px",
       color: "#111827",
     });
+  });
+
+  it("rejects unknown themes instead of silently falling back", () => {
+    expect(() => buildStyleFromAppearance({ theme: "legacy" as "none" | "arcpay" })).toThrowError(
+      ArcPayError,
+    );
   });
 });

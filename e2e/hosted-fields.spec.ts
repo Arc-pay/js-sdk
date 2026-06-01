@@ -47,4 +47,61 @@ test.describe("Hosted Fields", () => {
       expiresAt: "2026-05-12T12:00:00Z",
     });
   });
+
+  test("sends only iframe-safe appearance styles to hosted fields", async ({ page }) => {
+    await page.goto("/merchant.html");
+    await page.waitForFunction(() => (window as any).__arcpay);
+
+    await page.evaluate(async () => {
+      const arcpay = (window as any).__arcpay;
+      const root = document.createElement("div");
+      root.innerHTML = `<div id="card-number" style="height: 32px"></div>`;
+      document.body.appendChild(root);
+
+      const elements = arcpay.elements({
+        iframeBase: window.location.origin,
+        appearance: {
+          variables: {
+            colorText: "rgb(15, 23, 42)",
+            colorPlaceholder: "rgb(100, 116, 139)",
+            caretColor: "rgb(15, 23, 42)",
+          },
+          rules: {
+            base: {
+              border: "10px solid red",
+              padding: "24px",
+              "font-weight": "600",
+            },
+            focus: {
+              color: "rgb(14, 116, 144)",
+            },
+          },
+        },
+      });
+      const field = elements.create("cardNumber");
+      await new Promise<void>((resolve, reject) => {
+        field.on("ready", resolve);
+        field.on("error", (event: { reason: string }) => reject(new Error(event.reason)));
+        field.mount("#card-number");
+      });
+    });
+
+    const iframe = await page.locator("#card-number iframe").elementHandle();
+    const frame = await iframe?.contentFrame();
+    if (!frame) throw new Error("cardNumber iframe was not mounted");
+
+    const style = await frame.waitForFunction(() => (window as any).__lastArcPayStyle);
+
+    expect(await style.jsonValue()).toEqual({
+      base: {
+        color: "rgb(15, 23, 42)",
+        "--arcpay-placeholder-color": "rgb(100, 116, 139)",
+        "caret-color": "rgb(15, 23, 42)",
+        "font-weight": "600",
+      },
+      focus: {
+        color: "rgb(14, 116, 144)",
+      },
+    });
+  });
 });
