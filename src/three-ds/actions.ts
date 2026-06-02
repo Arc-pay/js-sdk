@@ -84,7 +84,9 @@ export type PaymentStatusSnapshot = Pick<Payment, "id" | "status" | "updated_at"
 export interface HandleNextActionOptions extends RunThreeDSBrowserFlowOptions {
   paymentId: string;
   response: ExecutePaymentResponse;
-  waitForPaymentTerminal?: (request: WaitForPaymentTerminalRequest) => Promise<PaymentStatusSnapshot>;
+  waitForPaymentTerminal?: (
+    request: WaitForPaymentTerminalRequest,
+  ) => Promise<PaymentStatusSnapshot>;
   onChallengeSubmitted?: (request: {
     paymentId: string;
     action: PaymentNextAction;

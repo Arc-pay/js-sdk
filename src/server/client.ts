@@ -281,8 +281,7 @@ const resolveRetryDelayMs = (
   attempt: number,
   error: ArcPayError,
 ): number => {
-  const value =
-    typeof retryDelayMs === "function" ? retryDelayMs(attempt, error) : retryDelayMs;
+  const value = typeof retryDelayMs === "function" ? retryDelayMs(attempt, error) : retryDelayMs;
   if (value === undefined) return defaultRetryDelayMs(attempt);
   if (!Number.isFinite(value) || value < 0) {
     throw new ArcPayError({
