@@ -44,12 +44,14 @@ function latestPublishedVersion(packageName) {
 
 function updateRuntimeVersion(fileUrl, exportName, nextVersion) {
   const source = readFileSync(fileUrl, "utf8");
-  const pattern = new RegExp(`(export\\s+)?const ${exportName} = "[^"]+";`);
+  const pattern = new RegExp(`(export\\s+)?(?:const\\s+)?${exportName}(\\s*=\\s*)"[^"]+";?`);
   if (!pattern.test(source)) {
     throw new Error(`Could not find ${exportName} in ${fileUrl.pathname}`);
   }
-  const nextSource = source.replace(pattern, (match, exportPrefix = "") => {
-    return `${exportPrefix}const ${exportName} = "${nextVersion}";`;
+  const nextSource = source.replace(pattern, (_match, exportPrefix = "", separator = " = ") => {
+    const suffix = fileUrl.pathname.endsWith(".go") ? "" : ";";
+    const keyword = fileUrl.pathname.endsWith(".go") ? "" : "const ";
+    return `${exportPrefix}${keyword}${exportName}${separator}"${nextVersion}"${suffix}`;
   });
   writeFileSync(fileUrl, nextSource);
 }

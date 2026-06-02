@@ -42,7 +42,7 @@ func TestCreatePaymentSendsServerHeadersAndIdempotencyKey(t *testing.T) {
 		if got := r.Header.Get("Idempotency-Key"); got != testIdempotencyKey {
 			t.Fatalf("Idempotency-Key = %q", got)
 		}
-		if got := r.Header.Get("User-Agent"); got != "ArcPay-Go/0.1.32" {
+		if got := r.Header.Get("User-Agent"); got != "ArcPay-Go/"+goSDKVersion {
 			t.Fatalf("User-Agent = %q", got)
 		}
 		var body CreatePaymentRequest
