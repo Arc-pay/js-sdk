@@ -57,21 +57,29 @@ export interface ArcPayClientOptions {
   secretKey: string;
   apiBase?: string;
   fetch?: typeof fetch;
+  timeoutMs?: number;
+  maxNetworkRetries?: number;
+  retryDelayMs?: number | ((attempt: number, error: ArcPayError) => number);
 }
 
 export interface IdempotencyOptions {
   idempotencyKey: string;
   signal?: AbortSignal;
+  timeoutMs?: number;
 }
 
 type RequestOptionsInput = RequestOptions | IdempotencyOptions | null | undefined;
 
 export interface RequestOptions {
   signal?: AbortSignal;
+  timeoutMs?: number;
 }
 
 const DEFAULT_API_BASE = "https://api.arcpay.space/v1";
 const API_VERSION = "2026-05-06";
+const SERVER_SDK_VERSION = "0.1.32";
+const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_MAX_NETWORK_RETRIES = 1;
 const DEFAULT_POLL_INTERVAL_MS = 1500;
 const DEFAULT_POLL_TIMEOUT_MS = 60_000;
 const DEFAULT_TERMINAL_PAYMENT_STATUSES: readonly TerminalPaymentStatus[] = [
@@ -232,6 +240,61 @@ const normalizePollMs = (value: number | undefined, fallback: number): number =>
   return value;
 };
 
+const normalizePositiveMs = (
+  value: number | undefined,
+  fallback: number,
+  code: string,
+  message: string,
+): number => {
+  if (value === undefined) return fallback;
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new ArcPayError({
+      type: "validation_error",
+      code,
+      message,
+      retryable: false,
+    });
+  }
+  return value;
+};
+
+const normalizeMaxRetries = (value: number | undefined): number => {
+  if (value === undefined) return DEFAULT_MAX_NETWORK_RETRIES;
+  if (!Number.isInteger(value) || value < 0) {
+    throw new ArcPayError({
+      type: "validation_error",
+      code: "invalid_retry_options",
+      message: "maxNetworkRetries must be a non-negative integer",
+      retryable: false,
+    });
+  }
+  return value;
+};
+
+const defaultRetryDelayMs = (attempt: number): number => {
+  const baseMs = Math.min(100 * 2 ** Math.max(0, attempt - 1), 1_000);
+  return baseMs + Math.floor(Math.random() * baseMs);
+};
+
+const resolveRetryDelayMs = (
+  retryDelayMs: ArcPayClientOptions["retryDelayMs"],
+  attempt: number,
+  error: ArcPayError,
+): number => {
+  const value =
+    typeof retryDelayMs === "function" ? retryDelayMs(attempt, error) : retryDelayMs;
+  if (value === undefined) return defaultRetryDelayMs(attempt);
+  if (!Number.isFinite(value) || value < 0) {
+    throw new ArcPayError({
+      type: "validation_error",
+      code: "invalid_retry_options",
+      message: "retryDelayMs must be a non-negative finite number",
+      retryable: false,
+    });
+  }
+  return value;
+};
+
 interface APIErrorBody {
   error?: {
     type?: string;
@@ -275,7 +338,7 @@ const parseErrorResponse = async (res: Response): Promise<ArcPayError> => {
     code: detail.code,
     message: detail.message ?? `Request failed with status ${res.status}`,
     param: detail.param,
-    requestId: detail.request_id,
+    requestId: detail.request_id ?? res.headers.get("x-request-id") ?? undefined,
     declineCode: detail.decline_code,
     retryable: isRetryableError(type, res.status, detail.code),
   });
@@ -296,6 +359,9 @@ export class ArcPayClient {
   private readonly secretKey: string;
   private readonly apiBase: string;
   private readonly fetchImpl: typeof fetch;
+  private readonly timeoutMs: number;
+  private readonly maxNetworkRetries: number;
+  private readonly retryDelayMs: ArcPayClientOptions["retryDelayMs"];
 
   constructor(options: ArcPayClientOptions) {
     const secretKey: unknown = options.secretKey;
@@ -311,6 +377,14 @@ export class ArcPayClient {
     this.secretKey = secretKey;
     this.apiBase = normalizeBase(options.apiBase ?? DEFAULT_API_BASE);
     this.fetchImpl = options.fetch ?? fetch;
+    this.timeoutMs = normalizePositiveMs(
+      options.timeoutMs,
+      DEFAULT_TIMEOUT_MS,
+      "invalid_timeout_options",
+      "timeoutMs must be a positive finite number",
+    );
+    this.maxNetworkRetries = normalizeMaxRetries(options.maxNetworkRetries);
+    this.retryDelayMs = options.retryDelayMs;
   }
 
   async listPayments(
@@ -547,6 +621,7 @@ export class ArcPayClient {
       Authorization: `Bearer ${this.secretKey}`,
       "X-Arc-Pay-API-Version": API_VERSION,
       "Content-Type": "application/json",
+      "User-Agent": `ArcPay-JS/${SERVER_SDK_VERSION}`,
     };
     if (requireIdempotency) {
       headers["Idempotency-Key"] = requireIdempotencyKey(requestOpts);
@@ -554,23 +629,56 @@ export class ArcPayClient {
       headers["Idempotency-Key"] = requireIdempotencyKey(requestOpts);
     }
 
-    let res: Response;
-    try {
-      res = await this.fetchImpl(`${this.apiBase}${path}`, {
-        method,
-        headers,
-        body: body === undefined ? undefined : JSON.stringify(body),
-        signal: requestOpts.signal,
-      });
-    } catch (err) {
-      throw new ArcPayError({
-        type: "network_error",
-        message: err instanceof Error ? err.message : "Network request failed",
-        retryable: true,
-      });
+    const url = `${this.apiBase}${path}`;
+    const bodyText = body === undefined ? undefined : JSON.stringify(body);
+    const safeToRetry = method === "GET" || headers["Idempotency-Key"] !== undefined;
+    let attempt = 0;
+
+    for (;;) {
+      attempt += 1;
+      const timeoutMs = normalizePositiveMs(
+        requestOpts.timeoutMs,
+        this.timeoutMs,
+        "invalid_timeout_options",
+        "timeoutMs must be a positive finite number",
+      );
+      const timeoutController = new AbortController();
+      const timeout = setTimeout(() => timeoutController.abort(), timeoutMs);
+      const signal = requestOpts.signal
+        ? AbortSignal.any([requestOpts.signal, timeoutController.signal])
+        : timeoutController.signal;
+
+      let error: ArcPayError | undefined;
+      try {
+        const res = await this.fetchImpl(url, {
+          method,
+          headers,
+          body: bodyText,
+          signal,
+        });
+        clearTimeout(timeout);
+        if (res.ok) return parseSuccessResponse<T>(res);
+        error = await parseErrorResponse(res);
+      } catch (err) {
+        clearTimeout(timeout);
+        const timedOut = timeoutController.signal.aborted && !requestOpts.signal?.aborted;
+        error = new ArcPayError({
+          type: timedOut ? "api_error" : "network_error",
+          code: timedOut ? "request_timeout" : undefined,
+          message: timedOut
+            ? `Request timed out after ${timeoutMs}ms`
+            : err instanceof Error
+              ? err.message
+              : "Network request failed",
+          retryable: timedOut ? true : !requestOpts.signal?.aborted,
+        });
+      }
+
+      if (!safeToRetry || !error.retryable || attempt > this.maxNetworkRetries) {
+        throw error;
+      }
+      await sleep(resolveRetryDelayMs(this.retryDelayMs, attempt, error), requestOpts.signal);
     }
-    if (!res.ok) throw await parseErrorResponse(res);
-    return parseSuccessResponse<T>(res);
   }
 }
 

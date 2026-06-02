@@ -20,7 +20,10 @@ describe("server ArcPayClient", () => {
     fetchMock = vi.fn();
   });
 
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
 
   it("rejects publishable keys on server APIs", () => {
     expect(() =>
@@ -63,6 +66,134 @@ describe("server ArcPayClient", () => {
     expect(init.headers.Authorization).toBe("Bearer sk_test_x");
     expect(init.headers["X-Arc-Pay-API-Version"]).toBe("2026-05-06");
     expect(init.headers["Idempotency-Key"]).toBe(IDEMPOTENCY_KEY);
+    expect(init.headers["User-Agent"]).toBe("ArcPay-JS/0.1.32");
+  });
+
+  it("retries transient API errors with the same idempotency key", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: {
+              type: "api_error",
+              code: "service_unavailable",
+              message: "dependency unavailable",
+              request_id: "req_retry_1",
+            },
+          }),
+          { status: 503, headers: { "content-type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        ok({
+          id: "11111111-1111-1111-1111-111111111111",
+          amount: 10000,
+          currency: "RUB",
+          payment_method: "bank_card",
+          status: "created",
+          created_at: "2026-05-12T09:00:00Z",
+          updated_at: "2026-05-12T09:00:00Z",
+        }),
+      );
+    const client = new ArcPayClient({
+      secretKey: "sk_test_x",
+      apiBase: "https://api.example.test/v1",
+      fetch: fetchMock as unknown as typeof fetch,
+      maxNetworkRetries: 1,
+      retryDelayMs: () => 0,
+    });
+
+    await client.createPayment(
+      {
+        amount: 10000,
+        currency: "RUB",
+        payment_method: "bank_card",
+        external_id: "order-retry",
+        capture_mode: "one_stage",
+      },
+      { idempotencyKey: IDEMPOTENCY_KEY },
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0]?.[1].headers["Idempotency-Key"]).toBe(IDEMPOTENCY_KEY);
+    expect(fetchMock.mock.calls[1]?.[1].headers["Idempotency-Key"]).toBe(IDEMPOTENCY_KEY);
+  });
+
+  it("does not retry Arc Pay timeout responses", async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: {
+            type: "api_error",
+            code: "timeout",
+            message: "processing timeout; poll payment status",
+            request_id: "req_timeout",
+          },
+        }),
+        { status: 504, headers: { "content-type": "application/json" } },
+      ),
+    );
+    const client = new ArcPayClient({
+      secretKey: "sk_test_x",
+      fetch: fetchMock as unknown as typeof fetch,
+      maxNetworkRetries: 2,
+      retryDelayMs: () => 0,
+    });
+
+    await expect(
+      client.createPayment(
+        {
+          amount: 10000,
+          currency: "RUB",
+          payment_method: "bank_card",
+          external_id: "order-timeout",
+          capture_mode: "one_stage",
+        },
+        { idempotencyKey: IDEMPOTENCY_KEY },
+      ),
+    ).rejects.toMatchObject({
+      code: "timeout",
+      retryable: false,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("aborts requests after the configured timeout", async () => {
+    vi.useFakeTimers();
+    fetchMock.mockImplementation(
+      (_url: string, init: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener("abort", () => {
+            reject(new DOMException("The operation was aborted", "AbortError"));
+          });
+        }),
+    );
+    const client = new ArcPayClient({
+      secretKey: "sk_test_x",
+      fetch: fetchMock as unknown as typeof fetch,
+      timeoutMs: 10,
+      maxNetworkRetries: 0,
+    });
+
+    const paymentPromise = client.createPayment(
+      {
+        amount: 10000,
+        currency: "RUB",
+        payment_method: "bank_card",
+        external_id: "order-timeout-ms",
+        capture_mode: "one_stage",
+      },
+      { idempotencyKey: IDEMPOTENCY_KEY },
+    );
+    const assertion = expect(paymentPromise).rejects.toMatchObject({
+      type: "api_error",
+      code: "request_timeout",
+      retryable: true,
+    });
+    await vi.advanceTimersByTimeAsync(10);
+
+    await assertion;
+    vi.useRealTimers();
   });
 
   it("creates a card setup intent", async () => {

@@ -5,6 +5,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 const packagePath = new URL("../package.json", import.meta.url);
 const sdkIndexPath = new URL("../src/index.ts", import.meta.url);
 const reactIndexPath = new URL("../src/react/index.ts", import.meta.url);
+const serverClientPath = new URL("../src/server/client.ts", import.meta.url);
 
 function parseVersion(version) {
   const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version);
@@ -42,11 +43,13 @@ function latestPublishedVersion(packageName) {
 
 function updateRuntimeVersion(fileUrl, exportName, nextVersion) {
   const source = readFileSync(fileUrl, "utf8");
-  const pattern = new RegExp(`export const ${exportName} = "[^"]+";`);
+  const pattern = new RegExp(`(export\\s+)?const ${exportName} = "[^"]+";`);
   if (!pattern.test(source)) {
     throw new Error(`Could not find ${exportName} in ${fileUrl.pathname}`);
   }
-  const nextSource = source.replace(pattern, `export const ${exportName} = "${nextVersion}";`);
+  const nextSource = source.replace(pattern, (match, exportPrefix = "") => {
+    return `${exportPrefix}const ${exportName} = "${nextVersion}";`;
+  });
   writeFileSync(fileUrl, nextSource);
 }
 
@@ -61,5 +64,6 @@ pkg.version = nextVersion;
 writeFileSync(packagePath, `${JSON.stringify(pkg, null, 2)}\n`);
 updateRuntimeVersion(sdkIndexPath, "SDK_VERSION", nextVersion);
 updateRuntimeVersion(reactIndexPath, "REACT_WRAPPER_VERSION", nextVersion);
+updateRuntimeVersion(serverClientPath, "SERVER_SDK_VERSION", nextVersion);
 
 console.log(nextVersion);
