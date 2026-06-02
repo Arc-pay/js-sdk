@@ -35,6 +35,8 @@ import { createArcPayClient } from "@thavguard/arc-pay/server";
 
 const client = createArcPayClient({
   secretKey: "sk_test_...",
+  timeoutMs: 30_000,
+  maxNetworkRetries: 1,
 });
 ```
 
@@ -122,6 +124,15 @@ Mutating server-client methods require an explicit `{ idempotencyKey }`:
 `cancelLink`, and `createCheckoutSession`. Missing idempotency raises
 `ArcPayError` with `code="missing_idempotency_key"` before any HTTP request is
 sent.
+
+The server client sends `User-Agent: ArcPay-JS/<version>` and retries transient
+network/API failures only when the request is safe to retry: `GET` requests or
+mutating requests with an explicit idempotency key. Arc Pay `timeout` responses
+are not retried automatically because they mean the payment is pending
+confirmation; keep the same order waiting, poll `GET /payments/{id}`, and rely
+on webhooks or reconciliation. Configure `timeoutMs`, `maxNetworkRetries`, and
+`retryDelayMs` on the client when your backend needs stricter operational
+limits.
 
 H2H card payments require HTTPS `success_url` and `fail_url` on
 `createPayment`. Arc Pay stores those URLs on the payment and redirects the
@@ -211,6 +222,60 @@ contains `card_token_id`. Later merchant-initiated charges use
 The server client accepts an optional `apiBase` only for local or isolated test
 environments. Production integrations should use the default
 `https://api.arcpay.space/v1`; sandbox/live is selected by the key prefix.
+
+## Go Server SDK
+
+The Go server SDK lives in `go/` and exposes the same server-side REST contract:
+secret-key authentication, required idempotency for mutating calls, typed
+errors, request timeouts, transient retries, and payment polling helpers.
+
+```sh
+go get github.com/Arc-pay/js-sdk/go
+```
+
+```go
+package checkout
+
+import (
+  "context"
+  "time"
+
+  arcpay "github.com/Arc-pay/js-sdk/go"
+)
+
+func createPayment(ctx context.Context) (*arcpay.Payment, error) {
+  client, err := arcpay.NewClient(arcpay.ClientOptions{
+    SecretKey:         "sk_test_...",
+    Timeout:           30 * time.Second,
+    MaxNetworkRetries: 1,
+  })
+  if err != nil {
+    return nil, err
+  }
+
+  payment, err := client.CreatePayment(ctx, arcpay.CreatePaymentRequest{
+    Amount:        10000,
+    Currency:      arcpay.RUB,
+    PaymentMethod: arcpay.BankCard,
+    ExternalID:    "order-1",
+    CaptureMode:   arcpay.OneStage,
+    SuccessURL:    "https://merchant.example/success",
+    FailURL:       "https://merchant.example/fail",
+  }, arcpay.IdempotencyOptions{
+    IdempotencyKey: "018f2f6a-4f53-7b9b-8f7b-2f0d9f6f2a31",
+  })
+  if err != nil {
+    return nil, err
+  }
+  return &payment, nil
+}
+```
+
+All Go SDK methods accept `context.Context` as the first argument. Use request
+contexts from your HTTP handlers so cancellations and deadlines propagate
+through outbound Arc Pay calls. `WaitForPaymentTerminalResult` returns
+diagnostics (`Attempts`, `Elapsed`, and last `PaymentStatus`) instead of hiding
+non-terminal states behind an opaque timeout.
 
 ## License
 
