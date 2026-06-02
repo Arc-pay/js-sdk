@@ -16,7 +16,12 @@ export default defineConfig(
         target: "es2018",
       }
     : {
-        entry: ["src/index.ts", "src/react/index.ts", "src/server/index.ts"],
+        entry: [
+          "src/index.ts",
+          "src/react/index.ts",
+          "src/server/index.ts",
+          "src/server/browser.ts",
+        ],
         format: ["esm", "cjs"],
         dts: true,
         clean: true,

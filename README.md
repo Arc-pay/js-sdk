@@ -247,7 +247,7 @@ func createPayment(ctx context.Context) (*arcpay.Payment, error) {
   client, err := arcpay.NewClient(arcpay.ClientOptions{
     SecretKey:         "sk_test_...",
     Timeout:           30 * time.Second,
-    MaxNetworkRetries: 1,
+    MaxNetworkRetries: arcpay.RetryCount(1),
   })
   if err != nil {
     return nil, err
@@ -276,6 +276,8 @@ contexts from your HTTP handlers so cancellations and deadlines propagate
 through outbound Arc Pay calls. `WaitForPaymentTerminalResult` returns
 diagnostics (`Attempts`, `Elapsed`, and last `PaymentStatus`) instead of hiding
 non-terminal states behind an opaque timeout.
+Leave `MaxNetworkRetries` unset to use the SDK default, or pass
+`arcpay.RetryCount(0)` to disable transient network retries explicitly.
 
 ## License
 

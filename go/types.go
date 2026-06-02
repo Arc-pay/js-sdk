@@ -57,40 +57,77 @@ const (
 	PaymentTimeout    PaymentStatus = "timeout"
 )
 
+type PaymentOperationType string
+
+const (
+	OperationExecute         PaymentOperationType = "execute"
+	OperationSavedCardCharge PaymentOperationType = "saved_card_charge"
+	OperationThreeDS         PaymentOperationType = "three_ds"
+	OperationCapture         PaymentOperationType = "capture"
+	OperationVoid            PaymentOperationType = "void"
+	OperationRefund          PaymentOperationType = "refund"
+)
+
+type PaymentOperationStatus string
+
+const (
+	OperationInFlight  PaymentOperationStatus = "in_flight"
+	OperationSucceeded PaymentOperationStatus = "succeeded"
+	OperationFailed    PaymentOperationStatus = "failed"
+	OperationUnknown   PaymentOperationStatus = "unknown"
+)
+
+type PaymentOperationSummary struct {
+	OperationType   PaymentOperationType   `json:"operation_type"`
+	Status          PaymentOperationStatus `json:"status"`
+	Amount          int64                  `json:"amount"`
+	Currency        Currency               `json:"currency"`
+	OperationRefID  string                 `json:"operation_ref_id,omitempty"`
+	BankOperationID string                 `json:"bank_operation_id,omitempty"`
+	BankRRN         string                 `json:"bank_rrn,omitempty"`
+	BankAuthCode    string                 `json:"bank_auth_code,omitempty"`
+	ErrorCode       string                 `json:"error_code,omitempty"`
+	ErrorMessage    string                 `json:"error_message,omitempty"`
+	CreatedAt       string                 `json:"created_at"`
+	UpdatedAt       string                 `json:"updated_at"`
+	CompletedAt     string                 `json:"completed_at,omitempty"`
+}
+
 type Payment struct {
-	ID               string            `json:"id"`
-	Amount           int64             `json:"amount"`
-	AuthorizedAmount *int64            `json:"authorized_amount,omitempty"`
-	CapturedAmount   *int64            `json:"captured_amount,omitempty"`
-	RefundedAmount   *int64            `json:"refunded_amount,omitempty"`
-	Currency         Currency          `json:"currency"`
-	PaymentMethod    PaymentMethod     `json:"payment_method"`
-	Status           PaymentStatus     `json:"status"`
-	ExternalID       string            `json:"external_id,omitempty"`
-	Description      string            `json:"description,omitempty"`
-	BankPaymentID    string            `json:"bank_payment_id,omitempty"`
-	BankCode         string            `json:"bank_code,omitempty"`
-	BankOrderID      string            `json:"bank_order_id,omitempty"`
-	BankTerminalID   string            `json:"bank_terminal_id,omitempty"`
-	BankRRN          string            `json:"bank_rrn,omitempty"`
-	BankInternalRef  string            `json:"bank_internal_ref,omitempty"`
-	BankAuthCode     string            `json:"bank_auth_code,omitempty"`
-	CardTokenID      string            `json:"card_token_id,omitempty"`
-	DeclineCode      string            `json:"decline_code,omitempty"`
-	CardMask         string            `json:"card_mask,omitempty"`
-	CardScheme       string            `json:"card_scheme,omitempty"`
-	RedirectURL      string            `json:"redirect_url,omitempty"`
-	PaymentMode      PaymentFlowMode   `json:"payment_mode,omitempty"`
-	CaptureMode      CaptureMode       `json:"capture_mode,omitempty"`
-	CreatedAt        string            `json:"created_at"`
-	UpdatedAt        string            `json:"updated_at"`
-	Metadata         map[string]string `json:"metadata,omitempty"`
+	ID               string                    `json:"id"`
+	Amount           int64                     `json:"amount"`
+	AuthorizedAmount *int64                    `json:"authorized_amount,omitempty"`
+	CapturedAmount   *int64                    `json:"captured_amount,omitempty"`
+	RefundedAmount   *int64                    `json:"refunded_amount,omitempty"`
+	Currency         Currency                  `json:"currency"`
+	PaymentMethod    PaymentMethod             `json:"payment_method"`
+	Status           PaymentStatus             `json:"status"`
+	ExternalID       string                    `json:"external_id,omitempty"`
+	Description      string                    `json:"description,omitempty"`
+	BankPaymentID    string                    `json:"bank_payment_id,omitempty"`
+	BankCode         string                    `json:"bank_code,omitempty"`
+	BankOrderID      string                    `json:"bank_order_id,omitempty"`
+	BankTerminalID   string                    `json:"bank_terminal_id,omitempty"`
+	BankRRN          string                    `json:"bank_rrn,omitempty"`
+	BankInternalRef  string                    `json:"bank_internal_ref,omitempty"`
+	BankAuthCode     string                    `json:"bank_auth_code,omitempty"`
+	CardTokenID      string                    `json:"card_token_id,omitempty"`
+	DeclineCode      string                    `json:"decline_code,omitempty"`
+	CardMask         string                    `json:"card_mask,omitempty"`
+	CardScheme       string                    `json:"card_scheme,omitempty"`
+	RedirectURL      string                    `json:"redirect_url,omitempty"`
+	PaymentMode      PaymentFlowMode           `json:"payment_mode,omitempty"`
+	CaptureMode      CaptureMode               `json:"capture_mode,omitempty"`
+	CreatedAt        string                    `json:"created_at"`
+	UpdatedAt        string                    `json:"updated_at"`
+	Metadata         map[string]string         `json:"metadata,omitempty"`
+	Operations       []PaymentOperationSummary `json:"operations"`
 }
 
 type PaymentList struct {
 	Payments   []Payment `json:"payments"`
 	Total      int       `json:"total"`
-	NextCursor string    `json:"next_cursor"`
+	NextCursor string    `json:"next_cursor,omitempty"`
 	PageSize   int       `json:"page_size"`
 }
 
@@ -202,6 +239,18 @@ type WalletInteraction struct {
 	Phone       string        `json:"phone,omitempty"`
 }
 
+type WalletAction struct {
+	Provider      PaymentMethod `json:"provider"`
+	Action        string        `json:"action"`
+	SDK           string        `json:"sdk,omitempty"`
+	URL           string        `json:"url,omitempty"`
+	QRURL         string        `json:"qr_url,omitempty"`
+	QRImageBase64 string        `json:"qr_image_base64,omitempty"`
+	QRContentType string        `json:"qr_content_type,omitempty"`
+	BankInvoiceID string        `json:"bank_invoice_id,omitempty"`
+	BackURL       string        `json:"back_url,omitempty"`
+}
+
 type ExecutePaymentRequest interface {
 	executePaymentRequest()
 }
@@ -230,7 +279,7 @@ type ExecutePaymentResponse struct {
 	PaymentMode      PaymentFlowMode    `json:"payment_mode,omitempty"`
 	LiabilityShifted *bool              `json:"liability_shifted,omitempty"`
 	CardTokenID      string             `json:"card_token_id,omitempty"`
-	WalletAction     map[string]any     `json:"wallet_action,omitempty"`
+	WalletAction     *WalletAction      `json:"wallet_action,omitempty"`
 	NextAction       *PaymentNextAction `json:"next_action,omitempty"`
 	DeclineCode      string             `json:"decline_code,omitempty"`
 	DeclineMessage   string             `json:"decline_message,omitempty"`
@@ -313,7 +362,14 @@ type CreateLinkRequest struct {
 	Locale             string              `json:"locale,omitempty"`
 	PaymentMethods     []LinkPaymentMethod `json:"payment_methods"`
 	Items              []LinkItem          `json:"items,omitempty"`
-	BillingConfig      map[string]any      `json:"billing_config,omitempty"`
+	BillingConfig      *BillingConfig      `json:"billing_config,omitempty"`
+}
+
+type BillingConfig struct {
+	IntervalType  string `json:"interval_type,omitempty"`
+	IntervalCount int    `json:"interval_count,omitempty"`
+	TrialDays     int    `json:"trial_days,omitempty"`
+	TrialPrice    int64  `json:"trial_price,omitempty"`
 }
 
 type LinkPaymentMethod struct {
@@ -333,17 +389,36 @@ type LinkItem struct {
 }
 
 type Link struct {
-	ID             string              `json:"id"`
-	ShortCode      string              `json:"short_code"`
-	LinkType       string              `json:"link_type"`
-	Status         string              `json:"status"`
-	Environment    string              `json:"environment"`
-	Amount         int64               `json:"amount"`
-	Currency       Currency            `json:"currency"`
-	URL            string              `json:"url"`
-	PaymentMethods []LinkPaymentMethod `json:"payment_methods"`
-	CaptureMode    CaptureMode         `json:"capture_mode"`
-	Metadata       map[string]string   `json:"metadata,omitempty"`
+	ID                 string              `json:"id"`
+	TenantID           string              `json:"tenant_id,omitempty"`
+	OrganizationID     string              `json:"organization_id,omitempty"`
+	ShortCode          string              `json:"short_code"`
+	LinkType           string              `json:"link_type"`
+	Status             string              `json:"status"`
+	Environment        string              `json:"environment"`
+	Amount             int64               `json:"amount"`
+	Currency           Currency            `json:"currency"`
+	CreatedAt          string              `json:"created_at,omitempty"`
+	UpdatedAt          string              `json:"updated_at,omitempty"`
+	Description        string              `json:"description,omitempty"`
+	URL                string              `json:"url"`
+	MaxUses            *int                `json:"max_uses,omitempty"`
+	UsesCount          int                 `json:"uses_count,omitempty"`
+	ExpiresAt          string              `json:"expires_at,omitempty"`
+	CustomerName       string              `json:"customer_name,omitempty"`
+	CustomerID         string              `json:"customer_id,omitempty"`
+	CustomerEmail      string              `json:"customer_email,omitempty"`
+	DueDate            string              `json:"due_date,omitempty"`
+	ExternalOrderID    string              `json:"external_order_id,omitempty"`
+	PaymentMethods     []LinkPaymentMethod `json:"payment_methods"`
+	RedirectURL        string              `json:"redirect_url,omitempty"`
+	WebhookURL         string              `json:"webhook_url,omitempty"`
+	Items              []LinkItem          `json:"items,omitempty"`
+	BillingConfig      *BillingConfig      `json:"billing_config,omitempty"`
+	Metadata           map[string]string   `json:"metadata,omitempty"`
+	CaptureMode        CaptureMode         `json:"capture_mode"`
+	AutocompletionDate string              `json:"autocompletion_date,omitempty"`
+	Locale             string              `json:"locale,omitempty"`
 }
 
 type CreateCheckoutSessionRequest struct {

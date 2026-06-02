@@ -31,7 +31,31 @@ export type PaymentStatus =
   | "failed"
   | "timeout";
 
-type PaymentOperation = "create" | "capture" | "refund" | "void" | "execute";
+export type PaymentOperationType =
+  | "execute"
+  | "saved_card_charge"
+  | "three_ds"
+  | "capture"
+  | "void"
+  | "refund";
+export type PaymentOperationStatus = "in_flight" | "succeeded" | "failed" | "unknown";
+
+export interface PaymentOperationSummary {
+  operation_type: PaymentOperationType;
+  status: PaymentOperationStatus;
+  amount: number;
+  currency: Currency;
+  operation_ref_id?: string;
+  bank_operation_id?: string;
+  bank_rrn?: string;
+  bank_auth_code?: string;
+  error_code?: string;
+  error_message?: string;
+  created_at: string;
+  updated_at: string;
+  completed_at?: string;
+}
+
 export type TerminalPaymentStatus =
   | "authorized"
   | "captured"
@@ -71,12 +95,13 @@ export interface Payment {
   created_at: string;
   updated_at: string;
   metadata?: Record<string, string>;
+  operations: PaymentOperationSummary[];
 }
 
 export interface PaymentList {
   payments: Payment[];
   total: number;
-  next_cursor: string;
+  next_cursor?: string;
   page_size: number;
 }
 

@@ -12,6 +12,7 @@ on:
       - "scripts/**"
       - "src/**"
       - "tests/**"
+      - "go/**"
       - "tsconfig.json"
       - "tsup.config.ts"
       - "vitest.config.ts"
@@ -66,6 +67,15 @@ jobs:
       - name: Verify package
         run: pnpm prepack
 
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+
+      - name: Verify Go SDK
+        run: go test ./...
+        working-directory: go
+
       - name: Commit release version
         run: |
           git config user.name "github-actions[bot]"
@@ -79,3 +89,11 @@ jobs:
 
       - name: Publish to npm
         run: npm publish --access public
+
+      - name: Tag Go module
+        run: |
+          if git rev-parse "go/v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            exit 0
+          fi
+          git tag "go/v${{ steps.version.outputs.version }}"
+          git push origin "go/v${{ steps.version.outputs.version }}"

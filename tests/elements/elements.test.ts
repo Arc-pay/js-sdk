@@ -182,6 +182,17 @@ describe("Elements.tokenize — validation guards", () => {
     els.destroy();
   });
 
+  it("rejects missing tokenize identifiers before sending iframe commands", async () => {
+    const els = makeElements();
+    await expect(els.tokenize("", "idem-key")).rejects.toMatchObject({
+      code: "missing_payment_id",
+    });
+    await expect(els.tokenize("pay_1", "")).rejects.toMatchObject({
+      code: "missing_idempotency_key",
+    });
+    els.destroy();
+  });
+
   it("rejects with ArcPayError(incomplete_elements) when only two elements created", async () => {
     const els = makeElements();
     const divs = makeMountDivs();

@@ -26,6 +26,19 @@ const createChannelId = (): string => {
   return globalThis.crypto.randomUUID();
 };
 
+const assertNonEmptyTokenizeInput = (
+  name: "paymentId" | "idempotencyKey",
+  value: unknown,
+): void => {
+  if (typeof value === "string" && value.trim().length > 0) return;
+  throw new ArcPayError({
+    type: "validation_error",
+    code: name === "paymentId" ? "missing_payment_id" : "missing_idempotency_key",
+    message: `${name} must be a non-empty string`,
+    retryable: false,
+  });
+};
+
 export class Elements {
   private readonly elementMap = new Map<FieldType, Element>();
   private readonly iframeBase: string;
@@ -72,6 +85,9 @@ export class Elements {
   }
 
   async tokenize(paymentId: string, idempotencyKey: string): Promise<TokenizeResult> {
+    assertNonEmptyTokenizeInput("paymentId", paymentId);
+    assertNonEmptyTokenizeInput("idempotencyKey", idempotencyKey);
+
     // C2: concurrent-call guard — only one tokenize() may be in-flight at a time.
     if (this.tokenizeInFlight) {
       throw new ArcPayError({

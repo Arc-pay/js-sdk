@@ -18,7 +18,7 @@ import (
 const (
 	defaultAPIBase           = "https://api.arcpay.space/v1"
 	apiVersion               = "2026-05-06"
-	goSDKVersion             = "0.1.33"
+	goSDKVersion             = "0.1.34"
 	defaultTimeout           = 30 * time.Second
 	defaultMaxNetworkRetries = 1
 	defaultPollInterval      = 1500 * time.Millisecond
@@ -34,7 +34,7 @@ type ClientOptions struct {
 	APIBase           string
 	HTTPClient        *http.Client
 	Timeout           time.Duration
-	MaxNetworkRetries int
+	MaxNetworkRetries *int
 	RetryDelay        RetryDelayFunc
 }
 
@@ -56,6 +56,10 @@ type Client struct {
 	retryDelay        RetryDelayFunc
 }
 
+func RetryCount(value int) *int {
+	return &value
+}
+
 func NewClient(options ClientOptions) (*Client, error) {
 	if err := validateSecretKey(options.SecretKey); err != nil {
 		return nil, err
@@ -67,12 +71,12 @@ func NewClient(options ClientOptions) (*Client, error) {
 	if timeout < 0 {
 		return nil, &Error{Type: ValidationError, Code: "invalid_timeout_options", Message: "Timeout must be positive", Retryable: false}
 	}
-	maxRetries := options.MaxNetworkRetries
+	maxRetries := defaultMaxNetworkRetries
+	if options.MaxNetworkRetries != nil {
+		maxRetries = *options.MaxNetworkRetries
+	}
 	if maxRetries < 0 {
 		return nil, &Error{Type: ValidationError, Code: "invalid_retry_options", Message: "MaxNetworkRetries must be non-negative", Retryable: false}
-	}
-	if options.MaxNetworkRetries == 0 {
-		maxRetries = defaultMaxNetworkRetries
 	}
 	httpClient := options.HTTPClient
 	if httpClient == nil {
@@ -372,7 +376,16 @@ func (c *Client) request(ctx context.Context, method, path string, body any, ide
 		res, err := c.httpClient.Do(req)
 		cancel()
 		if err != nil {
-			lastErr = &Error{Type: NetworkError, Message: err.Error(), Retryable: ctx.Err() == nil}
+			if attemptCtx.Err() == context.DeadlineExceeded && ctx.Err() == nil {
+				lastErr = &Error{
+					Type:      APIError,
+					Code:      "request_timeout",
+					Message:   fmt.Sprintf("Request timed out after %s", timeout),
+					Retryable: true,
+				}
+			} else {
+				lastErr = &Error{Type: NetworkError, Message: err.Error(), Retryable: ctx.Err() == nil}
+			}
 		} else {
 			lastErr = decodeResponse(res, out)
 			if lastErr == nil {

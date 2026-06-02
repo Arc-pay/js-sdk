@@ -159,6 +159,41 @@ describe("parseIncoming", () => {
     expect(parseIncoming(event, EXPECTED_ORIGIN)).toBe(data);
   });
 
+  it("rejects unknown arcpay message types", () => {
+    const event = makeMessageEvent({ type: "arcpay:legacy-ready" }, EXPECTED_ORIGIN);
+    expect(parseIncoming(event, EXPECTED_ORIGIN)).toBeNull();
+  });
+
+  it("rejects structurally invalid tokenize-result messages", () => {
+    const event = makeMessageEvent(
+      {
+        type: "arcpay:tokenize-result",
+        cardTokenId: "tok_1",
+        cardMask: "427600****1234",
+        cardScheme: "visa",
+        cardBin: "427600",
+        expiresIn: "300",
+        expiresAt: "2028-12-31T23:59:59Z",
+      },
+      EXPECTED_ORIGIN,
+    );
+    expect(parseIncoming(event, EXPECTED_ORIGIN)).toBeNull();
+  });
+
+  it("rejects structurally invalid change messages", () => {
+    const event = makeMessageEvent(
+      {
+        type: "arcpay:change",
+        field: "cardNumber",
+        isValid: "true",
+        isEmpty: false,
+        isComplete: true,
+      },
+      EXPECTED_ORIGIN,
+    );
+    expect(parseIncoming(event, EXPECTED_ORIGIN)).toBeNull();
+  });
+
   it("returns arcpay:change message with all fields intact", () => {
     const data = {
       type: "arcpay:change" as const,

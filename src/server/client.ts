@@ -77,7 +77,7 @@ export interface RequestOptions {
 
 const DEFAULT_API_BASE = "https://api.arcpay.space/v1";
 const API_VERSION = "2026-05-06";
-const SERVER_SDK_VERSION = "0.1.33";
+const SERVER_SDK_VERSION = "0.1.34";
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_NETWORK_RETRIES = 1;
 const DEFAULT_POLL_INTERVAL_MS = 1500;
@@ -93,6 +93,19 @@ const DEFAULT_TERMINAL_PAYMENT_STATUSES: readonly TerminalPaymentStatus[] = [
   "declined",
   "failed",
 ];
+
+const isBrowserRuntime = (): boolean =>
+  typeof window !== "undefined" && typeof document !== "undefined";
+
+const throwServerSDKBrowserError = (): never => {
+  throw new ArcPayError({
+    type: "configuration_error",
+    code: "server_sdk_browser_runtime",
+    message:
+      "@thavguard/arc-pay/server cannot be used in browser bundles. Keep sk_* secret keys on your backend.",
+    retryable: false,
+  });
+};
 
 function validateSecretKey(key: unknown): asserts key is string {
   if (typeof key !== "string" || key.length === 0) {
@@ -363,6 +376,7 @@ export class ArcPayClient {
   private readonly retryDelayMs: ArcPayClientOptions["retryDelayMs"];
 
   constructor(options: ArcPayClientOptions) {
+    if (isBrowserRuntime()) throwServerSDKBrowserError();
     const secretKey: unknown = options.secretKey;
     validateSecretKey(secretKey);
     if (!options.fetch && typeof fetch === "undefined") {

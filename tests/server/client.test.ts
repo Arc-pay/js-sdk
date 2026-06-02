@@ -16,19 +16,69 @@ const ok = (body: unknown, status = 200): Response =>
 
 describe("server ArcPayClient", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
+  let windowDescriptor: PropertyDescriptor | undefined;
+  let documentDescriptor: PropertyDescriptor | undefined;
 
   beforeEach(() => {
+    windowDescriptor = Object.getOwnPropertyDescriptor(globalThis, "window");
+    documentDescriptor = Object.getOwnPropertyDescriptor(globalThis, "document");
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: undefined,
+    });
+    Object.defineProperty(globalThis, "document", {
+      configurable: true,
+      value: undefined,
+    });
     fetchMock = vi.fn();
   });
 
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
+    if (windowDescriptor) {
+      Object.defineProperty(globalThis, "window", windowDescriptor);
+    } else {
+      delete (globalThis as { window?: unknown }).window;
+    }
+    if (documentDescriptor) {
+      Object.defineProperty(globalThis, "document", documentDescriptor);
+    } else {
+      delete (globalThis as { document?: unknown }).document;
+    }
   });
 
   it("rejects publishable keys on server APIs", () => {
     expect(() =>
       createArcPayClient({ secretKey: "pk_test_x", fetch: fetchMock as unknown as typeof fetch }),
+    ).toThrowError(ArcPayError);
+  });
+
+  it("fails closed when the server SDK is constructed in a browser runtime", () => {
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {},
+    });
+    Object.defineProperty(globalThis, "document", {
+      configurable: true,
+      value: {},
+    });
+
+    expect(() =>
+      createArcPayClient({ secretKey: "sk_test_x", fetch: fetchMock as unknown as typeof fetch }),
+    ).toThrowError(ArcPayError);
+    expect(() =>
+      createArcPayClient({ secretKey: "sk_test_x", fetch: fetchMock as unknown as typeof fetch }),
+    ).toThrow(/server cannot be used in browser bundles/i);
+  });
+
+  it("browser server export rejects secret-key usage", async () => {
+    const browserServer = await import("../../src/server/browser");
+    expect(() =>
+      browserServer.createArcPayClient({
+        secretKey: "sk_test_x",
+        fetch: fetchMock as unknown as typeof fetch,
+      }),
     ).toThrowError(ArcPayError);
   });
 
@@ -243,11 +293,11 @@ describe("server ArcPayClient", () => {
     } satisfies Parameters<ArcPayClient["createPayment"]>[0];
 
     // @ts-expect-error Saved-card setup is only POST /cards/setup.
-    const legacyRequest: Parameters<ArcPayClient["createPayment"]>[0] = {
+    const unsupportedRequest: Parameters<ArcPayClient["createPayment"]>[0] = {
       ...request,
       save_card: true,
     };
-    expect(legacyRequest).toBeDefined();
+    expect(unsupportedRequest).toBeDefined();
   });
 
   it("validates required idempotency keys for mandatory operations", async () => {

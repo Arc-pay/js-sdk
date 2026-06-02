@@ -11,6 +11,12 @@ import (
 
 const testIdempotencyKey = "018f2f6a-4f53-7b9b-8f7b-2f0d9f6f2a31"
 
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (fn roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return fn(req)
+}
+
 func TestNewClientRejectsPublishableKeys(t *testing.T) {
 	_, err := NewClient(ClientOptions{SecretKey: "pk_test_123"})
 	if err == nil {
@@ -126,7 +132,7 @@ func TestCreatePaymentRetriesTransientErrorsWithSameIdempotencyKey(t *testing.T)
 	client, err := NewClient(ClientOptions{
 		SecretKey:         "sk_test_123",
 		APIBase:           server.URL + "/v1",
-		MaxNetworkRetries: 1,
+		MaxNetworkRetries: RetryCount(1),
 		RetryDelay:        func(int, *Error) time.Duration { return 0 },
 	})
 	if err != nil {
@@ -147,6 +153,74 @@ func TestCreatePaymentRetriesTransientErrorsWithSameIdempotencyKey(t *testing.T)
 	}
 }
 
+func TestMaxNetworkRetriesZeroDisablesRetries(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte(`{"error":{"type":"api_error","code":"service_unavailable","message":"dependency unavailable","request_id":"req_no_retry"}}`))
+	}))
+	defer server.Close()
+
+	client, err := NewClient(ClientOptions{
+		SecretKey:         "sk_test_123",
+		APIBase:           server.URL + "/v1",
+		MaxNetworkRetries: RetryCount(0),
+		RetryDelay:        func(int, *Error) time.Duration { return 0 },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.CreatePayment(context.Background(), CreatePaymentRequest{
+		Amount:        10000,
+		Currency:      RUB,
+		PaymentMethod: BankCard,
+		ExternalID:    "order-no-retry",
+		CaptureMode:   OneStage,
+	}, IdempotencyOptions{IdempotencyKey: testIdempotencyKey})
+	var apiErr *Error
+	if !AsError(err, &apiErr) {
+		t.Fatalf("expected *Error, got %T", err)
+	}
+	if apiErr.Code != "service_unavailable" || !apiErr.Retryable {
+		t.Fatalf("unexpected error: %#v", apiErr)
+	}
+	if attempts != 1 {
+		t.Fatalf("attempts = %d", attempts)
+	}
+}
+
+func TestRequestTimeoutReturnsTypedRetryableAPIError(t *testing.T) {
+	client, err := NewClient(ClientOptions{
+		SecretKey: "sk_test_123",
+		APIBase:   "https://api.example.test/v1",
+		HTTPClient: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			<-req.Context().Done()
+			return nil, req.Context().Err()
+		})},
+		Timeout:           time.Millisecond,
+		MaxNetworkRetries: RetryCount(0),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.CreatePayment(context.Background(), CreatePaymentRequest{
+		Amount:        10000,
+		Currency:      RUB,
+		PaymentMethod: BankCard,
+		ExternalID:    "order-timeout-ms",
+		CaptureMode:   OneStage,
+	}, IdempotencyOptions{IdempotencyKey: testIdempotencyKey})
+	var apiErr *Error
+	if !AsError(err, &apiErr) {
+		t.Fatalf("expected *Error, got %T", err)
+	}
+	if apiErr.Type != APIError || apiErr.Code != "request_timeout" || !apiErr.Retryable {
+		t.Fatalf("unexpected error: %#v", apiErr)
+	}
+}
+
 func TestCreatePaymentDoesNotRetryArcPayTimeoutResponse(t *testing.T) {
 	attempts := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -160,7 +234,7 @@ func TestCreatePaymentDoesNotRetryArcPayTimeoutResponse(t *testing.T) {
 	client, err := NewClient(ClientOptions{
 		SecretKey:         "sk_test_123",
 		APIBase:           server.URL + "/v1",
-		MaxNetworkRetries: 2,
+		MaxNetworkRetries: RetryCount(2),
 		RetryDelay:        func(int, *Error) time.Duration { return 0 },
 	})
 	if err != nil {
@@ -200,6 +274,116 @@ func TestExecutePaymentRequiresH2HMode(t *testing.T) {
 	}
 	if apiErr.Code != "invalid_payment_mode" {
 		t.Fatalf("code = %q", apiErr.Code)
+	}
+}
+
+func TestExecutePaymentDecodesTypedWalletAction(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"payment_id":"pay_1",
+			"status":"pending",
+			"payment_mode":"h2h",
+			"wallet_action":{
+				"provider":"sberpay",
+				"action":"qr",
+				"qr_url":"https://bank.example/sberpay/qr/123",
+				"back_url":"https://merchant.example/back"
+			}
+		}`))
+	}))
+	defer server.Close()
+
+	client, err := NewClient(ClientOptions{SecretKey: "sk_test_123", APIBase: server.URL + "/v1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := client.ExecutePayment(context.Background(), "pay_1", WalletExecutePaymentRequest{
+		PaymentMethod: SberPay,
+		PaymentMode:   H2H,
+		WalletInteraction: WalletInteraction{
+			Provider: SberPay,
+			Surface:  "merchant_web",
+			Action:   "qr",
+		},
+	}, IdempotencyOptions{IdempotencyKey: testIdempotencyKey})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.WalletAction == nil {
+		t.Fatal("expected wallet action")
+	}
+	if result.WalletAction.Provider != SberPay || result.WalletAction.Action != "qr" {
+		t.Fatalf("unexpected wallet action: %#v", result.WalletAction)
+	}
+	if result.WalletAction.QRURL != "https://bank.example/sberpay/qr/123" {
+		t.Fatalf("QRURL = %q", result.WalletAction.QRURL)
+	}
+}
+
+func TestCreateLinkDecodesFullLinkShape(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"id":"link_1",
+			"tenant_id":"tenant_1",
+			"organization_id":"org_1",
+			"short_code":"abc123",
+			"link_type":"recurring",
+			"status":"active",
+			"environment":"sandbox",
+			"amount":10000,
+			"currency":"RUB",
+			"created_at":"2026-06-02T10:00:00Z",
+			"updated_at":"2026-06-02T10:00:00Z",
+			"description":"Subscription",
+			"url":"https://pay.example/link/abc123",
+			"max_uses":3,
+			"uses_count":1,
+			"expires_at":"2026-07-02T10:00:00Z",
+			"customer_name":"Ivan",
+			"customer_id":"cust_1",
+			"customer_email":"ivan@example.test",
+			"due_date":"2026-06-15",
+			"external_order_id":"order_1",
+			"payment_methods":[{"method":"bank_card","payment_mode":"h2h","display_name":"Card"}],
+			"redirect_url":"https://merchant.example/return",
+			"webhook_url":"https://merchant.example/webhook",
+			"items":[{"name":"Plan","quantity":"1","unit_price":10000,"vat_rate":20}],
+			"billing_config":{"interval_type":"month","interval_count":1,"trial_days":7,"trial_price":100},
+			"metadata":{"plan":"pro"},
+			"capture_mode":"one_stage",
+			"autocompletion_date":"2026-06-03",
+			"locale":"ru"
+		}`))
+	}))
+	defer server.Close()
+
+	client, err := NewClient(ClientOptions{SecretKey: "sk_test_123", APIBase: server.URL + "/v1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	link, err := client.CreateLink(context.Background(), CreateLinkRequest{
+		LinkType:    "recurring",
+		Amount:      10000,
+		Currency:    RUB,
+		CaptureMode: OneStage,
+		PaymentMethods: []LinkPaymentMethod{
+			{Method: BankCard, PaymentMode: H2H},
+		},
+		BillingConfig: &BillingConfig{IntervalType: "month", IntervalCount: 1},
+	}, IdempotencyOptions{IdempotencyKey: testIdempotencyKey})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if link.TenantID != "tenant_1" || link.OrganizationID != "org_1" || link.UsesCount != 1 {
+		t.Fatalf("unexpected link shape: %#v", link)
+	}
+	if link.BillingConfig == nil || link.BillingConfig.IntervalType != "month" || link.BillingConfig.TrialPrice != 100 {
+		t.Fatalf("unexpected billing config: %#v", link.BillingConfig)
+	}
+	if len(link.Items) != 1 || link.Items[0].Name != "Plan" {
+		t.Fatalf("unexpected link items: %#v", link.Items)
 	}
 }
 
