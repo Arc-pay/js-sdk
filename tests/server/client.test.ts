@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { SDK_VERSION } from "../../src";
 import { ArcPayClient, createArcPayClient } from "../../src/server";
 import { ArcPayError } from "../../src/core/errors";
 
@@ -66,7 +67,7 @@ describe("server ArcPayClient", () => {
     expect(init.headers.Authorization).toBe("Bearer sk_test_x");
     expect(init.headers["X-Arc-Pay-API-Version"]).toBe("2026-05-06");
     expect(init.headers["Idempotency-Key"]).toBe(IDEMPOTENCY_KEY);
-    expect(init.headers["User-Agent"]).toBe("ArcPay-JS/0.1.32");
+    expect(init.headers["User-Agent"]).toBe(`ArcPay-JS/${SDK_VERSION}`);
   });
 
   it("retries transient API errors with the same idempotency key", async () => {
