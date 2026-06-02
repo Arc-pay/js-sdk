@@ -6,6 +6,7 @@ const packagePath = new URL("../package.json", import.meta.url);
 const sdkIndexPath = new URL("../src/index.ts", import.meta.url);
 const reactIndexPath = new URL("../src/react/index.ts", import.meta.url);
 const serverClientPath = new URL("../src/server/client.ts", import.meta.url);
+const goClientPath = new URL("../go/client.go", import.meta.url);
 
 function parseVersion(version) {
   const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version);
@@ -65,5 +66,6 @@ writeFileSync(packagePath, `${JSON.stringify(pkg, null, 2)}\n`);
 updateRuntimeVersion(sdkIndexPath, "SDK_VERSION", nextVersion);
 updateRuntimeVersion(reactIndexPath, "REACT_WRAPPER_VERSION", nextVersion);
 updateRuntimeVersion(serverClientPath, "SERVER_SDK_VERSION", nextVersion);
+updateRuntimeVersion(goClientPath, "goSDKVersion", nextVersion);
 
 console.log(nextVersion);
