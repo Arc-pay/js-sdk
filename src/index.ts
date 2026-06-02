@@ -21,7 +21,9 @@ export {
   buildThreeDSBrowserStep,
   buildThreeDSMethodCompletion,
   collectBrowserInfo,
+  confirmPayment,
   getThreeDSAction,
+  handleNextAction,
   isThreeDSChallengeAction,
   isThreeDSMethodAction,
   mountThreeDSBrowserForm,
@@ -31,14 +33,20 @@ export type {
   BrowserFormField,
   BrowserInfo,
   BrowserPostForm,
+  ConfirmPaymentNonTerminalReason,
+  ConfirmPaymentOptions,
+  ConfirmPaymentResult,
+  HandleNextActionOptions,
   MountedThreeDSForm,
+  PaymentStatusSnapshot,
   RunThreeDSBrowserFlowOptions,
   ThreeDSAction,
   ThreeDSBrowserStep,
   ThreeDSBrowserFlowResult,
   ThreeDSMountOptions,
+  WaitForPaymentTerminalRequest,
 } from "./three-ds";
-export const SDK_VERSION = "0.1.30";
+export const SDK_VERSION = "0.1.31";
 
 export type { FieldType } from "./elements/postmessage";
 export type { ElementOptions, ElementEvent } from "./elements/element";

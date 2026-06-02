@@ -334,6 +334,66 @@ describe("server ArcPayClient", () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.example.test/v1/payments/pay_1");
   });
 
+  it("returns a non-terminal polling result with diagnostics", async () => {
+    fetchMock.mockImplementation(() =>
+      ok({
+        id: "pay_1",
+        amount: 10000,
+        currency: "RUB",
+        payment_method: "bank_card",
+        status: "pending_3ds",
+        created_at: "2026-05-12T09:00:00Z",
+        updated_at: "2026-05-12T09:00:00Z",
+      }),
+    );
+    const client = new ArcPayClient({
+      secretKey: "sk_live_x",
+      apiBase: "https://api.example.test/v1",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+
+    const result = await client.waitForPaymentTerminalResult("pay_1", {
+      intervalMs: 1,
+      timeoutMs: 1,
+    });
+
+    expect(result).toMatchObject({
+      status: "non_terminal",
+      payment_status: "pending_3ds",
+      reason: "timeout",
+    });
+    expect(result.attempts).toBeGreaterThanOrEqual(1);
+  });
+
+  it("includes the last non-terminal status when waitForPaymentTerminal times out", async () => {
+    fetchMock.mockImplementation(() =>
+      ok({
+        id: "pay_1",
+        amount: 10000,
+        currency: "RUB",
+        payment_method: "bank_card",
+        status: "pending",
+        created_at: "2026-05-12T09:00:00Z",
+        updated_at: "2026-05-12T09:00:00Z",
+      }),
+    );
+    const client = new ArcPayClient({
+      secretKey: "sk_live_x",
+      apiBase: "https://api.example.test/v1",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+
+    await expect(
+      client.waitForPaymentTerminal("pay_1", {
+        intervalMs: 1,
+        timeoutMs: 1,
+      }),
+    ).rejects.toMatchObject({
+      code: "payment_poll_timeout",
+      message: expect.stringContaining("stayed pending"),
+    });
+  });
+
   it("maps public API error envelopes into ArcPayError", async () => {
     fetchMock.mockResolvedValue(
       new Response(

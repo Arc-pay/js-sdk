@@ -1,4 +1,12 @@
-import type { CardBrowserInfo, ExecutePaymentResponse, PaymentNextAction } from "../server/types";
+import type {
+  CardBrowserInfo,
+  ExecutePaymentRequest,
+  ExecutePaymentResponse,
+  Payment,
+  PaymentNextAction,
+  PaymentStatus,
+  TerminalPaymentStatus,
+} from "../server/types";
 
 export type ThreeDSAction = PaymentNextAction;
 export type BrowserInfo = CardBrowserInfo;
@@ -65,6 +73,67 @@ export type ThreeDSBrowserFlowResult =
       methodResult?: "loaded" | "timeout";
     };
 
+export interface WaitForPaymentTerminalRequest {
+  paymentId: string;
+  signal?: AbortSignal;
+}
+
+export type PaymentStatusSnapshot = Pick<Payment, "id" | "status" | "updated_at"> &
+  Partial<Payment>;
+
+export interface HandleNextActionOptions extends RunThreeDSBrowserFlowOptions {
+  paymentId: string;
+  response: ExecutePaymentResponse;
+  waitForPaymentTerminal?: (request: WaitForPaymentTerminalRequest) => Promise<PaymentStatusSnapshot>;
+  onChallengeSubmitted?: (request: {
+    paymentId: string;
+    action: PaymentNextAction;
+    mounted: MountedThreeDSForm;
+    response?: ExecutePaymentResponse;
+    methodResult?: "loaded" | "timeout";
+    signal?: AbortSignal;
+  }) => Promise<PaymentStatusSnapshot | ExecutePaymentResponse | void>;
+  terminalStatuses?: readonly TerminalPaymentStatus[];
+}
+
+export interface ConfirmPaymentOptions extends Omit<HandleNextActionOptions, "response"> {
+  paymentId: string;
+  cardTokenId: string;
+  browserInfo?: BrowserInfo;
+  executePayment: (request: ExecutePaymentRequest) => Promise<ExecutePaymentResponse>;
+}
+
+export type ConfirmPaymentNonTerminalReason =
+  | "awaiting_webhook"
+  | "poll_timeout"
+  | "unsupported_next_action";
+
+export type ConfirmPaymentResult =
+  | {
+      status: "terminal";
+      paymentId: string;
+      paymentStatus: TerminalPaymentStatus;
+      payment?: PaymentStatusSnapshot;
+      response?: ExecutePaymentResponse;
+      threeDS?: ThreeDSBrowserFlowResult;
+    }
+  | {
+      status: "requires_action";
+      paymentId: string;
+      nextAction: PaymentNextAction;
+      response?: ExecutePaymentResponse;
+      threeDS: Extract<ThreeDSBrowserFlowResult, { status: "challenge_submitted" }>;
+    }
+  | {
+      status: "non_terminal";
+      paymentId: string;
+      paymentStatus: PaymentStatus | ExecutePaymentResponse["status"];
+      payment?: PaymentStatusSnapshot;
+      response?: ExecutePaymentResponse;
+      threeDS?: ThreeDSBrowserFlowResult;
+      reason: ConfirmPaymentNonTerminalReason;
+    };
+
 const supportedColorDepths = [1, 4, 8, 15, 16, 24, 32, 48] as const;
 
 const normalizeColorDepth = (value: number): BrowserInfo["color_depth"] =>
@@ -113,6 +182,61 @@ export const isThreeDSMethodAction = (nextAction?: PaymentNextAction): boolean =
 
 export const isThreeDSChallengeAction = (nextAction?: PaymentNextAction): boolean => {
   return nextAction?.type === "three_ds_challenge" && nextAction.three_ds.phase === "challenge";
+};
+
+const DEFAULT_TERMINAL_STATUSES: readonly TerminalPaymentStatus[] = [
+  "authorized",
+  "captured",
+  "settled",
+  "voided",
+  "expired",
+  "refunded",
+  "chargeback",
+  "declined",
+  "failed",
+];
+
+const isTerminalStatus = (
+  status: PaymentStatus | ExecutePaymentResponse["status"] | undefined,
+  terminalStatuses: readonly TerminalPaymentStatus[] = DEFAULT_TERMINAL_STATUSES,
+): status is TerminalPaymentStatus =>
+  Boolean(status && terminalStatuses.includes(status as TerminalPaymentStatus));
+
+const statusFrom = (
+  value: PaymentStatusSnapshot | ExecutePaymentResponse | undefined,
+): PaymentStatus | ExecutePaymentResponse["status"] | undefined => value?.status;
+
+const resultFromStatus = (
+  paymentId: string,
+  value: PaymentStatusSnapshot | ExecutePaymentResponse,
+  context: {
+    response?: ExecutePaymentResponse;
+    threeDS?: ThreeDSBrowserFlowResult;
+    terminalStatuses?: readonly TerminalPaymentStatus[];
+    reason?: ConfirmPaymentNonTerminalReason;
+  } = {},
+): ConfirmPaymentResult => {
+  const status = statusFrom(value);
+  if (isTerminalStatus(status, context.terminalStatuses)) {
+    const payment = "id" in value ? value : undefined;
+    return {
+      status: "terminal",
+      paymentId,
+      paymentStatus: status,
+      payment,
+      response: context.response ?? ("payment_id" in value ? value : undefined),
+      threeDS: context.threeDS,
+    };
+  }
+  return {
+    status: "non_terminal",
+    paymentId,
+    paymentStatus: status ?? "pending",
+    payment: "id" in value ? value : undefined,
+    response: context.response ?? ("payment_id" in value ? value : undefined),
+    threeDS: context.threeDS,
+    reason: context.reason ?? "awaiting_webhook",
+  };
 };
 
 export const buildThreeDSBrowserForm = (nextAction: PaymentNextAction): BrowserPostForm => ({
@@ -309,6 +433,117 @@ export const runThreeDSBrowserFlow = async (
   } finally {
     mounted.remove();
   }
+};
+
+export const handleNextAction = async (
+  options: HandleNextActionOptions,
+): Promise<ConfirmPaymentResult> => {
+  const terminalStatuses = options.terminalStatuses ?? DEFAULT_TERMINAL_STATUSES;
+
+  if (!options.response.next_action) {
+    if (isTerminalStatus(options.response.status, terminalStatuses)) {
+      return resultFromStatus(options.paymentId, options.response, {
+        response: options.response,
+        terminalStatuses,
+      });
+    }
+    if (options.waitForPaymentTerminal) {
+      try {
+        const payment = await options.waitForPaymentTerminal({
+          paymentId: options.paymentId,
+          signal: options.signal,
+        });
+        return resultFromStatus(options.paymentId, payment, {
+          response: options.response,
+          terminalStatuses,
+        });
+      } catch {
+        return resultFromStatus(options.paymentId, options.response, {
+          response: options.response,
+          terminalStatuses,
+          reason: "poll_timeout",
+        });
+      }
+    }
+    return resultFromStatus(options.paymentId, options.response, {
+      response: options.response,
+      terminalStatuses,
+    });
+  }
+
+  const threeDS = await runThreeDSBrowserFlow(options.response.next_action, options);
+  if (threeDS.status === "challenge_submitted") {
+    const challengeResult = await options.onChallengeSubmitted?.({
+      paymentId: options.paymentId,
+      action: threeDS.action,
+      mounted: threeDS.mounted,
+      response: threeDS.response,
+      methodResult: threeDS.methodResult,
+      signal: options.signal,
+    });
+    if (challengeResult) {
+      return resultFromStatus(options.paymentId, challengeResult, {
+        response: threeDS.response ?? options.response,
+        threeDS,
+        terminalStatuses,
+      });
+    }
+    if (options.waitForPaymentTerminal) {
+      try {
+        const payment = await options.waitForPaymentTerminal({
+          paymentId: options.paymentId,
+          signal: options.signal,
+        });
+        return resultFromStatus(options.paymentId, payment, {
+          response: threeDS.response ?? options.response,
+          threeDS,
+          terminalStatuses,
+        });
+      } catch {
+        return {
+          status: "requires_action",
+          paymentId: options.paymentId,
+          nextAction: threeDS.action,
+          response: threeDS.response ?? options.response,
+          threeDS,
+        };
+      }
+    }
+    return {
+      status: "requires_action",
+      paymentId: options.paymentId,
+      nextAction: threeDS.action,
+      response: threeDS.response ?? options.response,
+      threeDS,
+    };
+  }
+  if (threeDS.status === "method_completed") {
+    return resultFromStatus(options.paymentId, threeDS.response, {
+      response: threeDS.response,
+      threeDS,
+      terminalStatuses,
+    });
+  }
+  return {
+    status: "non_terminal",
+    paymentId: options.paymentId,
+    paymentStatus: options.response.status,
+    response: options.response,
+    threeDS,
+    reason: "unsupported_next_action",
+  };
+};
+
+export const confirmPayment = async (
+  options: ConfirmPaymentOptions,
+): Promise<ConfirmPaymentResult> => {
+  const response = await options.executePayment({
+    payment_method: "bank_card",
+    payment_mode: "h2h",
+    card_token_id: options.cardTokenId,
+    browser_info: options.browserInfo ?? collectBrowserInfo(),
+  });
+  return handleNextAction({ ...options, response });
 };
 
 const htmlEscape = (value: string): string =>

@@ -22,6 +22,7 @@ import type {
   TerminalPaymentStatus,
   VoidRequest,
   WaitForPaymentOptions,
+  WaitForPaymentTerminalResult,
 } from "./types";
 
 export type {
@@ -44,8 +45,12 @@ export type {
   PaymentFlowMode,
   PaymentList,
   PaymentMethod,
+  PaymentStatus,
   Refund,
+  TerminalPaymentStatus,
   VoidRequest,
+  WaitForPaymentOptions,
+  WaitForPaymentTerminalResult,
 } from "./types";
 
 export interface ArcPayClientOptions {
@@ -338,23 +343,48 @@ export class ArcPayClient {
     paymentId: string,
     opts: WaitForPaymentOptions = {},
   ): Promise<Payment> {
+    const result = await this.waitForPaymentTerminalResult(paymentId, opts);
+    if (result.status === "terminal") return result.payment;
+    throw new ArcPayError({
+      type: "api_error",
+      code: "payment_poll_timeout",
+      message: `Payment ${paymentId} stayed ${result.payment_status} after ${result.elapsed_ms}ms and ${result.attempts} poll attempts`,
+      retryable: true,
+    });
+  }
+
+  async waitForPaymentTerminalResult(
+    paymentId: string,
+    opts: WaitForPaymentOptions = {},
+  ): Promise<WaitForPaymentTerminalResult> {
     const intervalMs = normalizePollMs(opts.intervalMs, DEFAULT_POLL_INTERVAL_MS);
     const timeoutMs = normalizePollMs(opts.timeoutMs, DEFAULT_POLL_TIMEOUT_MS);
     const terminalStatuses = new Set(opts.terminalStatuses ?? DEFAULT_TERMINAL_PAYMENT_STATUSES);
     const startedAt = Date.now();
+    let attempts = 0;
 
     for (;;) {
       const payment = await this.getPayment(paymentId, { signal: opts.signal });
+      attempts += 1;
+      const elapsedMs = Date.now() - startedAt;
       if (terminalStatuses.has(payment.status as TerminalPaymentStatus)) {
-        return payment;
+        return {
+          status: "terminal",
+          payment,
+          payment_status: payment.status as TerminalPaymentStatus,
+          attempts,
+          elapsed_ms: elapsedMs,
+        };
       }
-      if (Date.now() - startedAt >= timeoutMs) {
-        throw new ArcPayError({
-          type: "api_error",
-          code: "payment_poll_timeout",
-          message: `Payment ${paymentId} did not reach a terminal status within ${timeoutMs}ms`,
-          retryable: true,
-        });
+      if (elapsedMs >= timeoutMs) {
+        return {
+          status: "non_terminal",
+          payment,
+          payment_status: payment.status,
+          attempts,
+          elapsed_ms: elapsedMs,
+          reason: "timeout",
+        };
       }
       await sleep(intervalMs, opts.signal);
     }

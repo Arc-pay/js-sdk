@@ -3,7 +3,9 @@ import {
   buildThreeDSBrowserForm,
   buildThreeDSBrowserStep,
   buildThreeDSMethodCompletion,
+  confirmPayment,
   getThreeDSAction,
+  handleNextAction,
   mountThreeDSBrowserForm,
   runThreeDSBrowserFlow,
 } from "../../src/three-ds";
@@ -175,6 +177,121 @@ describe("3DS next action helpers", () => {
     if (result.status === "challenge_submitted") {
       expect(result.methodResult).toBe("loaded");
       result.mounted.remove();
+    }
+  });
+
+  it("confirms a payment and returns a terminal status without bank-specific branches", async () => {
+    const result = await confirmPayment({
+      paymentId: "pay_1",
+      cardTokenId: "card_token_1",
+      browserInfo: {
+        accept_header: "text/html",
+        language: "ru-RU",
+        screen_width: 390,
+        screen_height: 844,
+        color_depth: 24,
+        timezone_offset_minutes: -180,
+        user_agent: "test",
+        window_size: "02",
+      },
+      executePayment: async (request) => {
+        expect(request).toMatchObject({
+          payment_method: "bank_card",
+          payment_mode: "h2h",
+          card_token_id: "card_token_1",
+        });
+        return {
+          payment_id: "pay_1",
+          status: "captured",
+        };
+      },
+    });
+
+    expect(result).toEqual({
+      status: "terminal",
+      paymentId: "pay_1",
+      paymentStatus: "captured",
+      payment: undefined,
+      response: {
+        payment_id: "pay_1",
+        status: "captured",
+      },
+      threeDS: undefined,
+    });
+  });
+
+  it("handles a challenge action and resolves through a standard terminal payment poll", async () => {
+    const challengeAction: PaymentNextAction = {
+      type: "three_ds_challenge",
+      three_ds: {
+        version: "2",
+        phase: "challenge",
+        submit: {
+          method: "POST",
+          url: "https://acs.bank.example",
+          target: "browser",
+          fields: [{ name: "creq", value: "challenge-data" }],
+        },
+      },
+    };
+    const submitted: string[] = [];
+
+    const result = await handleNextAction({
+      paymentId: "pay_1",
+      response: {
+        payment_id: "pay_1",
+        status: "pending_3ds",
+        next_action: challengeAction,
+      },
+      submitter: (form) => submitted.push(form.action),
+      waitForPaymentTerminal: async ({ paymentId }) => ({
+        id: paymentId,
+        amount: 10000,
+        currency: "RUB",
+        payment_method: "bank_card",
+        status: "authorized",
+        created_at: "2026-06-02T00:00:00Z",
+        updated_at: "2026-06-02T00:00:01Z",
+      }),
+    });
+
+    expect(submitted).toEqual(["https://acs.bank.example/"]);
+    expect(result.status).toBe("terminal");
+    if (result.status === "terminal") {
+      expect(result.paymentStatus).toBe("authorized");
+      expect(result.threeDS?.status).toBe("challenge_submitted");
+    }
+  });
+
+  it("returns requires_action when the ACS challenge is still buyer-owned", async () => {
+    const challengeAction: PaymentNextAction = {
+      type: "three_ds_challenge",
+      three_ds: {
+        version: "1",
+        phase: "challenge",
+        submit: {
+          method: "POST",
+          url: "https://acs.bank.example",
+          target: "browser",
+          fields: [{ name: "PaReq", value: "pa-req" }],
+        },
+      },
+    };
+
+    const result = await handleNextAction({
+      paymentId: "pay_1",
+      response: {
+        payment_id: "pay_1",
+        status: "pending_3ds",
+        next_action: challengeAction,
+      },
+      submitter: () => undefined,
+    });
+
+    expect(result.status).toBe("requires_action");
+    if (result.status === "requires_action") {
+      expect(result.nextAction).toBe(challengeAction);
+      result.threeDS.mounted.remove();
     }
   });
 });

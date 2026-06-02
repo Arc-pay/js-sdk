@@ -6,7 +6,9 @@ export type {
   Payment,
   PaymentList,
   PaymentMethod,
+  PaymentStatus,
   PaymentFlowMode,
+  TerminalPaymentStatus,
   AvailablePaymentMethod,
   Refund,
   Link,
@@ -24,6 +26,8 @@ export type {
   CreateCheckoutSessionRequest,
   ListPaymentsQuery,
   ListAvailablePaymentMethodsQuery,
+  WaitForPaymentOptions,
+  WaitForPaymentTerminalResult,
 } from "./client";
 export {
   buildThreeDSAutoSubmitHtml,

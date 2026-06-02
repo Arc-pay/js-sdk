@@ -247,6 +247,23 @@ export interface WaitForPaymentOptions {
   signal?: AbortSignal;
 }
 
+export type WaitForPaymentTerminalResult =
+  | {
+      status: "terminal";
+      payment: Payment;
+      payment_status: TerminalPaymentStatus;
+      attempts: number;
+      elapsed_ms: number;
+    }
+  | {
+      status: "non_terminal";
+      payment: Payment;
+      payment_status: PaymentStatus;
+      attempts: number;
+      elapsed_ms: number;
+      reason: "timeout";
+    };
+
 export interface AvailablePaymentMethod {
   method: PaymentMethod;
   payment_mode: PaymentFlowMode;

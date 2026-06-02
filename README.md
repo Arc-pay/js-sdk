@@ -130,48 +130,77 @@ return as navigation only; confirm the final status through webhooks or
 `GET /payments/{id}`.
 
 H2H card execution returns a standardized `next_action` when the buyer must do
-something in the browser. Run `executePayment` only on your backend with a
-secret key, then pass its response to your browser. In the browser, use
-`runThreeDSBrowserFlow()` to run the 3DS Method hidden iframe, call your backend
-completion proxy, and submit any returned ACS challenge form:
+something in the browser. The shape is bank-agnostic: integrations branch only
+on `next_action.type`, `next_action.three_ds.phase`, and Arc Pay payment
+statuses. Do not branch on Sber, PSB, Alfa, Tinkoff, or any other adapter field.
+
+Run `executePayment` only on your backend with a secret key. For the browser
+handoff, prefer `confirmPayment()`: it collects `browser_info`, calls your
+backend execute proxy, runs 3DS Method/challenge actions, optionally waits for a
+terminal payment, and returns a clear result union:
+
+- `terminal` — Arc Pay reached `authorized`, `captured`, `declined`, `failed`,
+  or another terminal status.
+- `requires_action` — the buyer is on the issuer ACS page and the result will
+  arrive through webhook/status polling.
+- `non_terminal` — no more browser action is available, but the payment is still
+  pending or polling timed out.
 
 ```ts
-import { runThreeDSBrowserFlow } from "@thavguard/arc-pay/js";
+import { confirmPayment } from "@thavguard/arc-pay/js";
 
-const result = await fetch(`/api/payments/${paymentId}/execute`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ card_token_id: cardTokenId }),
-}).then((response) => {
-  if (!response.ok) throw new Error("Payment execution failed");
-  return response.json();
-});
-
-await runThreeDSBrowserFlow(result.next_action, {
+const result = await confirmPayment({
+  paymentId,
+  cardTokenId,
+  async executePayment(request) {
+    const response = await fetch(`/api/payments/${paymentId}/execute`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": crypto.randomUUID(),
+      },
+      body: JSON.stringify(request),
+    });
+    if (!response.ok) throw new Error("Payment execution failed");
+    return response.json();
+  },
   async completeThreeDSMethod(completion) {
-    const idempotencyKey = crypto.randomUUID();
     const response = await fetch(`/api/payments/${paymentId}/complete-3ds-method`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Idempotency-Key": idempotencyKey,
+        "Idempotency-Key": crypto.randomUUID(),
       },
       body: JSON.stringify(completion),
     });
     if (!response.ok) throw new Error("3DS Method completion failed");
     return response.json();
   },
+  waitForPaymentTerminal: ({ paymentId, signal }) =>
+    fetch(`/api/payments/${paymentId}/wait-terminal`, { signal }).then((response) => {
+      if (!response.ok) throw new Error("Payment status wait failed");
+      return response.json().then((result) => result.payment);
+    }),
 });
+
+if (result.status === "terminal") {
+  // Show success/failure from result.paymentStatus.
+}
 ```
 
 Do not branch on bank-specific 3DS fields. Arc Pay normalizes 3DS 1.x and 2.x
 into `next_action.three_ds.submit`.
 
-After the browser step redirects or the customer returns to your order page,
-use `waitForPaymentTerminal(paymentId)` or your own webhook/status loop. The
-server helper polls `GET /payments/{id}` and stops at terminal Arc Pay statuses.
+Your backend can implement `/api/payments/:id/wait-terminal` with
+`client.waitForPaymentTerminalResult(paymentId)`. The result includes the last
+payment status, poll attempts, and elapsed time, so test harnesses can report
+`pending_3ds` or `pending` as a clear non-terminal result instead of hiding it as
+an opaque timeout. The older `waitForPaymentTerminal(paymentId)` convenience
+method still returns only the terminal payment and throws on timeout.
+
 The browser helper automates the merchant-owned handoff, but the issuer ACS page
-still belongs to the bank after the challenge form is submitted.
+still belongs to the bank after the challenge form is submitted. Webhooks remain
+the authoritative production signal for order fulfillment.
 
 For saved cards and subscriptions, create a setup intent with
 `createCardSetup()`, tokenize through Hosted Fields, execute the setup payment,
