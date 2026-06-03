@@ -337,6 +337,7 @@ export interface CreateLinkRequest {
     payment_object: string;
     payment_method: string;
     measure: string;
+    item_code: string;
   }[];
   billing_config?: {
     interval_type?: "day" | "week" | "month" | "year";
@@ -380,6 +381,10 @@ export interface Link {
     quantity?: string;
     unit_price?: number;
     vat_rate?: number;
+    payment_object?: string;
+    payment_method?: string;
+    measure?: string;
+    item_code?: string;
   }[];
   billing_config?: {
     interval_type?: string;

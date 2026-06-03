@@ -389,6 +389,7 @@ type LinkItem struct {
 	PaymentObject string `json:"payment_object,omitempty"`
 	PaymentMethod string `json:"payment_method,omitempty"`
 	Measure       string `json:"measure,omitempty"`
+	ItemCode      string `json:"item_code,omitempty"`
 }
 
 type Link struct {
