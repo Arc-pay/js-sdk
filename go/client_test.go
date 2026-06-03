@@ -321,6 +321,60 @@ func TestExecutePaymentDecodesTypedWalletAction(t *testing.T) {
 	}
 }
 
+func TestChargeSavedCardSendsFiscalBuyerContactAndItemCode(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/payments/saved-card" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+		if got := r.Header.Get("Idempotency-Key"); got != testIdempotencyKey {
+			t.Fatalf("Idempotency-Key = %q", got)
+		}
+		var body ChargeSavedCardRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body.CustomerEmail != "buyer@example.test" || body.CustomerPhone != "+79990001122" {
+			t.Fatalf("buyer contact was not serialized: %#v", body)
+		}
+		if len(body.FiscalItems) != 1 || body.FiscalItems[0].ItemCode != "sku-1" {
+			t.Fatalf("fiscal item code was not serialized: %#v", body.FiscalItems)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"payment_id":"11111111-1111-1111-1111-111111111111",
+			"status":"pending"
+		}`))
+	}))
+	defer server.Close()
+
+	client, err := NewClient(ClientOptions{SecretKey: "sk_test_123", APIBase: server.URL + "/v1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.ChargeSavedCard(context.Background(), ChargeSavedCardRequest{
+		Amount:        10000,
+		Currency:      RUB,
+		CardTokenID:   "22222222-2222-2222-2222-222222222222",
+		CustomerID:    "customer-1",
+		CustomerEmail: "buyer@example.test",
+		CustomerPhone: "+79990001122",
+		MerchantINN:   "5027119066",
+		FiscalItems: []FiscalItem{{
+			Name:          "Service",
+			Quantity:      "1",
+			UnitPrice:     10000,
+			VATRate:       NoVAT,
+			PaymentObject: "service",
+			PaymentMethod: "full_payment",
+			Measure:       "piece",
+			ItemCode:      "sku-1",
+		}},
+	}, IdempotencyOptions{IdempotencyKey: testIdempotencyKey})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestCreateLinkDecodesFullLinkShape(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
