@@ -165,6 +165,7 @@ type FiscalItem struct {
 	PaymentObject string        `json:"payment_object"`
 	PaymentMethod string        `json:"payment_method"`
 	Measure       string        `json:"measure"`
+	ItemCode      string        `json:"item_code"`
 }
 
 type CreatePaymentRequest struct {
@@ -311,15 +312,17 @@ type BrowserPostField struct {
 }
 
 type ChargeSavedCardRequest struct {
-	Amount      int64             `json:"amount"`
-	Currency    Currency          `json:"currency"`
-	CardTokenID string            `json:"card_token_id"`
-	CustomerID  string            `json:"customer_id"`
-	ExternalID  string            `json:"external_id,omitempty"`
-	Description string            `json:"description,omitempty"`
-	Metadata    map[string]string `json:"metadata,omitempty"`
-	MerchantINN string            `json:"merchant_inn,omitempty"`
-	FiscalItems []FiscalItem      `json:"fiscal_items,omitempty"`
+	Amount        int64             `json:"amount"`
+	Currency      Currency          `json:"currency"`
+	CardTokenID   string            `json:"card_token_id"`
+	CustomerID    string            `json:"customer_id"`
+	ExternalID    string            `json:"external_id,omitempty"`
+	Description   string            `json:"description,omitempty"`
+	Metadata      map[string]string `json:"metadata,omitempty"`
+	CustomerEmail string            `json:"customer_email,omitempty"`
+	CustomerPhone string            `json:"customer_phone,omitempty"`
+	MerchantINN   string            `json:"merchant_inn,omitempty"`
+	FiscalItems   []FiscalItem      `json:"fiscal_items,omitempty"`
 }
 
 type CompleteThreeDSMethodRequest struct {

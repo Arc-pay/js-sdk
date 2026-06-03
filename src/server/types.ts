@@ -115,6 +115,7 @@ export interface FiscalItem {
   payment_object: string;
   payment_method: string;
   measure: string;
+  item_code: string;
 }
 
 export interface CreatePaymentRequest {
@@ -256,6 +257,8 @@ export interface ChargeSavedCardRequest {
   external_id?: string;
   description?: string;
   metadata?: Record<string, string>;
+  customer_email?: string;
+  customer_phone?: string;
   merchant_inn?: string;
   fiscal_items?: FiscalItem[];
 }
