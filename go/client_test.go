@@ -363,7 +363,7 @@ func TestChargeSavedCardSendsFiscalBuyerContactAndItemCode(t *testing.T) {
 			Name:          "Service",
 			Quantity:      "1",
 			UnitPrice:     10000,
-			VATRate:       NoVAT,
+			VATRate:       FiscalVATRate("no_vat"),
 			PaymentObject: "service",
 			PaymentMethod: "full_payment",
 			Measure:       "piece",
