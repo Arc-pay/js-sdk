@@ -327,14 +327,24 @@ func validateExecutePaymentRequest(body ExecutePaymentRequest) error {
 		if request.PaymentMethod == "" {
 			return &Error{Type: ValidationError, Code: "invalid_request", Message: "payment_method is required", Retryable: false}
 		}
-		if request.PaymentMethod == BankCard {
-			return &Error{Type: ValidationError, Code: "invalid_request", Message: "WalletExecutePaymentRequest cannot use payment_method=bank_card", Retryable: false}
+		if request.PaymentMethod == BankCard || request.PaymentMethod == P2P {
+			return &Error{Type: ValidationError, Code: "invalid_request", Message: "WalletExecutePaymentRequest cannot use payment_method=bank_card or p2p", Retryable: false}
 		}
 		if request.PaymentMode != H2H {
 			return &Error{Type: ValidationError, Code: "invalid_payment_mode", Message: "payment_mode must be h2h for executePayment", Retryable: false}
 		}
 		if request.WalletInteraction.Provider != request.PaymentMethod {
 			return &Error{Type: ValidationError, Code: "invalid_request", Message: "wallet_interaction.provider must match payment_method", Retryable: false}
+		}
+	case P2PExecutePaymentRequest:
+		if request.PaymentMethod == "" {
+			return &Error{Type: ValidationError, Code: "invalid_request", Message: "payment_method is required", Retryable: false}
+		}
+		if request.PaymentMethod != P2P {
+			return &Error{Type: ValidationError, Code: "invalid_request", Message: "P2PExecutePaymentRequest requires payment_method=p2p", Retryable: false}
+		}
+		if request.PaymentMode != H2H {
+			return &Error{Type: ValidationError, Code: "invalid_payment_mode", Message: "payment_mode must be h2h for executePayment", Retryable: false}
 		}
 	default:
 		return &Error{Type: ValidationError, Code: "invalid_request", Message: "unsupported executePayment request", Retryable: false}

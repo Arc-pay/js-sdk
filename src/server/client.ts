@@ -191,7 +191,7 @@ const normalizeExecutePaymentRequest = (body: ExecutePaymentRequest): ExecutePay
       retryable: false,
     });
   }
-  if (body.payment_method !== "bank_card") {
+  if (body.payment_method !== "bank_card" && body.payment_method !== "p2p") {
     if (!body.wallet_interaction) {
       throw new ArcPayError({
         type: "validation_error",
@@ -208,6 +208,14 @@ const normalizeExecutePaymentRequest = (body: ExecutePaymentRequest): ExecutePay
         retryable: false,
       });
     }
+  }
+  if (body.payment_method === "p2p" && "wallet_interaction" in body) {
+    throw new ArcPayError({
+      type: "validation_error",
+      code: "invalid_request",
+      message: "wallet_interaction is not supported for p2p executePayment",
+      retryable: false,
+    });
   }
   return body;
 };

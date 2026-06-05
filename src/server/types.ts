@@ -10,6 +10,7 @@ export type PaymentMethod =
   | "mirpay"
   | "applepay"
   | "googlepay"
+  | "p2p"
   | "bnpl";
 
 export type CaptureMode = "one_stage" | "two_stage";
@@ -193,6 +194,15 @@ export interface WalletAction {
   back_url?: string;
 }
 
+export interface P2PRequisite {
+  display_mask?: string;
+  card_number?: string;
+  account_number?: string;
+  holder_name?: string;
+  phone?: string;
+  bank_name?: string;
+}
+
 export interface CardBrowserInfo {
   accept_header: string;
   language: string;
@@ -213,12 +223,20 @@ export interface CardExecutePaymentRequest {
 }
 
 export interface WalletExecutePaymentRequest {
-  payment_method: Exclude<PaymentMethod, "bank_card">;
+  payment_method: Exclude<PaymentMethod, "bank_card" | "p2p">;
   payment_mode: "h2h";
   wallet_interaction: WalletInteraction;
 }
 
-export type ExecutePaymentRequest = CardExecutePaymentRequest | WalletExecutePaymentRequest;
+export interface P2PExecutePaymentRequest {
+  payment_method: "p2p";
+  payment_mode: "h2h";
+}
+
+export type ExecutePaymentRequest =
+  | CardExecutePaymentRequest
+  | WalletExecutePaymentRequest
+  | P2PExecutePaymentRequest;
 
 export interface ExecutePaymentResponse {
   payment_id: string;
@@ -228,6 +246,10 @@ export interface ExecutePaymentResponse {
   liability_shifted?: boolean;
   card_token_id?: string;
   wallet_action?: WalletAction;
+  p2p_allocation_id?: string;
+  p2p_requisite_id?: string;
+  p2p_expires_at?: string;
+  p2p_requisite?: P2PRequisite;
   next_action?: PaymentNextAction;
   decline_code?: string;
   decline_message?: string;
