@@ -1,6 +1,6 @@
 {
   "name": "@thavguard/arc-pay",
-  "version": "0.1.36",
+  "version": "0.1.37",
   "description": "Arc Pay browser SDK — publishable-key tokenization, Hosted Fields, and React bindings",
   "private": false,
   "license": "MIT",
