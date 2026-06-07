@@ -340,6 +340,17 @@ const isRetryableError = (type: ArcPayErrorType, status: number, code?: string):
   return type === "api_error" && status >= 500;
 };
 
+const parseRetryAfterSeconds = (value: string | null): number | undefined => {
+  if (!value) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.ceil(seconds);
+  const dateMs = Date.parse(value);
+  if (Number.isFinite(dateMs)) {
+    return Math.max(0, Math.ceil((dateMs - Date.now()) / 1000));
+  }
+  return undefined;
+};
+
 const parseErrorResponse = async (res: Response): Promise<ArcPayError> => {
   let body: APIErrorBody = {};
   try {
@@ -361,6 +372,7 @@ const parseErrorResponse = async (res: Response): Promise<ArcPayError> => {
     requestId: detail.request_id ?? res.headers.get("x-request-id") ?? undefined,
     declineCode: detail.decline_code,
     retryable: isRetryableError(type, res.status, detail.code),
+    retryAfterSeconds: parseRetryAfterSeconds(res.headers.get("retry-after")),
   });
 };
 

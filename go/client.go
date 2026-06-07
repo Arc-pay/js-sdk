@@ -482,13 +482,14 @@ func decodeResponse(res *http.Response, out any) *Error {
 		message = fmt.Sprintf("Request failed with status %d", res.StatusCode)
 	}
 	return &Error{
-		Type:        errType,
-		Code:        code,
-		Message:     message,
-		Param:       envelope.Error.Param,
-		RequestID:   requestID,
-		DeclineCode: envelope.Error.DeclineCode,
-		Retryable:   isRetryableError(errType, res.StatusCode, code),
+		Type:              errType,
+		Code:              code,
+		Message:           message,
+		Param:             envelope.Error.Param,
+		RequestID:         requestID,
+		DeclineCode:       envelope.Error.DeclineCode,
+		Retryable:         isRetryableError(errType, res.StatusCode, code),
+		RetryAfterSeconds: retryAfterSeconds(res.Header.Get("Retry-After")),
 	}
 }
 
@@ -511,6 +512,24 @@ func isRetryableError(errorType ErrorType, status int, code string) bool {
 		return false
 	}
 	return errorType == APIError && status >= 500
+}
+
+func retryAfterSeconds(value string) int {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0
+	}
+	if seconds, err := strconv.Atoi(value); err == nil && seconds >= 0 {
+		return seconds
+	}
+	if when, err := http.ParseTime(value); err == nil {
+		duration := time.Until(when)
+		if duration <= 0 {
+			return 0
+		}
+		return int((duration + time.Second - 1) / time.Second)
+	}
+	return 0
 }
 
 func appendPaymentsQuery(path string, query ListPaymentsQuery) string {

@@ -22,6 +22,8 @@ type Error struct {
 	RequestID   string
 	DeclineCode string
 	Retryable   bool
+	// RetryAfterSeconds is set from the Retry-After response header when present.
+	RetryAfterSeconds int
 }
 
 func (e *Error) Error() string {

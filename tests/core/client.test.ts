@@ -104,4 +104,25 @@ describe("client", () => {
       retryable: true,
     });
   });
+
+  it("marks rate limit errors retryable and preserves Retry-After", async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: {
+            type: "rate_limit_error",
+            code: "rate_limited",
+            message: "Too many requests",
+          },
+        }),
+        { status: 429, headers: { "content-type": "application/json", "retry-after": "60" } },
+      ),
+    );
+    const c = createClient({ apiBase: "https://api.arcpay.space", publishableKey: "pk_test_x" });
+    await expect(c.post("/x", {})).rejects.toMatchObject({
+      type: "rate_limit_error",
+      retryable: true,
+      retryAfterSeconds: 60,
+    });
+  });
 });

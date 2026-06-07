@@ -18,6 +18,7 @@ interface ArcPayErrorInit {
   declineCode?: string;
   retryable: boolean;
   requestId?: string;
+  retryAfterSeconds?: number;
 }
 
 export class ArcPayError extends Error {
@@ -28,6 +29,7 @@ export class ArcPayError extends Error {
   readonly declineCode?: string;
   readonly retryable: boolean;
   readonly requestId?: string;
+  readonly retryAfterSeconds?: number;
 
   constructor(init: ArcPayErrorInit) {
     super(init.message);
@@ -39,6 +41,7 @@ export class ArcPayError extends Error {
     this.declineCode = init.declineCode;
     this.retryable = init.retryable;
     this.requestId = init.requestId;
+    this.retryAfterSeconds = init.retryAfterSeconds;
   }
 }
 

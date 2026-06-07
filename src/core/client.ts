@@ -63,6 +63,23 @@ const buildHeaders = (
   return headers;
 };
 
+const isRetryableError = (type: ArcPayError["type"], status: number, code?: string): boolean => {
+  if (type === "rate_limit_error") return true;
+  if (code === "timeout") return false;
+  return type === "api_error" && status >= 500;
+};
+
+const parseRetryAfterSeconds = (value: string | null): number | undefined => {
+  if (!value) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.ceil(seconds);
+  const dateMs = Date.parse(value);
+  if (Number.isFinite(dateMs)) {
+    return Math.max(0, Math.ceil((dateMs - Date.now()) / 1000));
+  }
+  return undefined;
+};
+
 const parseErrorResponse = async (res: Response): Promise<ArcPayError> => {
   let body: ApiErrorBody = {};
   try {
@@ -76,7 +93,6 @@ const parseErrorResponse = async (res: Response): Promise<ArcPayError> => {
     : res.status >= 500
       ? "api_error"
       : "validation_error";
-  const retryable = type === "api_error" && res.status >= 500;
   return new ArcPayError({
     type,
     code: errBody.code,
@@ -84,7 +100,8 @@ const parseErrorResponse = async (res: Response): Promise<ArcPayError> => {
     param: errBody.param,
     requestId: errBody.request_id,
     declineCode: errBody.decline_code,
-    retryable,
+    retryable: isRetryableError(type, res.status, errBody.code),
+    retryAfterSeconds: parseRetryAfterSeconds(res.headers.get("retry-after")),
   });
 };
 
