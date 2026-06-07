@@ -77,7 +77,7 @@ export interface RequestOptions {
 
 const DEFAULT_API_BASE = "https://api.arcpay.space/v1";
 const API_VERSION = "2026-05-06";
-const SERVER_SDK_VERSION = "0.1.37";
+const SERVER_SDK_VERSION = "0.1.38";
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_NETWORK_RETRIES = 1;
 const DEFAULT_POLL_INTERVAL_MS = 1500;
