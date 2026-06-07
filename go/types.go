@@ -86,6 +86,7 @@ type PaymentOperationSummary struct {
 	OperationRefID  string                 `json:"operation_ref_id,omitempty"`
 	BankOperationID string                 `json:"bank_operation_id,omitempty"`
 	BankRRN         string                 `json:"bank_rrn,omitempty"`
+	BankInternalRef string                 `json:"bank_internal_ref,omitempty"`
 	BankAuthCode    string                 `json:"bank_auth_code,omitempty"`
 	ErrorCode       string                 `json:"error_code,omitempty"`
 	ErrorMessage    string                 `json:"error_message,omitempty"`

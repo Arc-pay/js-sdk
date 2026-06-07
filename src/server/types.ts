@@ -49,6 +49,7 @@ export interface PaymentOperationSummary {
   operation_ref_id?: string;
   bank_operation_id?: string;
   bank_rrn?: string;
+  bank_internal_ref?: string;
   bank_auth_code?: string;
   error_code?: string;
   error_message?: string;
