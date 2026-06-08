@@ -54,9 +54,13 @@ describe("client", () => {
       code: "invalid_idempotency_key",
     });
     await expect(
-      c.post("/v1/payments/pay_123/execute", {}, {
-        idempotencyKey: "00000000-0000-4000-8000-000000000001",
-      }),
+      c.post(
+        "/v1/payments/pay_123/execute",
+        {},
+        {
+          idempotencyKey: "00000000-0000-4000-8000-000000000001",
+        },
+      ),
     ).rejects.toMatchObject({
       type: "validation_error",
       code: "invalid_idempotency_key",
