@@ -13,6 +13,7 @@ export {
 } from "./core/errors";
 export type { ArcPayErrorType } from "./core/errors";
 export type { Environment } from "./core/env";
+export { isIdempotencyKey, newIdempotencyKey } from "./core/idempotency";
 export type { TokenizeResult } from "./tokenize/tokenize";
 export type { CardScheme } from "./tokenize/scheme";
 export {

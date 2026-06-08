@@ -1,4 +1,5 @@
 import { ArcPayError, type ArcPayErrorType } from "../core/errors";
+import { isIdempotencyKey } from "../core/idempotency";
 import type {
   AvailablePaymentMethod,
   CaptureRequest,
@@ -143,9 +144,6 @@ const normalizeRequestOptions = (
   opts: RequestOptionsInput,
 ): RequestOptionsWithOptionalIdempotency => opts ?? {};
 
-const IDEMPOTENCY_KEY_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
 const requireIdempotencyKey = (opts: RequestOptionsWithOptionalIdempotency): string => {
   if (!opts.idempotencyKey) {
     throw new ArcPayError({
@@ -155,11 +153,11 @@ const requireIdempotencyKey = (opts: RequestOptionsWithOptionalIdempotency): str
       retryable: false,
     });
   }
-  if (!IDEMPOTENCY_KEY_RE.test(opts.idempotencyKey)) {
+  if (!isIdempotencyKey(opts.idempotencyKey)) {
     throw new ArcPayError({
       type: "validation_error",
       code: "invalid_idempotency_key",
-      message: "idempotencyKey must be a valid UUID",
+      message: "idempotencyKey must be a valid UUIDv7",
       retryable: false,
     });
   }

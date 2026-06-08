@@ -1,4 +1,5 @@
 import { ArcPayError } from "./errors";
+import { isIdempotencyKey } from "./idempotency";
 
 const API_VERSION = "2026-05-06";
 
@@ -46,15 +47,11 @@ const buildHeaders = (
     "Content-Type": "application/json",
   };
   if (idempotencyKey) {
-    if (
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-        idempotencyKey,
-      )
-    ) {
+    if (!isIdempotencyKey(idempotencyKey)) {
       throw new ArcPayError({
         type: "validation_error",
         code: "invalid_idempotency_key",
-        message: "idempotencyKey must be a valid UUID",
+        message: "idempotencyKey must be a valid UUIDv7",
         retryable: false,
       });
     }

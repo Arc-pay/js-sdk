@@ -158,7 +158,7 @@ terminal payment, and returns a clear result union:
   pending or polling timed out.
 
 ```ts
-import { confirmPayment } from "@thavguard/arc-pay/js";
+import { confirmPayment, newIdempotencyKey } from "@thavguard/arc-pay/js";
 
 const result = await confirmPayment({
   paymentId,
@@ -168,7 +168,7 @@ const result = await confirmPayment({
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Idempotency-Key": crypto.randomUUID(),
+        "Idempotency-Key": newIdempotencyKey(),
       },
       body: JSON.stringify(request),
     });
@@ -180,7 +180,7 @@ const result = await confirmPayment({
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Idempotency-Key": crypto.randomUUID(),
+        "Idempotency-Key": newIdempotencyKey(),
       },
       body: JSON.stringify(completion),
     });

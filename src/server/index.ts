@@ -1,4 +1,5 @@
 export { ArcPayClient, createArcPayClient } from "./client";
+export { isIdempotencyKey, newIdempotencyKey } from "../core/idempotency";
 export type {
   ArcPayClientOptions,
   IdempotencyOptions,

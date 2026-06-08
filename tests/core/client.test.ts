@@ -44,11 +44,19 @@ describe("client", () => {
     expect(init.headers["Idempotency-Key"]).toBe(IDEMPOTENCY_KEY);
   });
 
-  it("rejects non-UUID idempotency keys before sending", async () => {
+  it("rejects non-UUIDv7 idempotency keys before sending", async () => {
     const c = createClient({ apiBase: "https://api.arcpay.space", publishableKey: "pk_test_x" });
 
     await expect(
       c.post("/v1/payments/pay_123/execute", {}, { idempotencyKey: "exec-1" }),
+    ).rejects.toMatchObject({
+      type: "validation_error",
+      code: "invalid_idempotency_key",
+    });
+    await expect(
+      c.post("/v1/payments/pay_123/execute", {}, {
+        idempotencyKey: "00000000-0000-4000-8000-000000000001",
+      }),
     ).rejects.toMatchObject({
       type: "validation_error",
       code: "invalid_idempotency_key",
