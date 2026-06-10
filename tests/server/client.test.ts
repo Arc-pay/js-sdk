@@ -698,49 +698,6 @@ describe("server ArcPayClient", () => {
     });
   });
 
-  it("executes a p2p payment request and returns allocated requisites", async () => {
-    fetchMock.mockResolvedValue(
-      ok({
-        payment_id: "pay_1",
-        status: "pending",
-        payment_mode: "h2h",
-        p2p_allocation_id: "alloc-1",
-        p2p_requisite_id: "req-1",
-        p2p_expires_at: "2026-06-05T13:20:00Z",
-        p2p_requisite: {
-          display_mask: "**** 1234",
-          card_number: "2200123412341234",
-          account_number: "40817810099910004312",
-          holder_name: "IVAN IVANOV",
-          phone: "+79991234567",
-          bank_name: "Test Bank",
-        },
-      }),
-    );
-    const client = new ArcPayClient({
-      secretKey: "sk_test_x",
-      fetch: fetchMock as unknown as typeof fetch,
-    });
-
-    const result = await client.executePayment(
-      "pay_1",
-      {
-        payment_method: "p2p",
-        payment_mode: "h2h",
-      },
-      { idempotencyKey: EXECUTE_IDEMPOTENCY_KEY },
-    );
-
-    expect(result.p2p_allocation_id).toBe("alloc-1");
-    expect(result.p2p_requisite?.card_number).toBe("2200123412341234");
-    expect(result.p2p_requisite?.bank_name).toBe("Test Bank");
-    const [, init] = fetchMock.mock.calls[0]!;
-    expect(JSON.parse(init.body as string)).toEqual({
-      payment_method: "p2p",
-      payment_mode: "h2h",
-    });
-  });
-
   it("rejects executePayment requests without explicit h2h payment_mode", async () => {
     const client = new ArcPayClient({
       secretKey: "sk_test_x",

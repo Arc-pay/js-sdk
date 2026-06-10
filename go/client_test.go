@@ -321,60 +321,6 @@ func TestExecutePaymentDecodesTypedWalletAction(t *testing.T) {
 	}
 }
 
-func TestExecutePaymentP2PReturnsRequisites(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/payments/pay_1/execute" {
-			t.Fatalf("unexpected path %s", r.URL.Path)
-		}
-		var body map[string]any
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatal(err)
-		}
-		if body["payment_method"] != "p2p" || body["payment_mode"] != "h2h" {
-			t.Fatalf("unexpected body %#v", body)
-		}
-		if _, ok := body["wallet_interaction"]; ok {
-			t.Fatalf("wallet_interaction must not be sent for p2p: %#v", body)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{
-			"payment_id":"pay_1",
-			"status":"pending",
-			"payment_mode":"h2h",
-			"p2p_allocation_id":"alloc-1",
-			"p2p_requisite_id":"req-1",
-			"p2p_expires_at":"2026-06-05T13:20:00Z",
-			"p2p_requisite":{
-				"display_mask":"**** 1234",
-				"card_number":"2200123412341234",
-				"account_number":"40817810099910004312",
-				"holder_name":"IVAN IVANOV",
-				"phone":"+79991234567",
-				"bank_name":"Test Bank"
-			}
-		}`))
-	}))
-	defer server.Close()
-
-	client, err := NewClient(ClientOptions{SecretKey: "sk_test_123", APIBase: server.URL + "/v1"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	result, err := client.ExecutePayment(context.Background(), "pay_1", P2PExecutePaymentRequest{
-		PaymentMethod: P2P,
-		PaymentMode:   H2H,
-	}, IdempotencyOptions{IdempotencyKey: testIdempotencyKey})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result.P2PAllocationID != "alloc-1" || result.P2PRequisiteID != "req-1" || result.P2PExpiresAt != "2026-06-05T13:20:00Z" {
-		t.Fatalf("unexpected p2p allocation fields: %#v", result)
-	}
-	if result.P2PRequisite == nil || result.P2PRequisite.CardNumber != "2200123412341234" || result.P2PRequisite.BankName != "Test Bank" {
-		t.Fatalf("unexpected p2p requisite: %#v", result.P2PRequisite)
-	}
-}
-
 func TestChargeSavedCardSendsFiscalBuyerContactAndItemCode(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/payments/saved-card" {

@@ -22,7 +22,6 @@ const (
 	MirPay    PaymentMethod = "mirpay"
 	ApplePay  PaymentMethod = "applepay"
 	GooglePay PaymentMethod = "googlepay"
-	P2P       PaymentMethod = "p2p"
 	BNPL      PaymentMethod = "bnpl"
 )
 
@@ -275,13 +274,6 @@ type WalletExecutePaymentRequest struct {
 
 func (WalletExecutePaymentRequest) executePaymentRequest() {}
 
-type P2PExecutePaymentRequest struct {
-	PaymentMethod PaymentMethod   `json:"payment_method"`
-	PaymentMode   PaymentFlowMode `json:"payment_mode"`
-}
-
-func (P2PExecutePaymentRequest) executePaymentRequest() {}
-
 type ExecutePaymentResponse struct {
 	PaymentID        string             `json:"payment_id"`
 	Status           PaymentStatus      `json:"status"`
@@ -290,22 +282,9 @@ type ExecutePaymentResponse struct {
 	LiabilityShifted *bool              `json:"liability_shifted,omitempty"`
 	CardTokenID      string             `json:"card_token_id,omitempty"`
 	WalletAction     *WalletAction      `json:"wallet_action,omitempty"`
-	P2PAllocationID  string             `json:"p2p_allocation_id,omitempty"`
-	P2PRequisiteID   string             `json:"p2p_requisite_id,omitempty"`
-	P2PExpiresAt     string             `json:"p2p_expires_at,omitempty"`
-	P2PRequisite     *P2PRequisite      `json:"p2p_requisite,omitempty"`
 	NextAction       *PaymentNextAction `json:"next_action,omitempty"`
 	DeclineCode      string             `json:"decline_code,omitempty"`
 	DeclineMessage   string             `json:"decline_message,omitempty"`
-}
-
-type P2PRequisite struct {
-	DisplayMask   string `json:"display_mask,omitempty"`
-	CardNumber    string `json:"card_number,omitempty"`
-	AccountNumber string `json:"account_number,omitempty"`
-	HolderName    string `json:"holder_name,omitempty"`
-	Phone         string `json:"phone,omitempty"`
-	BankName      string `json:"bank_name,omitempty"`
 }
 
 type PaymentNextAction struct {
