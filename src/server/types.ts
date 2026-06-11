@@ -219,9 +219,7 @@ export interface WalletExecutePaymentRequest {
   wallet_interaction: WalletInteraction;
 }
 
-export type ExecutePaymentRequest =
-  | CardExecutePaymentRequest
-  | WalletExecutePaymentRequest;
+export type ExecutePaymentRequest = CardExecutePaymentRequest | WalletExecutePaymentRequest;
 
 export interface ExecutePaymentResponse {
   payment_id: string;
