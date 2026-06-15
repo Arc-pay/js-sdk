@@ -18,7 +18,7 @@ import (
 const (
 	defaultAPIBase           = "https://api.arcpay.space/v1"
 	apiVersion               = "2026-05-06"
-	goSDKVersion             = "0.1.43"
+	goSDKVersion             = "0.1.44"
 	defaultTimeout           = 30 * time.Second
 	defaultMaxNetworkRetries = 1
 	defaultPollInterval      = 1500 * time.Millisecond

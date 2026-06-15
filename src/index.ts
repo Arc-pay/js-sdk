@@ -47,7 +47,7 @@ export type {
   ThreeDSMountOptions,
   WaitForPaymentTerminalRequest,
 } from "./three-ds";
-export const SDK_VERSION = "0.1.43";
+export const SDK_VERSION = "0.1.44";
 
 export type { FieldType } from "./elements/postmessage";
 export type { ElementOptions, ElementEvent } from "./elements/element";
