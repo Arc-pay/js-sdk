@@ -3,9 +3,13 @@ import type {
   ExecutePaymentRequest,
   ExecutePaymentResponse,
   Payment,
+  PaymentMethod,
   PaymentNextAction,
   PaymentStatus,
   TerminalPaymentStatus,
+  WalletAction,
+  WalletInteraction,
+  WalletInteractionAction,
 } from "../server/types";
 
 export type ThreeDSAction = PaymentNextAction;
@@ -105,6 +109,31 @@ export interface ConfirmPaymentOptions extends Omit<HandleNextActionOptions, "re
   executePayment: (request: ExecutePaymentRequest) => Promise<ExecutePaymentResponse>;
 }
 
+export interface WalletNextAction {
+  provider: Exclude<PaymentMethod, "bank_card">;
+  action: WalletInteractionAction;
+  sdk?: string;
+  url?: string;
+  qrUrl?: string;
+  qrImageBase64?: string;
+  qrContentType?: "image/png" | "image/svg+xml";
+  bankInvoiceId?: string;
+  backUrl?: string;
+  params?: Record<string, string>;
+}
+
+export interface ConfirmWalletPaymentOptions {
+  paymentId: string;
+  paymentMethod: Exclude<PaymentMethod, "bank_card">;
+  walletInteraction: WalletInteraction;
+  executePayment: (request: ExecutePaymentRequest) => Promise<ExecutePaymentResponse>;
+  waitForPaymentTerminal?: (
+    request: WaitForPaymentTerminalRequest,
+  ) => Promise<PaymentStatusSnapshot>;
+  terminalStatuses?: readonly TerminalPaymentStatus[];
+  signal?: AbortSignal;
+}
+
 export type ConfirmPaymentNonTerminalReason =
   | "awaiting_webhook"
   | "poll_timeout"
@@ -133,6 +162,30 @@ export type ConfirmPaymentResult =
       payment?: PaymentStatusSnapshot;
       response?: ExecutePaymentResponse;
       threeDS?: ThreeDSBrowserFlowResult;
+      reason: ConfirmPaymentNonTerminalReason;
+    };
+
+export type ConfirmWalletPaymentResult =
+  | {
+      status: "wallet_action";
+      paymentId: string;
+      paymentStatus: PaymentStatus | ExecutePaymentResponse["status"];
+      response: ExecutePaymentResponse;
+      walletAction: WalletNextAction;
+    }
+  | {
+      status: "terminal";
+      paymentId: string;
+      paymentStatus: TerminalPaymentStatus;
+      payment?: PaymentStatusSnapshot;
+      response?: ExecutePaymentResponse;
+    }
+  | {
+      status: "non_terminal";
+      paymentId: string;
+      paymentStatus: PaymentStatus | ExecutePaymentResponse["status"];
+      payment?: PaymentStatusSnapshot;
+      response?: ExecutePaymentResponse;
       reason: ConfirmPaymentNonTerminalReason;
     };
 
@@ -207,6 +260,22 @@ const isTerminalStatus = (
 const statusFrom = (
   value: PaymentStatusSnapshot | ExecutePaymentResponse | undefined,
 ): PaymentStatus | ExecutePaymentResponse["status"] | undefined => value?.status;
+
+const normalizeWalletAction = (walletAction?: WalletAction): WalletNextAction | null => {
+  if (!walletAction || walletAction.provider === "bank_card") return null;
+  return {
+    provider: walletAction.provider,
+    action: walletAction.action,
+    sdk: walletAction.sdk,
+    url: walletAction.url,
+    qrUrl: walletAction.qr_url,
+    qrImageBase64: walletAction.qr_image_base64,
+    qrContentType: walletAction.qr_content_type,
+    bankInvoiceId: walletAction.bank_invoice_id,
+    backUrl: walletAction.back_url,
+    params: walletAction.params,
+  };
+};
 
 const resultFromStatus = (
   paymentId: string,
@@ -546,6 +615,79 @@ export const confirmPayment = async (
     browser_info: options.browserInfo ?? collectBrowserInfo(),
   });
   return handleNextAction({ ...options, response });
+};
+
+export const confirmWalletPayment = async (
+  options: ConfirmWalletPaymentOptions,
+): Promise<ConfirmWalletPaymentResult> => {
+  if (options.walletInteraction.provider !== options.paymentMethod) {
+    throw new Error("walletInteraction.provider must match paymentMethod");
+  }
+
+  const terminalStatuses = options.terminalStatuses ?? DEFAULT_TERMINAL_STATUSES;
+  const response = await options.executePayment({
+    payment_method: options.paymentMethod,
+    payment_mode: "h2h",
+    wallet_interaction: options.walletInteraction,
+  });
+  const walletAction = normalizeWalletAction(response.wallet_action);
+  if (walletAction) {
+    return {
+      status: "wallet_action",
+      paymentId: options.paymentId,
+      paymentStatus: response.status,
+      response,
+      walletAction,
+    };
+  }
+  if (isTerminalStatus(response.status, terminalStatuses)) {
+    return {
+      status: "terminal",
+      paymentId: options.paymentId,
+      paymentStatus: response.status,
+      response,
+    };
+  }
+  if (options.waitForPaymentTerminal) {
+    try {
+      const payment = await options.waitForPaymentTerminal({
+        paymentId: options.paymentId,
+        signal: options.signal,
+      });
+      if (isTerminalStatus(payment.status, terminalStatuses)) {
+        return {
+          status: "terminal",
+          paymentId: options.paymentId,
+          paymentStatus: payment.status,
+          payment,
+          response,
+        };
+      }
+      return {
+        status: "non_terminal",
+        paymentId: options.paymentId,
+        paymentStatus: payment.status,
+        payment,
+        response,
+        reason: "awaiting_webhook",
+      };
+    } catch {
+      return {
+        status: "non_terminal",
+        paymentId: options.paymentId,
+        paymentStatus: response.status,
+        response,
+        reason: "poll_timeout",
+      };
+    }
+  }
+  return {
+    status: "non_terminal",
+    paymentId: options.paymentId,
+    paymentStatus: response.status,
+    response,
+    reason: "awaiting_webhook",
+  };
 };
 
 const htmlEscape = (value: string): string =>

@@ -23,6 +23,7 @@ export {
   buildThreeDSMethodCompletion,
   collectBrowserInfo,
   confirmPayment,
+  confirmWalletPayment,
   getThreeDSAction,
   handleNextAction,
   isThreeDSChallengeAction,
@@ -37,6 +38,8 @@ export type {
   ConfirmPaymentNonTerminalReason,
   ConfirmPaymentOptions,
   ConfirmPaymentResult,
+  ConfirmWalletPaymentOptions,
+  ConfirmWalletPaymentResult,
   HandleNextActionOptions,
   MountedThreeDSForm,
   PaymentStatusSnapshot,
@@ -46,6 +49,7 @@ export type {
   ThreeDSBrowserFlowResult,
   ThreeDSMountOptions,
   WaitForPaymentTerminalRequest,
+  WalletNextAction,
 } from "./three-ds";
 export const SDK_VERSION = "0.1.45";
 

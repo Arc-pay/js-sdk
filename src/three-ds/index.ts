@@ -5,6 +5,7 @@ export {
   buildThreeDSMethodCompletion,
   collectBrowserInfo,
   confirmPayment,
+  confirmWalletPayment,
   getThreeDSAction,
   handleNextAction,
   isThreeDSChallengeAction,
@@ -19,6 +20,8 @@ export type {
   ConfirmPaymentNonTerminalReason,
   ConfirmPaymentOptions,
   ConfirmPaymentResult,
+  ConfirmWalletPaymentOptions,
+  ConfirmWalletPaymentResult,
   HandleNextActionOptions,
   MountedThreeDSForm,
   PaymentStatusSnapshot,
@@ -28,4 +31,5 @@ export type {
   ThreeDSBrowserFlowResult,
   ThreeDSMountOptions,
   WaitForPaymentTerminalRequest,
+  WalletNextAction,
 } from "./actions";
