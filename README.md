@@ -264,6 +264,42 @@ if (execution.wallet_action?.action === "qr") {
 }
 ```
 
+For browser checkouts, use `confirmWalletPayment()` to call your backend execute
+proxy and receive a browser-friendly `walletAction` object. The helper keeps
+the public API request in snake_case and normalizes the returned action to
+camelCase for UI code.
+
+```ts
+import { confirmWalletPayment, newIdempotencyKey } from "@thavguard/arc-pay/js";
+
+const result = await confirmWalletPayment({
+  paymentId,
+  paymentMethod: "sbp",
+  walletInteraction: {
+    provider: "sbp",
+    surface: "merchant_web",
+    action: "qr",
+    back_url: "https://merchant.example/return",
+  },
+  async executePayment(request) {
+    const response = await fetch(`/api/payments/${paymentId}/execute`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": newIdempotencyKey(),
+      },
+      body: JSON.stringify(request),
+    });
+    if (!response.ok) throw new Error("SBP execution failed");
+    return response.json();
+  },
+});
+
+if (result.status === "wallet_action" && result.walletAction.action === "qr") {
+  // Render result.walletAction.qrUrl or result.walletAction.qrImageBase64.
+}
+```
+
 Do not construct NSPK payloads or bank-specific merchant identifiers yourself.
 If `status` is `failed`, use `decline_code` and `decline_message` for the buyer
 or support flow; for example `sbp_merchant_not_found` means the terminal is not
