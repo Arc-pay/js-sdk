@@ -219,6 +219,56 @@ complete any returned 3DS browser step, and wait for a terminal payment that
 contains `card_token_id`. Later merchant-initiated charges use
 `chargeSavedCard()`.
 
+## SBP QR with the server SDK
+
+SBP is a wallet/APM H2H flow. Keep the secret key on your backend, create the
+payment, then execute it with `wallet_interaction`. Render the returned
+`wallet_action` exactly as provided by Arc Pay.
+
+```ts
+import { createArcPayClient, newIdempotencyKey } from "@thavguard/arc-pay/server";
+
+const client = createArcPayClient({ secretKey: process.env.ARCPAY_SECRET_KEY! });
+
+const payment = await client.createPayment(
+  {
+    amount: 10000,
+    currency: "RUB",
+    payment_method: "sbp",
+    external_id: "order-123",
+    capture_mode: "one_stage",
+    success_url: "https://merchant.example/success",
+    fail_url: "https://merchant.example/fail",
+    callback_url: "https://merchant.example/webhooks/arc-pay",
+  },
+  { idempotencyKey: newIdempotencyKey() },
+);
+
+const execution = await client.executePayment(
+  payment.id,
+  {
+    payment_method: "sbp",
+    payment_mode: "h2h",
+    wallet_interaction: {
+      provider: "sbp",
+      surface: "merchant_web",
+      action: "qr",
+      back_url: "https://merchant.example/return",
+    },
+  },
+  { idempotencyKey: newIdempotencyKey() },
+);
+
+if (execution.wallet_action?.action === "qr") {
+  // Show execution.wallet_action.qr_url or qr_image_base64 in your checkout UI.
+}
+```
+
+Do not construct NSPK payloads or bank-specific merchant identifiers yourself.
+If `status` is `failed`, use `decline_code` and `decline_message` for the buyer
+or support flow; for example `sbp_merchant_not_found` means the terminal is not
+configured for SBP at the acquiring bank.
+
 The server client accepts an optional `apiBase` only for local or isolated test
 environments. Production integrations should use the default
 `https://api.arcpay.space/v1`; sandbox/live is selected by the key prefix.

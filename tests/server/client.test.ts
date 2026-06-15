@@ -698,6 +698,67 @@ describe("server ArcPayClient", () => {
     });
   });
 
+  it("executes an SBP QR payment request and preserves wallet_action fields", async () => {
+    fetchMock.mockResolvedValue(
+      ok({
+        payment_id: "pay_sbp_1",
+        status: "pending",
+        payment_mode: "h2h",
+        wallet_action: {
+          provider: "sbp",
+          action: "qr",
+          qr_url: "https://qr.nspk.ru/BD10006GQ7T2N9M9876543210",
+          qr_image_base64: "iVBORw0KGgo=",
+          qr_content_type: "image/png",
+          bank_invoice_id: "qrc-123",
+          back_url: "https://merchant.example/return",
+          params: { expires_in: "900" },
+        },
+      }),
+    );
+    const client = new ArcPayClient({
+      secretKey: "sk_test_x",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+
+    const result = await client.executePayment(
+      "pay_sbp_1",
+      {
+        payment_method: "sbp",
+        payment_mode: "h2h",
+        wallet_interaction: {
+          provider: "sbp",
+          surface: "merchant_web",
+          action: "qr",
+          back_url: "https://merchant.example/return",
+        },
+      },
+      { idempotencyKey: EXECUTE_IDEMPOTENCY_KEY },
+    );
+
+    expect(result.wallet_action).toMatchObject({
+      provider: "sbp",
+      action: "qr",
+      qr_url: "https://qr.nspk.ru/BD10006GQ7T2N9M9876543210",
+      qr_image_base64: "iVBORw0KGgo=",
+      qr_content_type: "image/png",
+      bank_invoice_id: "qrc-123",
+      back_url: "https://merchant.example/return",
+      params: { expires_in: "900" },
+    });
+    const [, init] = fetchMock.mock.calls[0]!;
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      payment_method: "sbp",
+      payment_mode: "h2h",
+      wallet_interaction: {
+        provider: "sbp",
+        surface: "merchant_web",
+        action: "qr",
+        back_url: "https://merchant.example/return",
+      },
+    });
+  });
+
   it("rejects executePayment requests without explicit h2h payment_mode", async () => {
     const client = new ArcPayClient({
       secretKey: "sk_test_x",

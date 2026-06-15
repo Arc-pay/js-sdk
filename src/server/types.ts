@@ -9,8 +9,7 @@ export type PaymentMethod =
   | "dolyami"
   | "mirpay"
   | "applepay"
-  | "googlepay"
-  | "bnpl";
+  | "googlepay";
 
 export type CaptureMode = "one_stage" | "two_stage";
 export type PaymentFlowMode = "h2h" | "redirect";
@@ -192,6 +191,7 @@ export interface WalletAction {
   qr_content_type?: "image/png" | "image/svg+xml";
   bank_invoice_id?: string;
   back_url?: string;
+  params?: Record<string, string>;
 }
 
 export interface CardBrowserInfo {
