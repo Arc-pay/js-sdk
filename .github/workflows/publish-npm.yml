@@ -55,7 +55,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pnpm install --no-frozen-lockfile --ignore-scripts
+          pnpm install --frozen-lockfile --ignore-scripts
           pnpm approve-builds esbuild
 
       - name: Prepare release version
@@ -76,6 +76,9 @@ jobs:
         run: go test ./...
         working-directory: go
 
+      - name: Publish to npm
+        run: npm publish --access public --provenance
+
       - name: Commit release version
         run: |
           git config user.name "github-actions[bot]"
@@ -86,9 +89,6 @@ jobs:
           fi
           git commit -m "chore(release): publish @thavguard/arc-pay@${{ steps.version.outputs.version }} [skip ci]"
           git push origin HEAD:main
-
-      - name: Publish to npm
-        run: npm publish --access public
 
       - name: Tag Go module
         run: |
