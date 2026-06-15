@@ -3,6 +3,7 @@ import {
   buildThreeDSBrowserForm,
   buildThreeDSBrowserStep,
   buildThreeDSMethodCompletion,
+  confirmWalletPayment,
   confirmPayment,
   getThreeDSAction,
   handleNextAction,
@@ -217,6 +218,126 @@ describe("3DS next action helpers", () => {
         status: "captured",
       },
       threeDS: undefined,
+    });
+  });
+
+  it("confirms an SBP wallet payment and returns a normalized QR action", async () => {
+    const result = await confirmWalletPayment({
+      paymentId: "pay_sbp_1",
+      paymentMethod: "sbp",
+      walletInteraction: {
+        provider: "sbp",
+        surface: "merchant_web",
+        action: "qr",
+        back_url: "https://merchant.example/return",
+      },
+      executePayment: async (request) => {
+        expect(request).toEqual({
+          payment_method: "sbp",
+          payment_mode: "h2h",
+          wallet_interaction: {
+            provider: "sbp",
+            surface: "merchant_web",
+            action: "qr",
+            back_url: "https://merchant.example/return",
+          },
+        });
+        return {
+          payment_id: "pay_sbp_1",
+          status: "pending",
+          payment_mode: "h2h",
+          wallet_action: {
+            provider: "sbp",
+            action: "qr",
+            qr_url: "https://qr.nspk.ru/BD10006GQ7T2N9M9876543210",
+            qr_image_base64: "iVBORw0KGgo=",
+            qr_content_type: "image/png",
+            bank_invoice_id: "qrc-123",
+            back_url: "https://merchant.example/return",
+            params: { expires_in: "900" },
+          },
+        };
+      },
+    });
+
+    expect(result).toEqual({
+      status: "wallet_action",
+      paymentId: "pay_sbp_1",
+      paymentStatus: "pending",
+      response: {
+        payment_id: "pay_sbp_1",
+        status: "pending",
+        payment_mode: "h2h",
+        wallet_action: {
+          provider: "sbp",
+          action: "qr",
+          qr_url: "https://qr.nspk.ru/BD10006GQ7T2N9M9876543210",
+          qr_image_base64: "iVBORw0KGgo=",
+          qr_content_type: "image/png",
+          bank_invoice_id: "qrc-123",
+          back_url: "https://merchant.example/return",
+          params: { expires_in: "900" },
+        },
+      },
+      walletAction: {
+        provider: "sbp",
+        action: "qr",
+        qrUrl: "https://qr.nspk.ru/BD10006GQ7T2N9M9876543210",
+        qrImageBase64: "iVBORw0KGgo=",
+        qrContentType: "image/png",
+        bankInvoiceId: "qrc-123",
+        backUrl: "https://merchant.example/return",
+        params: { expires_in: "900" },
+      },
+    });
+  });
+
+  it("treats failed SBP execute responses as terminal wallet results", async () => {
+    const result = await confirmWalletPayment({
+      paymentId: "pay_sbp_failed",
+      paymentMethod: "sbp",
+      walletInteraction: { provider: "sbp", surface: "merchant_web", action: "qr" },
+      executePayment: async () => ({
+        payment_id: "pay_sbp_failed",
+        status: "failed",
+        decline_code: "sbp_merchant_not_found",
+        decline_message: "SBP payments are not configured for this terminal",
+      }),
+    });
+
+    expect(result).toEqual({
+      status: "terminal",
+      paymentId: "pay_sbp_failed",
+      paymentStatus: "failed",
+      response: {
+        payment_id: "pay_sbp_failed",
+        status: "failed",
+        decline_code: "sbp_merchant_not_found",
+        decline_message: "SBP payments are not configured for this terminal",
+      },
+    });
+  });
+
+  it("returns non_terminal when SBP execute has no wallet action yet", async () => {
+    const result = await confirmWalletPayment({
+      paymentId: "pay_sbp_pending",
+      paymentMethod: "sbp",
+      walletInteraction: { provider: "sbp", surface: "merchant_web", action: "qr" },
+      executePayment: async () => ({
+        payment_id: "pay_sbp_pending",
+        status: "pending",
+      }),
+    });
+
+    expect(result).toEqual({
+      status: "non_terminal",
+      paymentId: "pay_sbp_pending",
+      paymentStatus: "pending",
+      response: {
+        payment_id: "pay_sbp_pending",
+        status: "pending",
+      },
+      reason: "awaiting_webhook",
     });
   });
 
