@@ -69,8 +69,8 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
+          cache: false
           go-version-file: go/go.mod
-          cache-dependency-path: go/go.sum
 
       - name: Verify Go SDK
         run: go test ./...
