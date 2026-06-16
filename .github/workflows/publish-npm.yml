@@ -36,7 +36,7 @@ jobs:
           !startsWith(github.event.head_commit.message, 'chore(release): publish @thavguard/arc-pay@')
         )
       }}
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, prod]
     steps:
       - uses: actions/checkout@v6
         with:
