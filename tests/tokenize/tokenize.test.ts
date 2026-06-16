@@ -69,7 +69,15 @@ describe("raw tokenize transport", () => {
       apiBase: "https://api.example.test",
       publishableKey: "pk_test_x",
     });
-    await expect(tokenize(client, { ...VALID, pan: "1111111111111111" })).rejects.toThrow(/luhn/i);
+    await tokenize(client, { ...VALID, pan: "1111111111111111" }).then(
+      () => {
+        throw new Error("tokenize should reject an invalid PAN before network call");
+      },
+      (err: unknown) => {
+        expect(err).toBeInstanceOf(Error);
+        expect((err as Error).message).toMatch(/luhn/i);
+      },
+    );
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

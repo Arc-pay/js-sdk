@@ -65,6 +65,14 @@ describe("ArcPay.load", () => {
   });
 
   it("throws on invalid key (sk_*)", async () => {
-    await expect(ArcPay.load("sk_test_x")).rejects.toThrow(/publishable key/i);
+    await ArcPay.load("sk_test_x").then(
+      () => {
+        throw new Error("ArcPay.load should reject secret keys");
+      },
+      (err: unknown) => {
+        expect(err).toBeInstanceOf(Error);
+        expect((err as Error).message).toMatch(/publishable key/i);
+      },
+    );
   });
 });
