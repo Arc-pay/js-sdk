@@ -267,6 +267,7 @@ export interface ChargeSavedCardRequest {
 export interface CompleteThreeDSMethodRequest {
   completion_indicator: "Y" | "N" | "U";
   three_ds_server_trans_id: string;
+  browser_info?: CardBrowserInfo;
 }
 
 export interface WaitForPaymentOptions {

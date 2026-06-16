@@ -153,14 +153,27 @@ describe("3DS next action helpers", () => {
       },
     };
     const submitted: string[] = [];
+    const browserInfo = {
+      accept_header: "text/html",
+      language: "ru-RU",
+      screen_width: 1440,
+      screen_height: 900,
+      color_depth: 24 as const,
+      timezone_offset_minutes: -180,
+      java_enabled: false,
+      user_agent: "Mozilla/5.0",
+      window_size: "04" as const,
+    };
 
     const resultPromise = runThreeDSBrowserFlow(methodAction, {
       methodTimeoutMs: 1000,
+      browserInfo,
       submitter: (form) => submitted.push(form.action),
       completeThreeDSMethod: async (completion) => {
         expect(completion).toEqual({
           completion_indicator: "Y",
           three_ds_server_trans_id: "trans-id",
+          browser_info: browserInfo,
         });
         return {
           payment_id: "pay_1",
@@ -178,6 +191,41 @@ describe("3DS next action helpers", () => {
     if (result.status === "challenge_submitted") {
       expect(result.methodResult).toBe("loaded");
       result.mounted.remove();
+    }
+  });
+
+  it("reports unknown 3DS Method completion on method timeout", async () => {
+    const methodAction: PaymentNextAction = {
+      type: "three_ds_method",
+      three_ds: {
+        version: "2",
+        phase: "method",
+        three_ds_server_trans_id: "trans-id",
+        completion_endpoint: "/v1/payments/pay_1/complete-3ds-method",
+        submit: {
+          method: "POST",
+          url: "https://method.bank.example",
+          target: "hidden_iframe",
+          fields: [{ name: "threeDSMethodData", value: "method-data" }],
+        },
+      },
+    };
+
+    const result = await runThreeDSBrowserFlow(methodAction, {
+      methodTimeoutMs: 1,
+      submitter: () => undefined,
+      completeThreeDSMethod: async (completion) => {
+        expect(completion.completion_indicator).toBe("U");
+        return {
+          payment_id: "pay_1",
+          status: "pending_3ds",
+        };
+      },
+    });
+
+    expect(result.status).toBe("method_completed");
+    if (result.status === "method_completed") {
+      expect(result.methodResult).toBe("timeout");
     }
   });
 
@@ -219,6 +267,53 @@ describe("3DS next action helpers", () => {
       },
       threeDS: undefined,
     });
+  });
+
+  it("uses the server-observed Accept header for execute and 3DS Method completion", async () => {
+    const methodAction: PaymentNextAction = {
+      type: "three_ds_method",
+      three_ds: {
+        version: "2",
+        phase: "method",
+        three_ds_server_trans_id: "trans-id",
+        completion_endpoint: "/v1/payments/pay_1/complete-3ds-method",
+        submit: {
+          method: "POST",
+          url: "https://method.bank.example",
+          target: "hidden_iframe",
+          fields: [{ name: "threeDSMethodData", value: "method-data" }],
+        },
+      },
+    };
+    const acceptHeader = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,*/*;q=0.8";
+
+    const resultPromise = confirmPayment({
+      paymentId: "pay_1",
+      cardTokenId: "card_token_1",
+      browserAcceptHeader: acceptHeader,
+      methodTimeoutMs: 1000,
+      submitter: () => undefined,
+      executePayment: async (request) => {
+        expect(request.browser_info.accept_header).toBe(acceptHeader);
+        return {
+          payment_id: "pay_1",
+          status: "pending_3ds_method",
+          next_action: methodAction,
+        };
+      },
+      completeThreeDSMethod: async (completion) => {
+        expect(completion.browser_info?.accept_header).toBe(acceptHeader);
+        return {
+          payment_id: "pay_1",
+          status: "pending_3ds",
+        };
+      },
+    });
+
+    document.querySelector("iframe")?.dispatchEvent(new Event("load"));
+    const result = await resultPromise;
+
+    expect(result.status).toBe("non_terminal");
   });
 
   it("confirms an SBP wallet payment and returns a normalized QR action", async () => {

@@ -327,8 +327,9 @@ type ChargeSavedCardRequest struct {
 }
 
 type CompleteThreeDSMethodRequest struct {
-	CompletionIndicator  string `json:"completion_indicator"`
-	ThreeDSServerTransID string `json:"three_ds_server_trans_id"`
+	CompletionIndicator  string           `json:"completion_indicator"`
+	ThreeDSServerTransID string           `json:"three_ds_server_trans_id"`
+	BrowserInfo          *CardBrowserInfo `json:"browser_info,omitempty"`
 }
 
 type AvailablePaymentMethod struct {

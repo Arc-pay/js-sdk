@@ -54,6 +54,7 @@ export interface RunThreeDSBrowserFlowOptions extends ThreeDSMountOptions {
     completion: ReturnType<typeof buildThreeDSMethodCompletion>,
     nextAction: PaymentNextAction,
   ) => Promise<ExecutePaymentResponse>;
+  browserInfo?: BrowserInfo;
   methodCompletionIndicator?: "Y" | "N" | "U";
   methodTimeoutMs?: number;
   signal?: AbortSignal;
@@ -105,6 +106,7 @@ export interface HandleNextActionOptions extends RunThreeDSBrowserFlowOptions {
 export interface ConfirmPaymentOptions extends Omit<HandleNextActionOptions, "response"> {
   paymentId: string;
   cardTokenId: string;
+  browserAcceptHeader?: string;
   browserInfo?: BrowserInfo;
   executePayment: (request: ExecutePaymentRequest) => Promise<ExecutePaymentResponse>;
 }
@@ -346,14 +348,23 @@ export const buildThreeDSBrowserStep = (
 export const buildThreeDSMethodCompletion = (
   nextAction: PaymentNextAction,
   completionIndicator: "Y" | "N" | "U" = "Y",
-): { completion_indicator: "Y" | "N" | "U"; three_ds_server_trans_id: string } => {
+  browserInfo?: BrowserInfo,
+): {
+  completion_indicator: "Y" | "N" | "U";
+  three_ds_server_trans_id: string;
+  browser_info?: BrowserInfo;
+} => {
   if (!isThreeDSMethodAction(nextAction) || !nextAction.three_ds.three_ds_server_trans_id) {
     throw new Error("nextAction must be a three_ds_method action with three_ds_server_trans_id");
   }
-  return {
+  const completion = {
     completion_indicator: completionIndicator,
     three_ds_server_trans_id: nextAction.three_ds.three_ds_server_trans_id,
   };
+  if (browserInfo) {
+    return { ...completion, browser_info: browserInfo };
+  }
+  return completion;
 };
 
 const requireDocument = (explicitDocument?: Document): Document => {
@@ -483,9 +494,9 @@ export const runThreeDSBrowserFlow = async (
       options.methodTimeoutMs ?? 10_000,
       options.signal,
     );
-    const indicator = options.methodCompletionIndicator ?? (methodResult === "loaded" ? "Y" : "N");
+    const indicator = options.methodCompletionIndicator ?? (methodResult === "loaded" ? "Y" : "U");
     const response = await completeThreeDSMethod(
-      buildThreeDSMethodCompletion(nextAction, indicator),
+      buildThreeDSMethodCompletion(nextAction, indicator, options.browserInfo),
       nextAction,
     );
     const followUpAction = getThreeDSAction(response.next_action);
@@ -608,13 +619,14 @@ export const handleNextAction = async (
 export const confirmPayment = async (
   options: ConfirmPaymentOptions,
 ): Promise<ConfirmPaymentResult> => {
+  const browserInfo = options.browserInfo ?? collectBrowserInfo(options.browserAcceptHeader);
   const response = await options.executePayment({
     payment_method: "bank_card",
     payment_mode: "h2h",
     card_token_id: options.cardTokenId,
-    browser_info: options.browserInfo ?? collectBrowserInfo(),
+    browser_info: browserInfo,
   });
-  return handleNextAction({ ...options, response });
+  return handleNextAction({ ...options, response, browserInfo });
 };
 
 export const confirmWalletPayment = async (

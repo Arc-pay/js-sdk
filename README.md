@@ -163,6 +163,9 @@ import { confirmPayment, newIdempotencyKey } from "@thavguard/arc-pay/js";
 const result = await confirmPayment({
   paymentId,
   cardTokenId,
+  // Optional but recommended: set this from the Accept header your backend saw
+  // when it rendered the checkout page. Browser JS cannot read that header.
+  browserAcceptHeader: initialBrowserAcceptHeader,
   async executePayment(request) {
     const response = await fetch(`/api/payments/${paymentId}/execute`, {
       method: "POST",
@@ -176,6 +179,8 @@ const result = await confirmPayment({
     return response.json();
   },
   async completeThreeDSMethod(completion) {
+    // Forward completion unchanged. It includes browser_info for banks that
+    // require browser data during 3DS Method finalization.
     const response = await fetch(`/api/payments/${paymentId}/complete-3ds-method`, {
       method: "POST",
       headers: {

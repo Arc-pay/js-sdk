@@ -86,13 +86,26 @@ describe("3DS helpers", () => {
 
   it("runs method completion and submits returned challenge", async () => {
     const submitted: string[] = [];
+    const browserInfo = {
+      accept_header: "text/html",
+      language: "ru-RU",
+      screen_width: 1440,
+      screen_height: 900,
+      color_depth: 24 as const,
+      timezone_offset_minutes: -180,
+      java_enabled: false,
+      user_agent: "Mozilla/5.0",
+      window_size: "04" as const,
+    };
     const resultPromise = runThreeDSBrowserFlow(methodAction, {
       methodTimeoutMs: 1000,
+      browserInfo,
       submitter: (form) => submitted.push(form.action),
       completeThreeDSMethod: async (completion) => {
         expect(completion).toEqual({
           completion_indicator: "Y",
           three_ds_server_trans_id: "trans-1",
+          browser_info: browserInfo,
         });
         return {
           payment_id: "pay-1",
@@ -111,6 +124,25 @@ describe("3DS helpers", () => {
     if (result.status === "challenge_submitted") {
       expect(result.methodResult).toBe("loaded");
       result.mounted.remove();
+    }
+  });
+
+  it("reports unknown 3DS Method completion when the method frame times out", async () => {
+    const result = await runThreeDSBrowserFlow(methodAction, {
+      methodTimeoutMs: 1,
+      submitter: () => undefined,
+      completeThreeDSMethod: async (completion) => {
+        expect(completion.completion_indicator).toBe("U");
+        return {
+          payment_id: "pay-1",
+          status: "pending_3ds",
+        };
+      },
+    });
+
+    expect(result.status).toBe("method_completed");
+    if (result.status === "method_completed") {
+      expect(result.methodResult).toBe("timeout");
     }
   });
 
