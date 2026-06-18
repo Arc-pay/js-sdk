@@ -90,6 +90,51 @@ func TestCreatePaymentSendsServerHeadersAndIdempotencyKey(t *testing.T) {
 	}
 }
 
+func TestCreatePaymentSendsOptionalSBPReturnURL(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body CreatePaymentRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body.PaymentMethod != SBP {
+			t.Fatalf("payment method = %s", body.PaymentMethod)
+		}
+		if body.ReturnURL != "https://merchant.example/return" {
+			t.Fatalf("return_url = %q", body.ReturnURL)
+		}
+		if body.SuccessURL != "" || body.FailURL != "" {
+			t.Fatalf("unexpected redirect URLs: success=%q fail=%q", body.SuccessURL, body.FailURL)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"id":"11111111-1111-1111-1111-111111111113",
+			"amount":10000,
+			"currency":"RUB",
+			"payment_method":"sbp",
+			"status":"created",
+			"created_at":"2026-05-12T09:00:00Z",
+			"updated_at":"2026-05-12T09:00:00Z"
+		}`))
+	}))
+	defer server.Close()
+
+	client, err := NewClient(ClientOptions{SecretKey: "sk_test_123", APIBase: server.URL + "/v1/"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.CreatePayment(context.Background(), CreatePaymentRequest{
+		Amount:        10000,
+		Currency:      RUB,
+		PaymentMethod: SBP,
+		ExternalID:    "order-sbp-return",
+		CaptureMode:   OneStage,
+		ReturnURL:     "https://merchant.example/return",
+	}, IdempotencyOptions{IdempotencyKey: testIdempotencyKey})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestCreatePaymentRequiresUUIDIdempotencyKey(t *testing.T) {
 	client, err := NewClient(ClientOptions{SecretKey: "sk_test_123"})
 	if err != nil {

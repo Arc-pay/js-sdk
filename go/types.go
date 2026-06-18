@@ -179,6 +179,7 @@ type CreatePaymentRequest struct {
 	Description   string            `json:"description,omitempty"`
 	SuccessURL    string            `json:"success_url,omitempty"`
 	FailURL       string            `json:"fail_url,omitempty"`
+	ReturnURL     string            `json:"return_url,omitempty"`
 	CallbackURL   string            `json:"callback_url,omitempty"`
 	CustomerEmail string            `json:"customer_email,omitempty"`
 	CustomerPhone string            `json:"customer_phone,omitempty"`

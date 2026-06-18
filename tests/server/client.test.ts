@@ -120,6 +120,78 @@ describe("server ArcPayClient", () => {
     expect(init.headers["User-Agent"]).toBe(`ArcPay-JS/${SDK_VERSION}`);
   });
 
+  it("creates an SBP payment with optional bank return URL", async () => {
+    fetchMock.mockResolvedValue(
+      ok({
+        id: "11111111-1111-1111-1111-111111111113",
+        amount: 10000,
+        currency: "RUB",
+        payment_method: "sbp",
+        status: "created",
+        created_at: "2026-05-12T09:00:00Z",
+        updated_at: "2026-05-12T09:00:00Z",
+      }),
+    );
+    const client = new ArcPayClient({
+      secretKey: "sk_test_x",
+      apiBase: "https://api.example.test/v1",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+
+    await client.createPayment(
+      {
+        amount: 10000,
+        currency: "RUB",
+        payment_method: "sbp",
+        external_id: "order-sbp-return",
+        capture_mode: "one_stage",
+        return_url: "https://merchant.example/return",
+      },
+      { idempotencyKey: IDEMPOTENCY_KEY },
+    );
+
+    const [, init] = fetchMock.mock.calls[0]!;
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      payment_method: "sbp",
+      return_url: "https://merchant.example/return",
+    });
+  });
+
+  it("creates an SBP payment without redirect URLs", async () => {
+    fetchMock.mockResolvedValue(
+      ok({
+        id: "11111111-1111-1111-1111-111111111114",
+        amount: 10000,
+        currency: "RUB",
+        payment_method: "sbp",
+        status: "created",
+        created_at: "2026-05-12T09:00:00Z",
+        updated_at: "2026-05-12T09:00:00Z",
+      }),
+    );
+    const client = new ArcPayClient({
+      secretKey: "sk_test_x",
+      apiBase: "https://api.example.test/v1",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+
+    await client.createPayment(
+      {
+        amount: 10000,
+        currency: "RUB",
+        payment_method: "sbp",
+        external_id: "order-sbp-no-urls",
+        capture_mode: "one_stage",
+      },
+      { idempotencyKey: IDEMPOTENCY_KEY },
+    );
+
+    const [, init] = fetchMock.mock.calls[0]!;
+    expect(JSON.parse(init.body as string)).not.toHaveProperty("success_url");
+    expect(JSON.parse(init.body as string)).not.toHaveProperty("fail_url");
+    expect(JSON.parse(init.body as string)).not.toHaveProperty("return_url");
+  });
+
   it("retries transient API errors with the same idempotency key", async () => {
     fetchMock
       .mockResolvedValueOnce(
