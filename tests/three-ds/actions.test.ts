@@ -285,7 +285,8 @@ describe("3DS next action helpers", () => {
         },
       },
     };
-    const acceptHeader = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,*/*;q=0.8";
+    const acceptHeader =
+      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,*/*;q=0.8";
 
     const resultPromise = confirmPayment({
       paymentId: "pay_1",
