@@ -1,0 +1,7 @@
+self-hosted-runner:
+  labels:
+    - arcpay-ci
+    - arcpay-bytebase-control
+    - prod
+
+config-variables: null
