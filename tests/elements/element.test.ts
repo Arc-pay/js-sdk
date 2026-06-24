@@ -196,7 +196,7 @@ describe("Element events — arcpay:ready", () => {
     dispatchFromIframe({ type: "arcpay:configured" }, cw);
 
     expect(listener).toHaveBeenCalledOnce();
-    expect(listener).toHaveBeenCalledWith({ type: "ready" });
+    expect(listener).toHaveBeenCalledWith({ type: "ready", field: "cardNumber" });
     expect(el.isReady()).toBe(true);
 
     dispatchFromIframe({ type: "arcpay:ready" }, cw);
@@ -214,10 +214,24 @@ describe("Element events — arcpay:ready", () => {
     const listener = vi.fn();
     el.on("error", listener);
 
-    dispatchFromIframe({ type: "arcpay:rejected", reason: "domain not authorized" }, cw);
+    dispatchFromIframe(
+      {
+        type: "arcpay:rejected",
+        reason: "domain not authorized",
+        code: "origin_not_allowed",
+        retryable: false,
+      },
+      cw,
+    );
 
     expect(listener).toHaveBeenCalledOnce();
-    expect(listener).toHaveBeenCalledWith({ type: "error", reason: "domain not authorized" });
+    expect(listener).toHaveBeenCalledWith({
+      type: "error",
+      field: "cardNumber",
+      code: "origin_not_allowed",
+      reason: "domain not authorized",
+      retryable: false,
+    });
     expect(el.isReady()).toBe(false);
     el.destroy();
   });
@@ -248,6 +262,8 @@ describe("Element events — arcpay:ready", () => {
         isValid: true,
         isEmpty: false,
         isComplete: true,
+        issue: null,
+        help: { code: "enter_card_number", message: "Enter the card number" },
       },
       cw,
     );
@@ -255,7 +271,10 @@ describe("Element events — arcpay:ready", () => {
     expect(ready).toHaveBeenCalledOnce();
     expect(error).not.toHaveBeenCalled();
 
-    dispatchFromIframe({ type: "arcpay:rejected", reason: "domain not authorized" }, cw);
+    dispatchFromIframe(
+      { type: "arcpay:rejected", reason: "domain not authorized", code: "origin_not_allowed" },
+      cw,
+    );
     expect(error).toHaveBeenCalledOnce();
     expect(ready).toHaveBeenCalledOnce();
     expect(change).toHaveBeenCalledOnce();
@@ -296,6 +315,8 @@ describe("Element events — arcpay:change", () => {
         isComplete: true,
         brand: "visa",
         lastFour: "1234",
+        issue: null,
+        help: { code: "card_brand_detected", message: "Card brand detected", brand: "visa" },
       },
       cw,
     );
@@ -303,11 +324,14 @@ describe("Element events — arcpay:change", () => {
     expect(listener).toHaveBeenCalledOnce();
     expect(listener).toHaveBeenCalledWith({
       type: "change",
+      field: "cardNumber",
       isValid: true,
       isEmpty: false,
       isComplete: true,
       brand: "visa",
       lastFour: "1234",
+      issue: null,
+      help: { code: "card_brand_detected", message: "Card brand detected", brand: "visa" },
     });
     el.destroy();
   });
@@ -328,6 +352,12 @@ describe("Element events — arcpay:change", () => {
         isValid: false,
         isEmpty: false,
         isComplete: false,
+        issue: {
+          code: "card_expiry_incomplete",
+          message: "Enter the full expiry date",
+          severity: "error",
+        },
+        help: { code: "enter_card_expiry", message: "Enter the expiry date" },
       },
       cw,
     );
@@ -353,6 +383,8 @@ describe("Element events — arcpay:change", () => {
         isValid: true,
         isEmpty: false,
         isComplete: true,
+        issue: null,
+        help: { code: "enter_card_number", message: "Enter the card number" },
       },
       cw,
     );

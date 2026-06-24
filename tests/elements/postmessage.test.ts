@@ -203,6 +203,8 @@ describe("parseIncoming", () => {
       isComplete: true,
       brand: "visa",
       lastFour: "1234",
+      issue: null,
+      help: { code: "card_brand_detected", message: "Card brand detected", brand: "visa" },
     };
     const event = makeMessageEvent(data, EXPECTED_ORIGIN);
     const result = parseIncoming(event, EXPECTED_ORIGIN);

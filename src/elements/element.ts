@@ -3,6 +3,8 @@ import {
   type FieldType,
   type ParentToIframe,
   type IframeToParent,
+  type HostedFieldHelp,
+  type HostedFieldIssue,
   postToIframe,
   parseIncoming,
 } from "./postmessage";
@@ -15,16 +17,22 @@ export interface ElementOptions {
 }
 
 export type ElementEvent =
-  | { type: "ready" }
+  | { type: "ready"; field: FieldType }
   | {
       type: "change";
+      field: FieldType;
       isValid: boolean;
       isEmpty: boolean;
       isComplete: boolean;
       brand?: string;
       lastFour?: string;
+      issue: HostedFieldIssue | null;
+      help: HostedFieldHelp | null;
     }
-  | { type: "error"; reason: string };
+  | { type: "focus"; field: FieldType; help: HostedFieldHelp | null }
+  | { type: "blur"; field: FieldType; issue: HostedFieldIssue | null }
+  | { type: "error"; field: FieldType; code: string; reason: string; retryable: boolean }
+  | { type: "loaderror"; field: FieldType; code: string; reason: string; retryable: boolean };
 
 type Listener = (event: ElementEvent) => void;
 type ElementEventName = ElementEvent["type"];
@@ -34,6 +42,8 @@ const FIELD_TITLES: Record<FieldType, string> = {
   cardExpiry: "Arc Pay card expiration date",
   cardCvv: "Arc Pay card security code",
 };
+
+const MOUNT_TIMEOUT_MS = 10000;
 
 export interface ElementContext {
   iframeBase: string;
@@ -46,10 +56,14 @@ export class Element {
   private readonly listeners: Record<ElementEventName, Set<Listener>> = {
     ready: new Set<Listener>(),
     change: new Set<Listener>(),
+    focus: new Set<Listener>(),
+    blur: new Set<Listener>(),
     error: new Set<Listener>(),
+    loaderror: new Set<Listener>(),
   };
   private status: "pending" | "ready" | "error" = "pending";
   private messageHandler: ((e: MessageEvent) => void) | null = null;
+  private mountTimer: number | null = null;
 
   constructor(
     public readonly field: FieldType,
@@ -99,6 +113,17 @@ export class Element {
       this.handleMessage(data);
     };
     window.addEventListener("message", this.messageHandler);
+    this.mountTimer = window.setTimeout(() => {
+      if (this.status !== "pending") return;
+      this.status = "error";
+      this.emit({
+        type: "loaderror",
+        field: this.field,
+        code: "iframe_ready_timeout",
+        reason: "Element iframe did not finish the Arc Pay handshake",
+        retryable: true,
+      });
+    }, MOUNT_TIMEOUT_MS);
 
     iframe.addEventListener(
       "load",
@@ -128,18 +153,33 @@ export class Element {
     } else if (data.type === "arcpay:configured") {
       if (this.status !== "pending") return;
       this.status = "ready";
-      this.emit({ type: "ready" });
+      this.clearMountTimer();
+      this.emit({ type: "ready", field: this.field });
     } else if (data.type === "arcpay:rejected") {
       this.status = "error";
-      this.emit({ type: "error", reason: data.reason });
+      this.clearMountTimer();
+      this.emit({
+        type: "error",
+        field: this.field,
+        code: data.code ?? "iframe_rejected",
+        reason: data.reason,
+        retryable: data.retryable ?? false,
+      });
+    } else if (data.type === "arcpay:focus" && data.field === this.field) {
+      this.emit({ type: "focus", field: this.field, help: data.help });
+    } else if (data.type === "arcpay:blur" && data.field === this.field) {
+      this.emit({ type: "blur", field: this.field, issue: data.issue });
     } else if (data.type === "arcpay:change" && data.field === this.field) {
       this.emit({
         type: "change",
+        field: this.field,
         isValid: data.isValid,
         isEmpty: data.isEmpty,
         isComplete: data.isComplete,
         brand: data.brand,
         lastFour: data.lastFour,
+        issue: data.issue,
+        help: data.help,
       });
     }
     // arcpay:tokenize-result / arcpay:tokenize-error handled by Elements factory (Task 9).
@@ -170,6 +210,7 @@ export class Element {
       window.removeEventListener("message", this.messageHandler);
       this.messageHandler = null;
     }
+    this.clearMountTimer();
     for (const listeners of Object.values(this.listeners)) {
       listeners.clear();
     }
@@ -219,5 +260,11 @@ export class Element {
     for (const listener of this.listeners[event.type]) {
       listener(event);
     }
+  }
+
+  private clearMountTimer(): void {
+    if (!this.mountTimer) return;
+    window.clearTimeout(this.mountTimer);
+    this.mountTimer = null;
   }
 }

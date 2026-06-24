@@ -2,6 +2,24 @@ import { ArcPayError } from "../core/errors";
 
 export type FieldType = "cardNumber" | "cardExpiry" | "cardCvv";
 
+export interface HostedFieldIssue {
+  code: string;
+  message: string;
+  severity: "error";
+}
+
+export interface HostedFieldHelp {
+  code: string;
+  message: string;
+  brand?: string;
+}
+
+export interface HostedFieldError {
+  code: string;
+  reason: string;
+  retryable: boolean;
+}
+
 // Parent → iframe
 export type ParentToIframe =
   | { type: "arcpay:hello"; origin: string; publishableKey: string; channelId: string }
@@ -16,7 +34,9 @@ export type ParentToIframe =
 export type IframeToParent =
   | { type: "arcpay:ready" }
   | { type: "arcpay:configured" }
-  | { type: "arcpay:rejected"; reason: string }
+  | { type: "arcpay:rejected"; reason: string; code?: string; retryable?: boolean }
+  | { type: "arcpay:focus"; field: FieldType; help: HostedFieldHelp | null }
+  | { type: "arcpay:blur"; field: FieldType; issue: HostedFieldIssue | null }
   | {
       type: "arcpay:change";
       field: FieldType;
@@ -25,6 +45,8 @@ export type IframeToParent =
       isComplete: boolean;
       brand?: string;
       lastFour?: string;
+      issue: HostedFieldIssue | null;
+      help: HostedFieldHelp | null;
     }
   | {
       type: "arcpay:tokenize-result";
@@ -79,6 +101,18 @@ const isField = (value: unknown): value is FieldType =>
 const isTokenizeErrorType = (value: unknown): value is TokenizeErrorType =>
   typeof value === "string" && TOKENIZE_ERROR_TYPES.includes(value as TokenizeErrorType);
 
+const isHostedFieldIssue = (value: unknown): value is HostedFieldIssue =>
+  isRecord(value) &&
+  typeof value.code === "string" &&
+  typeof value.message === "string" &&
+  value.severity === "error";
+
+const isHostedFieldHelp = (value: unknown): value is HostedFieldHelp =>
+  isRecord(value) &&
+  typeof value.code === "string" &&
+  typeof value.message === "string" &&
+  (value.brand === undefined || typeof value.brand === "string");
+
 const isArcpayMessage = (data: unknown): data is { type: string } =>
   typeof data === "object" &&
   data !== null &&
@@ -128,19 +162,46 @@ const isKnownArcpayMessage = (data: unknown): data is ParentToIframe | IframeToP
         typeof data.idempotencyKey === "string"
       );
     case "arcpay:rejected":
-      return "reason" in data && typeof data.reason === "string";
+      return (
+        "reason" in data &&
+        typeof data.reason === "string" &&
+        (!("code" in data) || data.code === undefined || typeof data.code === "string") &&
+        (!("retryable" in data) ||
+          data.retryable === undefined ||
+          typeof data.retryable === "boolean")
+      );
+    case "arcpay:focus":
+      return (
+        "field" in data &&
+        "help" in data &&
+        isField(data.field) &&
+        (data.help === null || isHostedFieldHelp(data.help))
+      );
+    case "arcpay:blur":
+      return (
+        "field" in data &&
+        "issue" in data &&
+        isField(data.field) &&
+        (data.issue === null || isHostedFieldIssue(data.issue))
+      );
     case "arcpay:change":
       return (
         "field" in data &&
         "isValid" in data &&
         "isEmpty" in data &&
         "isComplete" in data &&
+        "issue" in data &&
+        "help" in data &&
         isField(data.field) &&
         typeof data.isValid === "boolean" &&
         typeof data.isEmpty === "boolean" &&
         typeof data.isComplete === "boolean" &&
         (!("brand" in data) || data.brand === undefined || typeof data.brand === "string") &&
-        (!("lastFour" in data) || data.lastFour === undefined || typeof data.lastFour === "string")
+        (!("lastFour" in data) ||
+          data.lastFour === undefined ||
+          typeof data.lastFour === "string") &&
+        (data.issue === null || isHostedFieldIssue(data.issue)) &&
+        (data.help === null || isHostedFieldHelp(data.help))
       );
     case "arcpay:tokenize-result":
       return (
