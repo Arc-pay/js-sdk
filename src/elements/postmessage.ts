@@ -150,6 +150,15 @@ const isKnownArcpayMessage = (data: unknown): data is ParentToIframe | IframeToP
         typeof data.placeholder === "string"
       );
     case "arcpay:focus":
+      if ("field" in data || "help" in data) {
+        return (
+          "field" in data &&
+          "help" in data &&
+          isField(data.field) &&
+          (data.help === null || isHostedFieldHelp(data.help))
+        );
+      }
+      return true;
     case "arcpay:clear":
     case "arcpay:ready":
     case "arcpay:configured":
@@ -169,13 +178,6 @@ const isKnownArcpayMessage = (data: unknown): data is ParentToIframe | IframeToP
         (!("retryable" in data) ||
           data.retryable === undefined ||
           typeof data.retryable === "boolean")
-      );
-    case "arcpay:focus":
-      return (
-        "field" in data &&
-        "help" in data &&
-        isField(data.field) &&
-        (data.help === null || isHostedFieldHelp(data.help))
       );
     case "arcpay:blur":
       return (

@@ -159,6 +159,30 @@ describe("parseIncoming", () => {
     expect(parseIncoming(event, EXPECTED_ORIGIN)).toBe(data);
   });
 
+  it("accepts parent focus commands without treating them as iframe focus events", () => {
+    const data = { type: "arcpay:focus" as const };
+    const event = makeMessageEvent(data, EXPECTED_ORIGIN);
+    expect(parseIncoming(event, EXPECTED_ORIGIN)).toBe(data);
+  });
+
+  it("accepts iframe focus events only with a valid field and help payload", () => {
+    const data = {
+      type: "arcpay:focus" as const,
+      field: "cardNumber" as const,
+      help: { code: "card_brand_detected", message: "Card brand detected", brand: "visa" },
+    };
+    const event = makeMessageEvent(data, EXPECTED_ORIGIN);
+    expect(parseIncoming(event, EXPECTED_ORIGIN)).toBe(data);
+  });
+
+  it("rejects structurally invalid iframe focus events", () => {
+    const event = makeMessageEvent(
+      { type: "arcpay:focus", field: "notAField", help: null },
+      EXPECTED_ORIGIN,
+    );
+    expect(parseIncoming(event, EXPECTED_ORIGIN)).toBeNull();
+  });
+
   it("rejects unknown arcpay message types", () => {
     const event = makeMessageEvent({ type: "arcpay:legacy-ready" }, EXPECTED_ORIGIN);
     expect(parseIncoming(event, EXPECTED_ORIGIN)).toBeNull();
