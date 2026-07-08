@@ -36,7 +36,8 @@ jobs:
           !startsWith(github.event.head_commit.message, 'chore(release): publish @thavguard/arc-pay@')
         )
       }}
-    runs-on: [self-hosted, prod]
+    runs-on: [self-hosted, arcpay-ci]
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
         with:
