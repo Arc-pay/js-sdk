@@ -18,7 +18,6 @@ import type {
   ListPaymentsQuery,
   Payment,
   PaymentList,
-  PaymentNextAction,
   Refund,
   TerminalPaymentStatus,
   VoidRequest,

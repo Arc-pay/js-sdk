@@ -412,7 +412,7 @@ describe("server ArcPayClient", () => {
               external_id: "order-1",
               capture_mode: "one_stage",
             },
-            opts as any,
+            opts as never,
           ),
       },
       {
@@ -425,7 +425,7 @@ describe("server ArcPayClient", () => {
               success_url: "https://merchant.example.com/success",
               fail_url: "https://merchant.example.com/fail",
             },
-            opts as any,
+            opts as never,
           ),
       },
       {
@@ -439,7 +439,7 @@ describe("server ArcPayClient", () => {
               capture_mode: "one_stage",
               payment_methods: [{ method: "bank_card", payment_mode: "h2h" }],
             },
-            opts as any,
+            opts as never,
           ),
       },
       {
@@ -452,22 +452,22 @@ describe("server ArcPayClient", () => {
               payment_methods: [{ method: "bank_card", payment_mode: "h2h" }],
               capture_mode: "one_stage",
             },
-            opts as any,
+            opts as never,
           ),
       },
       {
         name: "capturePayment",
         invoke: (opts: unknown) =>
-          idempotentClient.capturePayment("pay_1", { amount: 5000 }, opts as any),
+          idempotentClient.capturePayment("pay_1", { amount: 5000 }, opts as never),
       },
       {
         name: "voidPayment",
-        invoke: (opts: unknown) => idempotentClient.voidPayment("pay_1", {}, opts as any),
+        invoke: (opts: unknown) => idempotentClient.voidPayment("pay_1", {}, opts as never),
       },
       {
         name: "createRefund",
         invoke: (opts: unknown) =>
-          idempotentClient.createRefund("pay_1", { amount: 5000 }, opts as any),
+          idempotentClient.createRefund("pay_1", { amount: 5000 }, opts as never),
       },
       {
         name: "executePayment",
@@ -490,7 +490,7 @@ describe("server ArcPayClient", () => {
                 window_size: "01",
               },
             },
-            opts as any,
+            opts as never,
           ),
       },
       {
@@ -502,12 +502,12 @@ describe("server ArcPayClient", () => {
               completion_indicator: "Y",
               three_ds_server_trans_id: "019e6b4e-ae3b-7776-8a56-7c0f8db5e303",
             },
-            opts as any,
+            opts as never,
           ),
       },
       {
         name: "cancelLink",
-        invoke: (opts: unknown) => idempotentClient.cancelLink("link_1", opts as any),
+        invoke: (opts: unknown) => idempotentClient.cancelLink("link_1", opts as never),
       },
     ];
 
@@ -709,7 +709,7 @@ describe("server ArcPayClient", () => {
           card_token_id: "tok_1",
           payment_mode: "h2h",
           browser_info: {},
-        } as any,
+        } as never,
         { idempotencyKey: EXECUTE_IDEMPOTENCY_KEY },
       ),
     ).rejects.toMatchObject({
@@ -844,7 +844,7 @@ describe("server ArcPayClient", () => {
           payment_method: "bank_card",
           card_token_id: "tok_1",
           browser_info: {},
-        } as any,
+        } as never,
         { idempotencyKey: EXECUTE_IDEMPOTENCY_KEY },
       ),
     ).rejects.toMatchObject({

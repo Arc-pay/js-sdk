@@ -11,7 +11,8 @@ const browserServerSDKError = (): ArcPayError =>
   });
 
 export class ArcPayClient {
-  constructor(_options: ArcPayClientOptions) {
+  constructor(options: ArcPayClientOptions) {
+    void options;
     throw browserServerSDKError();
   }
 }

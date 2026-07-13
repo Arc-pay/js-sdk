@@ -1,12 +1,19 @@
 import { expect, test } from "@playwright/test";
+import type { ArcPayInstance } from "../src";
+
+type ArcPayTestWindow = Window & {
+  __arcpay?: ArcPayInstance;
+  __lastArcPayStyle?: unknown;
+};
 
 test.describe("Hosted Fields", () => {
   test("mounts fields and tokenizes through iframe postMessage API", async ({ page }) => {
     await page.goto("/merchant.html");
-    await page.waitForFunction(() => (window as any).__arcpay);
+    await page.waitForFunction(() => (window as ArcPayTestWindow).__arcpay);
 
     const result = await page.evaluate(async () => {
-      const arcpay = (window as any).__arcpay;
+      const arcpay = (window as ArcPayTestWindow).__arcpay;
+      if (!arcpay) throw new Error("ArcPay fixture was not initialized");
       const root = document.createElement("div");
       root.innerHTML = `
         <div id="card-number" style="height: 32px"></div>
@@ -51,10 +58,11 @@ test.describe("Hosted Fields", () => {
 
   test("sends only iframe-safe appearance styles to hosted fields", async ({ page }) => {
     await page.goto("/merchant.html");
-    await page.waitForFunction(() => (window as any).__arcpay);
+    await page.waitForFunction(() => (window as ArcPayTestWindow).__arcpay);
 
     await page.evaluate(async () => {
-      const arcpay = (window as any).__arcpay;
+      const arcpay = (window as ArcPayTestWindow).__arcpay;
+      if (!arcpay) throw new Error("ArcPay fixture was not initialized");
       const root = document.createElement("div");
       root.innerHTML = `<div id="card-number" style="height: 32px"></div>`;
       document.body.appendChild(root);
@@ -91,7 +99,7 @@ test.describe("Hosted Fields", () => {
     const frame = await iframe?.contentFrame();
     if (!frame) throw new Error("cardNumber iframe was not mounted");
 
-    const style = await frame.waitForFunction(() => (window as any).__lastArcPayStyle);
+    const style = await frame.waitForFunction(() => (window as ArcPayTestWindow).__lastArcPayStyle);
 
     expect(await style.jsonValue()).toEqual({
       base: {

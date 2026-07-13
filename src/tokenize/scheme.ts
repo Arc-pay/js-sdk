@@ -1,12 +1,5 @@
 export type CardScheme =
-  | "visa"
-  | "mastercard"
-  | "amex"
-  | "discover"
-  | "mir"
-  | "jcb"
-  | "unionpay"
-  | "unknown";
+  "visa" | "mastercard" | "amex" | "discover" | "mir" | "jcb" | "unionpay" | "unknown";
 
 export const detectScheme = (pan: string): CardScheme => {
   if (/^4/.test(pan)) return "visa";

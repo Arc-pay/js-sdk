@@ -31,12 +31,7 @@ export type PaymentStatus =
   | "timeout";
 
 export type PaymentOperationType =
-  | "execute"
-  | "saved_card_charge"
-  | "three_ds"
-  | "capture"
-  | "void"
-  | "refund";
+  "execute" | "saved_card_charge" | "three_ds" | "capture" | "void" | "refund";
 export type PaymentOperationStatus = "in_flight" | "succeeded" | "failed" | "unknown";
 
 export interface PaymentOperationSummary {

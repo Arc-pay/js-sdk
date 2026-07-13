@@ -137,9 +137,7 @@ export interface ConfirmWalletPaymentOptions {
 }
 
 export type ConfirmPaymentNonTerminalReason =
-  | "awaiting_webhook"
-  | "poll_timeout"
-  | "unsupported_next_action";
+  "awaiting_webhook" | "poll_timeout" | "unsupported_next_action";
 
 export type ConfirmPaymentResult =
   | {
