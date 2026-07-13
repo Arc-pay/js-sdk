@@ -82,7 +82,7 @@
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.7.0",
     "jsdom": "^29.1.1",
-    "prettier": "^3.9.5",
+    "prettier": "3.9.5",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "tsup": "^8.3.0",
