@@ -237,7 +237,7 @@ export class Element {
   /**
    * Internal: returns the iframe's contentWindow for source-filtering in
    * Elements.doTokenize(). Returns null when the iframe is not yet mounted
-   * or when jsdom has not yet populated contentWindow (test environment).
+   * or the browser has not exposed contentWindow. Callers must fail closed.
    */
   getIframeContentWindow(): Window | null {
     return this.iframe?.contentWindow ?? null;

@@ -135,8 +135,19 @@ export class Elements {
   ): Promise<TokenizeResult> {
     const iframeOrigin = new URL(this.iframeBase).origin;
     // C1: obtain reference to the cardNumber iframe's contentWindow before
-    // registering the listener so we can filter by source.
+    // registering the listener so we can fail closed and filter by source.
     const cardIframeWindow = cardNumber.getIframeContentWindow();
+    if (!cardIframeWindow) {
+      return Promise.reject(
+        new ArcPayError({
+          type: "validation_error",
+          code: "iframe_not_loaded",
+          message: "tokenize() cannot start because the cardNumber iframe is not loaded",
+          retryable: false,
+          paymentId,
+        }),
+      );
+    }
 
     return new Promise<TokenizeResult>((resolve, reject) => {
       // C3: 30-second timeout — rejects and cleans up if no result arrives.
@@ -155,7 +166,7 @@ export class Elements {
 
       const onMessage = (event: MessageEvent) => {
         // C1: source guard — only accept messages from the cardNumber iframe.
-        if (cardIframeWindow !== null && event.source !== cardIframeWindow) return;
+        if (event.source !== cardIframeWindow) return;
         // C4: use parseIncoming for origin + arcpay: prefix guard.
         const data = parseIncoming<IframeToParent>(event, iframeOrigin);
         if (!data) return;

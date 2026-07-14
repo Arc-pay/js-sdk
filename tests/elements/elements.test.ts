@@ -417,6 +417,43 @@ describe("Elements.tokenize — C1 source guard", () => {
     expect(result.cardTokenId).toBe("tok_correct");
     els.destroy();
   });
+
+  it("fails closed when cardNumber iframe contentWindow is unavailable", async () => {
+    const els = makeElements();
+    const divs = makeMountDivs();
+    mountAll(els, divs);
+    mockAllIframeContentWindows();
+    simulateAllReady();
+
+    const cardNumberIframe = document.querySelector("iframe") as HTMLIFrameElement;
+    Object.defineProperty(cardNumberIframe, "contentWindow", {
+      configurable: true,
+      get: () => null,
+    });
+
+    const err = (await els
+      .tokenize("pay_src", "idem-src-2")
+      .catch((e: unknown) => e)) as ArcPayError;
+    expect(err).toBeInstanceOf(ArcPayError);
+    expect(err.type).toBe("validation_error");
+    expect(err.code).toBe("iframe_not_loaded");
+    expect(err.paymentId).toBe("pay_src");
+
+    dispatchFromIframe(
+      {
+        type: "arcpay:tokenize-result",
+        cardTokenId: "tok_untrusted",
+        cardMask: "427600****0000",
+        cardScheme: "visa",
+        cardBin: "427600",
+        expiresIn: 300,
+        expiresAt: "2029-06-30T23:59:59Z",
+      },
+      null,
+    );
+
+    els.destroy();
+  });
 });
 
 // ---------------------------------------------------------------------------
