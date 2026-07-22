@@ -1,7 +1,13 @@
 self-hosted-runner:
   labels:
     - arcpay-ci
+    - arcpay-fast
+    - arcpay-test
+    - arcpay-docker-build
+    - arcpay-security-scan
+    - arcpay-browser
     - arcpay-bytebase-control
+    - arcpay-debug
     - prod
 
 config-variables: null
