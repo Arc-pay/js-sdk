@@ -292,7 +292,12 @@ const resolveRetryDelayMs = (
   error: ArcPayError,
 ): number => {
   const value = typeof retryDelayMs === "function" ? retryDelayMs(attempt, error) : retryDelayMs;
-  if (value === undefined) return defaultRetryDelayMs(attempt);
+  if (value === undefined) {
+    const retryAfterMs =
+      error.retryAfterSeconds === undefined ? undefined : error.retryAfterSeconds * 1_000;
+    const delayMs = defaultRetryDelayMs(attempt);
+    return retryAfterMs === undefined ? delayMs : Math.max(delayMs, retryAfterMs);
+  }
   if (!Number.isFinite(value) || value < 0) {
     throw new ArcPayError({
       type: "validation_error",

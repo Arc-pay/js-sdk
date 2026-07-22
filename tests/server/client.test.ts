@@ -242,6 +242,58 @@ describe("server ArcPayClient", () => {
     expect(fetchMock.mock.calls[1]?.[1].headers["Idempotency-Key"]).toBe(IDEMPOTENCY_KEY);
   });
 
+  it("honors Retry-After before retrying rate limits", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: {
+              type: "rate_limit_error",
+              code: "rate_limited",
+              message: "rate limit exceeded",
+            },
+          }),
+          { status: 429, headers: { "content-type": "application/json", "retry-after": "2" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        ok({
+          id: "11111111-1111-1111-1111-111111111111",
+          amount: 10000,
+          currency: "RUB",
+          payment_method: "bank_card",
+          status: "created",
+          created_at: "2026-05-12T09:00:00Z",
+          updated_at: "2026-05-12T09:00:00Z",
+        }),
+      );
+    const client = new ArcPayClient({
+      secretKey: "sk_test_x",
+      apiBase: "https://api.example.test/v1",
+      fetch: fetchMock as unknown as typeof fetch,
+      maxNetworkRetries: 1,
+    });
+
+    const pending = client.createPayment(
+      {
+        amount: 10000,
+        currency: "RUB",
+        payment_method: "bank_card",
+        external_id: "order-rate-limit",
+        capture_mode: "one_stage",
+      },
+      { idempotencyKey: IDEMPOTENCY_KEY },
+    );
+    await vi.runOnlyPendingTimersAsync();
+
+    await expect(pending).resolves.toMatchObject({
+      id: "11111111-1111-1111-1111-111111111111",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("does not retry Arc Pay timeout responses", async () => {
     fetchMock.mockResolvedValue(
       new Response(

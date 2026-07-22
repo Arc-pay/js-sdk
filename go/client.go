@@ -430,7 +430,14 @@ func (c *Client) delay(attempt int, err *Error) time.Duration {
 	if base > time.Second {
 		base = time.Second
 	}
-	return base + time.Duration(rand.Int63n(int64(base)))
+	delay := base + time.Duration(rand.Int63n(int64(base)))
+	if err != nil && err.RetryAfterSeconds > 0 {
+		retryAfter := time.Duration(err.RetryAfterSeconds) * time.Second
+		if retryAfter > delay {
+			return retryAfter
+		}
+	}
+	return delay
 }
 
 type errorEnvelope struct {

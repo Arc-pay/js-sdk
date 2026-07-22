@@ -198,6 +198,20 @@ func TestCreatePaymentRetriesTransientErrorsWithSameIdempotencyKey(t *testing.T)
 	}
 }
 
+func TestDefaultRetryDelayHonorsRetryAfter(t *testing.T) {
+	client := &Client{}
+
+	delay := client.delay(1, &Error{
+		Type:              RateLimitError,
+		Retryable:         true,
+		RetryAfterSeconds: 2,
+	})
+
+	if delay != 2*time.Second {
+		t.Fatalf("delay = %s, want 2s", delay)
+	}
+}
+
 func TestMaxNetworkRetriesZeroDisablesRetries(t *testing.T) {
 	attempts := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
