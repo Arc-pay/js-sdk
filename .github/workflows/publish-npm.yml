@@ -36,7 +36,7 @@ jobs:
           !startsWith(github.event.head_commit.message, 'chore(release): publish @thavguard/arc-pay@')
         )
       }}
-    runs-on: [self-hosted, arcpay-docker-build]
+    runs-on: ${{ vars.ARCPAY_RUNNER_LANES_ENABLED == 'true' && fromJSON('["self-hosted","arcpay-docker-build"]') || fromJSON('["self-hosted","arcpay-ci"]') }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
