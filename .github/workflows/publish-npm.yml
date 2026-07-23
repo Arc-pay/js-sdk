@@ -46,12 +46,9 @@ jobs:
       - name: Verify preinstalled Node.js
         run: |
           node --version
-
           pnpm --version
-      - name: Enable pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@11.0.9 --activate
+      - name: Configure pnpm store
+        run: pnpm config set store-dir /var/cache/arcpay/pnpm-store
 
       - name: Install dependencies
         run: |
