@@ -1,5 +1,10 @@
 packages:
   - "."
 
+overrides:
+  minimatch: "10.2.5"
+  postcss: "8.5.18"
+  vite: "8.0.16"
+
 allowBuilds:
   esbuild: true
