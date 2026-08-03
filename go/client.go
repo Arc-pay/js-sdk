@@ -3,6 +3,7 @@ package arcpay
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -80,7 +81,13 @@ func NewClient(options ClientOptions) (*Client, error) {
 	}
 	httpClient := options.HTTPClient
 	if httpClient == nil {
-		httpClient = http.DefaultClient
+		httpClient = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					MinVersion: tls.VersionTLS12,
+				},
+			},
+		}
 	}
 	apiBase := strings.TrimRight(options.APIBase, "/")
 	if apiBase == "" {
