@@ -168,7 +168,7 @@ describe("parseIncoming", () => {
   it("accepts iframe focus events only with a valid field and help payload", () => {
     const data = {
       type: "arcpay:focus" as const,
-      field: "cardNumber" as const,
+      field: "card" as const,
       help: { code: "card_brand_detected", message: "Card brand detected", brand: "visa" },
     };
     const event = makeMessageEvent(data, EXPECTED_ORIGIN);
@@ -208,7 +208,7 @@ describe("parseIncoming", () => {
     const event = makeMessageEvent(
       {
         type: "arcpay:change",
-        field: "cardNumber",
+        field: "card",
         isValid: "true",
         isEmpty: false,
         isComplete: true,
@@ -221,7 +221,7 @@ describe("parseIncoming", () => {
   it("returns arcpay:change message with all fields intact", () => {
     const data = {
       type: "arcpay:change" as const,
-      field: "cardNumber" as const,
+      field: "card" as const,
       isValid: true,
       isEmpty: false,
       isComplete: true,

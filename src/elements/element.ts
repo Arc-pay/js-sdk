@@ -38,9 +38,7 @@ type Listener = (event: ElementEvent) => void;
 type ElementEventName = ElementEvent["type"];
 
 const FIELD_TITLES: Record<FieldType, string> = {
-  cardNumber: "Arc Pay card number",
-  cardExpiry: "Arc Pay card expiration date",
-  cardCvv: "Arc Pay card security code",
+  card: "Arc Pay secure card details",
 };
 
 const MOUNT_TIMEOUT_MS = 10000;
@@ -104,8 +102,8 @@ export class Element {
 
     this.messageHandler = (event: MessageEvent) => {
       // C1: source guard — only accept messages from this element's own iframe.
-      // Without this, any iframe at the same origin (e.g. cardExpiry, cardCvv)
-      // could trigger handlers on cardNumber and vice-versa.
+      // Without this, a sibling iframe at the same origin could trigger handlers
+      // on the secure card element.
       if (event.source !== this.iframe?.contentWindow) return;
       // C4: use parseIncoming for origin + arcpay: prefix guard.
       const data = parseIncoming<IframeToParent>(event, expectedOrigin);

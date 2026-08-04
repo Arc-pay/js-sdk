@@ -83,21 +83,16 @@ const elements = arcpay.elements({
   },
 });
 
-const number = elements.create("cardNumber", {
+const card = elements.create("card", {
   placeholder: "1234 1234 1234 1234",
-});
-const expiry = elements.create("cardExpiry");
-const cvc = elements.create("cardCvv", {
   appearance: {
     rules: {
-      base: { "text-align": "center" },
+      base: { "font-weight": "500" },
     },
   },
 });
 
-number.mount("#card-number");
-expiry.mount("#card-expiry");
-cvc.mount("#card-cvv");
+card.mount("#card");
 ```
 
 `appearance.theme` defaults to `"none"` so Arc Pay branding is not imposed on

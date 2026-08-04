@@ -25,7 +25,7 @@ describe("ArcPay.load", () => {
         },
       },
     });
-    const field = elements.create("cardNumber");
+    const field = elements.create("card");
 
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -46,7 +46,7 @@ describe("ArcPay.load", () => {
     window.dispatchEvent(event);
 
     expect(contentWindow.postMessage).toHaveBeenCalledWith(
-      { type: "arcpay:configure", field: "cardNumber", payload: { base: { color: "#111827" } } },
+      { type: "arcpay:configure", field: "card", payload: { base: { color: "#111827" } } },
       "https://sdk.arcpay.space",
     );
     elements.destroy();

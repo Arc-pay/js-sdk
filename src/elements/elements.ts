@@ -98,51 +98,48 @@ export class Elements {
       });
     }
 
-    const cardNumber = this.elementMap.get("cardNumber");
-    const cardExpiry = this.elementMap.get("cardExpiry");
-    const cardCvv = this.elementMap.get("cardCvv");
+    const card = this.elementMap.get("card");
 
-    if (!cardNumber || !cardExpiry || !cardCvv) {
+    if (!card) {
       throw new ArcPayError({
         type: "validation_error",
         code: "incomplete_elements",
-        message:
-          "All three elements (cardNumber, cardExpiry, cardCvv) must be created and mounted before tokenize()",
+        message: "A secure card element must be created and mounted before tokenize()",
         retryable: false,
       });
     }
-    if (!cardNumber.isReady() || !cardExpiry.isReady() || !cardCvv.isReady()) {
+    if (!card.isReady()) {
       throw new ArcPayError({
         type: "validation_error",
         code: "elements_not_ready",
-        message: "Wait for all elements to fire 'ready' event before tokenize()",
+        message: "Wait for the card element to fire 'ready' event before tokenize()",
         retryable: false,
       });
     }
 
     this.tokenizeInFlight = true;
     try {
-      return await this.doTokenize(cardNumber, paymentId, idempotencyKey);
+      return await this.doTokenize(card, paymentId, idempotencyKey);
     } finally {
       this.tokenizeInFlight = false;
     }
   }
 
   private doTokenize(
-    cardNumber: Element,
+    card: Element,
     paymentId: string,
     idempotencyKey: string,
   ): Promise<TokenizeResult> {
     const iframeOrigin = new URL(this.iframeBase).origin;
-    // C1: obtain reference to the cardNumber iframe's contentWindow before
+    // C1: obtain reference to the card iframe's contentWindow before
     // registering the listener so we can fail closed and filter by source.
-    const cardIframeWindow = cardNumber.getIframeContentWindow();
+    const cardIframeWindow = card.getIframeContentWindow();
     if (!cardIframeWindow) {
       return Promise.reject(
         new ArcPayError({
           type: "validation_error",
           code: "iframe_not_loaded",
-          message: "tokenize() cannot start because the cardNumber iframe is not loaded",
+          message: "tokenize() cannot start because the card iframe is not loaded",
           retryable: false,
           paymentId,
         }),
@@ -165,7 +162,7 @@ export class Elements {
       }, 30_000);
 
       const onMessage = (event: MessageEvent) => {
-        // C1: source guard — only accept messages from the cardNumber iframe.
+        // C1: source guard — only accept messages from the card iframe.
         if (event.source !== cardIframeWindow) return;
         // C4: use parseIncoming for origin + arcpay: prefix guard.
         const data = parseIncoming<IframeToParent>(event, iframeOrigin);
@@ -204,7 +201,7 @@ export class Elements {
       };
 
       window.addEventListener("message", onMessage);
-      cardNumber.send({ type: "arcpay:tokenize", paymentId, idempotencyKey });
+      card.send({ type: "arcpay:tokenize", paymentId, idempotencyKey });
     });
   }
 

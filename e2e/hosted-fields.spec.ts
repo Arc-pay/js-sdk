@@ -7,7 +7,9 @@ type ArcPayTestWindow = Window & {
 };
 
 test.describe("Hosted Fields", () => {
-  test("mounts fields and tokenizes through iframe postMessage API", async ({ page }) => {
+  test("mounts the secure card field and tokenizes through iframe postMessage API", async ({
+    page,
+  }) => {
     await page.goto("/merchant.html");
     await page.waitForFunction(() => (window as ArcPayTestWindow).__arcpay);
 
@@ -16,31 +18,18 @@ test.describe("Hosted Fields", () => {
       if (!arcpay) throw new Error("ArcPay fixture was not initialized");
       const root = document.createElement("div");
       root.innerHTML = `
-        <div id="card-number" style="height: 32px"></div>
-        <div id="card-expiry" style="height: 32px"></div>
-        <div id="card-cvv" style="height: 32px"></div>
+        <div id="card" style="height: 44px"></div>
       `;
       document.body.appendChild(root);
 
       const elements = arcpay.elements({ iframeBase: window.location.origin });
-      const fields = [
-        elements.create("cardNumber"),
-        elements.create("cardExpiry"),
-        elements.create("cardCvv"),
-      ];
-      const ready = Promise.all(
-        fields.map(
-          (field) =>
-            new Promise<void>((resolve, reject) => {
-              field.on("ready", resolve);
-              field.on("error", (event: { reason: string }) => reject(new Error(event.reason)));
-            }),
-        ),
-      );
+      const field = elements.create("card");
+      const ready = new Promise<void>((resolve, reject) => {
+        field.on("ready", resolve);
+        field.on("error", (event: { reason: string }) => reject(new Error(event.reason)));
+      });
 
-      fields[0].mount("#card-number");
-      fields[1].mount("#card-expiry");
-      fields[2].mount("#card-cvv");
+      field.mount("#card");
       await ready;
 
       return elements.tokenize("pay_hosted_fields", "idem-hosted-fields");
@@ -64,7 +53,7 @@ test.describe("Hosted Fields", () => {
       const arcpay = (window as ArcPayTestWindow).__arcpay;
       if (!arcpay) throw new Error("ArcPay fixture was not initialized");
       const root = document.createElement("div");
-      root.innerHTML = `<div id="card-number" style="height: 32px"></div>`;
+      root.innerHTML = `<div id="card" style="height: 44px"></div>`;
       document.body.appendChild(root);
 
       const elements = arcpay.elements({
@@ -87,17 +76,17 @@ test.describe("Hosted Fields", () => {
           },
         },
       });
-      const field = elements.create("cardNumber");
+      const field = elements.create("card");
       await new Promise<void>((resolve, reject) => {
         field.on("ready", resolve);
         field.on("error", (event: { reason: string }) => reject(new Error(event.reason)));
-        field.mount("#card-number");
+        field.mount("#card");
       });
     });
 
-    const iframe = await page.locator("#card-number iframe").elementHandle();
+    const iframe = await page.locator("#card iframe").elementHandle();
     const frame = await iframe?.contentFrame();
-    if (!frame) throw new Error("cardNumber iframe was not mounted");
+    if (!frame) throw new Error("card iframe was not mounted");
 
     const style = await frame.waitForFunction(() => (window as ArcPayTestWindow).__lastArcPayStyle);
 
