@@ -42,7 +42,7 @@ func TestCreatePaymentSendsServerHeadersAndIdempotencyKey(t *testing.T) {
 		if got := r.Header.Get("Authorization"); got != "Bearer sk_test_123" {
 			t.Fatalf("Authorization = %q", got)
 		}
-		if got := r.Header.Get("X-Arc-Pay-API-Version"); got != "2026-05-06" {
+		if got := r.Header.Get("X-Arc-Pay-Api-Version"); got != "2026-05-06" {
 			t.Fatalf("X-Arc-Pay-API-Version = %q", got)
 		}
 		if got := r.Header.Get("Idempotency-Key"); got != testIdempotencyKey {
@@ -214,7 +214,7 @@ func TestDefaultRetryDelayHonorsRetryAfter(t *testing.T) {
 
 func TestMaxNetworkRetriesZeroDisablesRetries(t *testing.T) {
 	attempts := 0
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		attempts++
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -282,7 +282,7 @@ func TestRequestTimeoutReturnsTypedRetryableAPIError(t *testing.T) {
 
 func TestCreatePaymentDoesNotRetryArcPayTimeoutResponse(t *testing.T) {
 	attempts := 0
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		attempts++
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusGatewayTimeout)
@@ -337,7 +337,7 @@ func TestExecutePaymentRequiresH2HMode(t *testing.T) {
 }
 
 func TestExecutePaymentDecodesTypedWalletAction(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{
 			"payment_id":"pay_1",
@@ -435,7 +435,7 @@ func TestChargeSavedCardSendsFiscalBuyerContactAndItemCode(t *testing.T) {
 }
 
 func TestCreateLinkDecodesFullLinkShape(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{
 			"id":"link_1",
@@ -502,7 +502,7 @@ func TestCreateLinkDecodesFullLinkShape(t *testing.T) {
 
 func TestWaitForPaymentTerminalResultReturnsDiagnostics(t *testing.T) {
 	attempts := 0
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		attempts++
 		w.Header().Set("Content-Type", "application/json")
 		if attempts == 1 {

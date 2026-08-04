@@ -3,11 +3,12 @@ package arcpay
 import (
 	"bytes"
 	"context"
+	cryptorand "crypto/rand"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/rand"
+	"math/big"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -24,6 +25,7 @@ const (
 	defaultMaxNetworkRetries = 1
 	defaultPollInterval      = 1500 * time.Millisecond
 	defaultPollTimeout       = 60 * time.Second
+	httpStatusServerError    = 500
 )
 
 var idempotencyKeyPattern = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
@@ -183,21 +185,15 @@ func (c *Client) WaitForPaymentTerminalResult(ctx context.Context, paymentID str
 	if timeout < 0 {
 		return WaitForPaymentTerminalResult{}, &Error{Type: ValidationError, Code: "invalid_poll_options", Message: "Polling intervals and timeouts must be positive", Retryable: false}
 	}
-	terminalStatuses := map[PaymentStatus]struct{}{
-		PaymentAuthorized: {},
-		PaymentCaptured:   {},
-		PaymentSettled:    {},
-		PaymentVoided:     {},
-		PaymentExpired:    {},
-		PaymentRefunded:   {},
-		PaymentChargeback: {},
-		PaymentDeclined:   {},
-		PaymentFailed:     {},
-	}
+	terminalStatus := defaultTerminalPaymentStatus
 	if len(opts.TerminalStatuses) > 0 {
-		terminalStatuses = make(map[PaymentStatus]struct{}, len(opts.TerminalStatuses))
+		terminalStatuses := make(map[PaymentStatus]struct{}, len(opts.TerminalStatuses))
 		for _, status := range opts.TerminalStatuses {
 			terminalStatuses[PaymentStatus(status)] = struct{}{}
+		}
+		terminalStatus = func(status PaymentStatus) bool {
+			_, ok := terminalStatuses[status]
+			return ok
 		}
 	}
 	startedAt := time.Now()
@@ -209,7 +205,7 @@ func (c *Client) WaitForPaymentTerminalResult(ctx context.Context, paymentID str
 		}
 		attempts++
 		elapsed := time.Since(startedAt)
-		if _, ok := terminalStatuses[payment.Status]; ok {
+		if terminalStatus(payment.Status) {
 			return WaitForPaymentTerminalResult{
 				Status:        WaitStatusTerminal,
 				Payment:       payment,
@@ -236,6 +232,16 @@ func (c *Client) WaitForPaymentTerminalResult(ctx context.Context, paymentID str
 		case <-timer.C:
 		}
 	}
+}
+
+func defaultTerminalPaymentStatus(status PaymentStatus) bool {
+	switch status {
+	case PaymentCreated, PaymentPending, PaymentPending3DS, PaymentTimeout:
+		return false
+	case PaymentAuthorized, PaymentCaptured, PaymentSettled, PaymentVoided, PaymentExpired, PaymentRefunded, PaymentChargeback, PaymentDeclined, PaymentFailed:
+		return true
+	}
+	return false
 }
 
 func (c *Client) CapturePayment(ctx context.Context, paymentID string, body CaptureRequest, opts IdempotencyOptions) (Payment, error) {
@@ -356,68 +362,95 @@ func (c *Client) request(ctx context.Context, method, path string, body any, ide
 		}
 	}
 	safeToRetry := method == http.MethodGet || idempotencyKey != ""
-	var bodyBytes []byte
-	if body != nil {
-		encoded, err := json.Marshal(body)
-		if err != nil {
-			return &Error{Type: ValidationError, Code: "invalid_request", Message: err.Error(), Retryable: false}
-		}
-		bodyBytes = encoded
+	bodyBytes, err := encodeRequestBody(body)
+	if err != nil {
+		return err
 	}
-	if timeout == 0 {
-		timeout = c.timeout
-	}
-	if timeout < 0 {
-		return &Error{Type: ValidationError, Code: "invalid_timeout_options", Message: "Timeout must be positive", Retryable: false}
+	requestTimeout, err := c.requestTimeout(timeout)
+	if err != nil {
+		return err
 	}
 
 	var lastErr *Error
 	for attempt := 1; ; attempt++ {
-		attemptCtx, cancel := context.WithTimeout(ctx, timeout)
-		req, err := http.NewRequestWithContext(attemptCtx, method, c.apiBase+path, bytes.NewReader(bodyBytes))
-		if err != nil {
-			cancel()
-			return &Error{Type: ValidationError, Code: "invalid_request", Message: err.Error(), Retryable: false}
-		}
-		c.setHeaders(req, idempotencyKey)
-		res, err := c.httpClient.Do(req)
-		cancel()
-		if err != nil {
-			if attemptCtx.Err() == context.DeadlineExceeded && ctx.Err() == nil {
-				lastErr = &Error{
-					Type:      APIError,
-					Code:      "request_timeout",
-					Message:   fmt.Sprintf("Request timed out after %s", timeout),
-					Retryable: true,
-				}
-			} else {
-				lastErr = &Error{Type: NetworkError, Message: err.Error(), Retryable: ctx.Err() == nil}
-			}
-		} else {
-			lastErr = decodeResponse(res, out)
-			if lastErr == nil {
-				return nil
-			}
+		lastErr = c.requestAttempt(ctx, method, path, bodyBytes, idempotencyKey, requestTimeout, out)
+		if lastErr == nil {
+			return nil
 		}
 		if !safeToRetry || !lastErr.Retryable || attempt > c.maxNetworkRetries {
 			return lastErr
 		}
-		delay := c.delay(attempt, lastErr)
-		if delay > 0 {
-			timer := time.NewTimer(delay)
-			select {
-			case <-ctx.Done():
-				timer.Stop()
-				return &Error{Type: NetworkError, Message: ctx.Err().Error(), Retryable: false}
-			case <-timer.C:
-			}
+		if retryErr := waitForRetry(ctx, c.delay(attempt, lastErr)); retryErr != nil {
+			return retryErr
 		}
+	}
+}
+
+func encodeRequestBody(body any) ([]byte, *Error) {
+	if body == nil {
+		return nil, nil
+	}
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		return nil, &Error{Type: ValidationError, Code: "invalid_request", Message: err.Error(), Retryable: false}
+	}
+	return encoded, nil
+}
+
+func (c *Client) requestTimeout(timeout time.Duration) (time.Duration, *Error) {
+	if timeout == 0 {
+		timeout = c.timeout
+	}
+	if timeout < 0 {
+		return 0, &Error{Type: ValidationError, Code: "invalid_timeout_options", Message: "Timeout must be positive", Retryable: false}
+	}
+	return timeout, nil
+}
+
+func (c *Client) requestAttempt(ctx context.Context, method, path string, bodyBytes []byte, idempotencyKey string, timeout time.Duration, out any) *Error {
+	attemptCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(attemptCtx, method, c.apiBase+path, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return &Error{Type: ValidationError, Code: "invalid_request", Message: err.Error(), Retryable: false}
+	}
+	c.setHeaders(req, idempotencyKey)
+	res, err := c.httpClient.Do(req)
+	if err != nil {
+		return requestAttemptError(ctx, attemptCtx, err, timeout)
+	}
+	return decodeResponse(res, out)
+}
+
+func requestAttemptError(ctx, attemptCtx context.Context, err error, timeout time.Duration) *Error {
+	if attemptCtx.Err() == context.DeadlineExceeded && ctx.Err() == nil {
+		return &Error{
+			Type:      APIError,
+			Code:      "request_timeout",
+			Message:   fmt.Sprintf("Request timed out after %s", timeout),
+			Retryable: true,
+		}
+	}
+	return &Error{Type: NetworkError, Message: err.Error(), Retryable: ctx.Err() == nil}
+}
+
+func waitForRetry(ctx context.Context, delay time.Duration) *Error {
+	if delay <= 0 {
+		return nil
+	}
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return &Error{Type: NetworkError, Message: ctx.Err().Error(), Retryable: false}
+	case <-timer.C:
+		return nil
 	}
 }
 
 func (c *Client) setHeaders(req *http.Request, idempotencyKey string) {
 	req.Header.Set("Authorization", "Bearer "+c.secretKey)
-	req.Header.Set("X-Arc-Pay-API-Version", apiVersion)
+	req.Header.Set("X-Arc-Pay-Api-Version", apiVersion)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "ArcPay-Go/"+goSDKVersion)
 	if idempotencyKey != "" {
@@ -433,11 +466,8 @@ func (c *Client) delay(attempt int, err *Error) time.Duration {
 		}
 		return delay
 	}
-	base := time.Duration(100*(1<<(attempt-1))) * time.Millisecond
-	if base > time.Second {
-		base = time.Second
-	}
-	delay := base + time.Duration(rand.Int63n(int64(base)))
+	base := min(time.Duration(100*(1<<(attempt-1)))*time.Millisecond, time.Second)
+	delay := base + cryptoJitter(base)
 	if err != nil && err.RetryAfterSeconds > 0 {
 		retryAfter := time.Duration(err.RetryAfterSeconds) * time.Second
 		if retryAfter > delay {
@@ -445,6 +475,17 @@ func (c *Client) delay(attempt int, err *Error) time.Duration {
 		}
 	}
 	return delay
+}
+
+func cryptoJitter(base time.Duration) time.Duration {
+	if base <= 0 {
+		return 0
+	}
+	n, err := cryptorand.Int(cryptorand.Reader, big.NewInt(int64(base)))
+	if err != nil {
+		return 0
+	}
+	return time.Duration(n.Int64())
 }
 
 type errorEnvelope struct {
@@ -465,7 +506,9 @@ func decodeResponse(res *http.Response, out any) *Error {
 	}
 	if res.StatusCode >= 200 && res.StatusCode < 300 {
 		if out == nil {
-			_, _ = io.Copy(io.Discard, res.Body)
+			if _, err := io.Copy(io.Discard, res.Body); err != nil {
+				return &Error{Type: APIError, Code: "invalid_response", Message: err.Error(), Retryable: false}
+			}
 			return nil
 		}
 		if err := json.NewDecoder(res.Body).Decode(out); err != nil && err != io.EOF {
@@ -474,7 +517,9 @@ func decodeResponse(res *http.Response, out any) *Error {
 		return nil
 	}
 	var envelope errorEnvelope
-	_ = json.NewDecoder(res.Body).Decode(&envelope)
+	if err := json.NewDecoder(res.Body).Decode(&envelope); err != nil && err != io.EOF {
+		return &Error{Type: APIError, Code: "invalid_response", Message: err.Error(), Retryable: false}
+	}
 	errType := publicErrorType(envelope.Error.Type, res.StatusCode)
 	code := envelope.Error.Code
 	requestID := envelope.Error.RequestID
@@ -499,10 +544,10 @@ func decodeResponse(res *http.Response, out any) *Error {
 
 func publicErrorType(value string, status int) ErrorType {
 	switch ErrorType(value) {
-	case ValidationError, AuthenticationError, AuthorizationError, StateError, RateLimitError, APIError:
+	case ValidationError, AuthenticationError, AuthorizationError, StateError, RateLimitError, APIError, NetworkError:
 		return ErrorType(value)
 	}
-	if status >= 500 {
+	if status >= httpStatusServerError {
 		return APIError
 	}
 	return ValidationError
@@ -515,7 +560,7 @@ func isRetryableError(errorType ErrorType, status int, code string) bool {
 	if code == "timeout" {
 		return false
 	}
-	return errorType == APIError && status >= 500
+	return errorType == APIError && status >= httpStatusServerError
 }
 
 func retryAfterSeconds(value string) int {
