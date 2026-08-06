@@ -89,7 +89,10 @@ export class Element {
     }
 
     const iframe = document.createElement("iframe");
-    iframe.src = `${this.context.iframeBase}/iframe/${this.field}`;
+    const iframeURL = new URL(`/iframe/${this.field}`, this.context.iframeBase);
+    iframeURL.searchParams.set("parent_origin", window.location.origin);
+    iframeURL.searchParams.set("publishable_key", this.context.publishableKey);
+    iframe.src = iframeURL.toString();
     iframe.style.cssText = "border:0;width:100%;height:100%;display:block;";
     iframe.setAttribute("allow", "payment");
     iframe.setAttribute("data-arcpay-element", this.field);

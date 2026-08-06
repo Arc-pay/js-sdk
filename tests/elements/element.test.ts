@@ -61,7 +61,9 @@ describe("Element.mount", () => {
     el.mount(container);
 
     const iframe = getIframe();
-    expect(iframe.src).toBe(`${IFRAME_BASE}/iframe/card`);
+    expect(iframe.src).toBe(
+      `${IFRAME_BASE}/iframe/card?parent_origin=http%3A%2F%2Flocalhost%3A3000&publishable_key=${PK}`,
+    );
     expect(iframe.getAttribute("allow")).toBe("payment");
     expect(iframe.getAttribute("data-arcpay-element")).toBe("card");
     expect(iframe.getAttribute("title")).toBe("Arc Pay secure card details");
