@@ -585,6 +585,174 @@ describe("server ArcPayClient", () => {
     }
   });
 
+  it("rejects unsafe or non-positive money amounts before sending requests", async () => {
+    const client = new ArcPayClient({
+      secretKey: "sk_test_x",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+
+    await expect(
+      client.createPayment(
+        {
+          amount: Number.MAX_SAFE_INTEGER + 1,
+          currency: "RUB",
+          payment_method: "bank_card",
+          external_id: "order-unsafe",
+          capture_mode: "one_stage",
+        },
+        { idempotencyKey: IDEMPOTENCY_KEY },
+      ),
+    ).rejects.toMatchObject({
+      type: "validation_error",
+      code: "invalid_amount",
+      param: "amount",
+    });
+
+    await expect(
+      client.createPayment(
+        {
+          amount: 10000,
+          currency: "RUB",
+          payment_method: "bank_card",
+          external_id: "order-fiscal-unsafe",
+          capture_mode: "one_stage",
+          fiscal_items: [
+            {
+              name: "Item",
+              quantity: "1",
+              unit_price: 12.5,
+              vat_rate: "no_vat",
+              payment_object: "commodity",
+              payment_method: "full_payment",
+              measure: "piece",
+              item_code: "sku-1",
+            },
+          ],
+        },
+        { idempotencyKey: IDEMPOTENCY_KEY },
+      ),
+    ).rejects.toMatchObject({
+      type: "validation_error",
+      code: "invalid_amount",
+      param: "fiscal_items.0.unit_price",
+    });
+
+    await expect(
+      client.capturePayment("pay_1", { amount: 0 }, { idempotencyKey: CAPTURE_IDEMPOTENCY_KEY }),
+    ).rejects.toMatchObject({
+      type: "validation_error",
+      code: "invalid_amount",
+      param: "amount",
+    });
+
+    await expect(
+      client.createRefund("pay_1", { amount: -1 }, { idempotencyKey: CAPTURE_IDEMPOTENCY_KEY }),
+    ).rejects.toMatchObject({
+      type: "validation_error",
+      code: "invalid_amount",
+      param: "amount",
+    });
+
+    await expect(
+      client.chargeSavedCard(
+        {
+          amount: Number.NaN,
+          currency: "RUB",
+          card_token_id: "card_tok_1",
+          customer_id: "cust_1",
+        },
+        { idempotencyKey: CAPTURE_IDEMPOTENCY_KEY },
+      ),
+    ).rejects.toMatchObject({
+      type: "validation_error",
+      code: "invalid_amount",
+      param: "amount",
+    });
+
+    await expect(
+      client.createLink(
+        {
+          link_type: "recurring",
+          amount: 10000,
+          currency: "RUB",
+          capture_mode: "one_stage",
+          payment_methods: [{ method: "bank_card", payment_mode: "h2h" }],
+          billing_config: { trial_price: 1.5 },
+        },
+        { idempotencyKey: CAPTURE_IDEMPOTENCY_KEY },
+      ),
+    ).rejects.toMatchObject({
+      type: "validation_error",
+      code: "invalid_amount",
+      param: "billing_config.trial_price",
+    });
+
+    await expect(
+      client.createCheckoutSession(
+        {
+          amount: 10.5,
+          currency: "RUB",
+          payment_methods: [{ method: "bank_card", payment_mode: "h2h" }],
+          capture_mode: "one_stage",
+        },
+        { idempotencyKey: CAPTURE_IDEMPOTENCY_KEY },
+      ),
+    ).rejects.toMatchObject({
+      type: "validation_error",
+      code: "invalid_amount",
+      param: "amount",
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("allows zero recurring trial price while preserving safe minor-unit validation", async () => {
+    fetchMock.mockResolvedValue(
+      ok({
+        id: "link_recurring_1",
+        short_code: "rcur1",
+        link_type: "recurring",
+        status: "active",
+        environment: "sandbox",
+        amount: 10000,
+        currency: "RUB",
+        url: "https://pay.example.test/l/rcur1",
+        payment_methods: [{ method: "bank_card", payment_mode: "h2h" }],
+        capture_mode: "one_stage",
+      }),
+    );
+    const client = new ArcPayClient({
+      secretKey: "sk_test_x",
+      apiBase: "https://api.example.test/v1",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+
+    await client.createLink(
+      {
+        link_type: "recurring",
+        amount: 10000,
+        currency: "RUB",
+        capture_mode: "one_stage",
+        customer_id: "cust_1",
+        payment_methods: [{ method: "bank_card", payment_mode: "h2h" }],
+        billing_config: {
+          interval_type: "month",
+          interval_count: 1,
+          trial_days: 7,
+          trial_price: 0,
+        },
+      },
+      { idempotencyKey: CAPTURE_IDEMPOTENCY_KEY },
+    );
+
+    const [, init] = fetchMock.mock.calls[0]!;
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      billing_config: {
+        trial_price: 0,
+      },
+    });
+  });
+
   it("serializes list payments query parameters", async () => {
     fetchMock.mockResolvedValue(ok({ payments: [], total: 0, page: 1, page_size: 20 }));
     const client = new ArcPayClient({

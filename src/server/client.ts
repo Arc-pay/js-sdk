@@ -209,6 +209,95 @@ const normalizeExecutePaymentRequest = (body: ExecutePaymentRequest): ExecutePay
   return body;
 };
 
+const requirePositiveMinorUnits = (value: unknown, param: string): number => {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) {
+    throw new ArcPayError({
+      type: "validation_error",
+      code: "invalid_amount",
+      message: `${param} must be a positive safe integer in minor units`,
+      param,
+      retryable: false,
+    });
+  }
+  return value;
+};
+
+const requireNonNegativeMinorUnits = (value: unknown, param: string): number => {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
+    throw new ArcPayError({
+      type: "validation_error",
+      code: "invalid_amount",
+      message: `${param} must be a non-negative safe integer in minor units`,
+      param,
+      retryable: false,
+    });
+  }
+  return value;
+};
+
+const normalizeCreatePaymentRequest = (body: CreatePaymentRequest): CreatePaymentRequest => {
+  const amount = requirePositiveMinorUnits(body.amount, "amount");
+  const fiscalItems = body.fiscal_items?.map((item, index) => ({
+    ...item,
+    unit_price: requirePositiveMinorUnits(item.unit_price, `fiscal_items.${index}.unit_price`),
+  }));
+  return { ...body, amount, ...(fiscalItems ? { fiscal_items: fiscalItems } : {}) };
+};
+
+const normalizeCaptureRequest = (body: CaptureRequest): CaptureRequest => {
+  if (body.amount === undefined) return body;
+  return { ...body, amount: requirePositiveMinorUnits(body.amount, "amount") };
+};
+
+const normalizeCreateRefundRequest = (body: CreateRefundRequest): CreateRefundRequest => ({
+  ...body,
+  amount: requirePositiveMinorUnits(body.amount, "amount"),
+});
+
+const normalizeChargeSavedCardRequest = (body: ChargeSavedCardRequest): ChargeSavedCardRequest => {
+  const amount = requirePositiveMinorUnits(body.amount, "amount");
+  const fiscalItems = body.fiscal_items?.map((item, index) => ({
+    ...item,
+    unit_price: requirePositiveMinorUnits(item.unit_price, `fiscal_items.${index}.unit_price`),
+  }));
+  return { ...body, amount, ...(fiscalItems ? { fiscal_items: fiscalItems } : {}) };
+};
+
+const normalizeCreateLinkRequest = (body: CreateLinkRequest): CreateLinkRequest => {
+  const amount = requirePositiveMinorUnits(body.amount, "amount");
+  const items = body.items?.map((item, index) => ({
+    ...item,
+    unit_price: requirePositiveMinorUnits(item.unit_price, `items.${index}.unit_price`),
+  }));
+  const billingConfig =
+    body.billing_config?.trial_price === undefined
+      ? body.billing_config
+      : {
+          ...body.billing_config,
+          trial_price: requireNonNegativeMinorUnits(
+            body.billing_config.trial_price,
+            "billing_config.trial_price",
+          ),
+        };
+  return {
+    ...body,
+    amount,
+    ...(items ? { items } : {}),
+    ...(billingConfig ? { billing_config: billingConfig } : {}),
+  };
+};
+
+const normalizeCreateCheckoutSessionRequest = (
+  body: CreateCheckoutSessionRequest,
+): CreateCheckoutSessionRequest => {
+  const amount = requirePositiveMinorUnits(body.amount, "amount");
+  const fiscalItems = body.fiscal_items?.map((item, index) => ({
+    ...item,
+    unit_price: requirePositiveMinorUnits(item.unit_price, `fiscal_items.${index}.unit_price`),
+  }));
+  return { ...body, amount, ...(fiscalItems ? { fiscal_items: fiscalItems } : {}) };
+};
+
 const appendQuery = (path: string, query?: object): string => {
   if (!query) return path;
   const params = new URLSearchParams();
@@ -423,7 +512,13 @@ export class ArcPayClient {
 
   async createPayment(body: CreatePaymentRequest, opts: IdempotencyOptions): Promise<Payment>;
   async createPayment(body: CreatePaymentRequest, opts: RequestOptionsInput): Promise<Payment> {
-    return this.request<Payment>("POST", "/payments", body, opts, true);
+    return this.request<Payment>(
+      "POST",
+      "/payments",
+      normalizeCreatePaymentRequest(body),
+      opts,
+      true,
+    );
   }
 
   async createCardSetup(body: CreateCardSetupRequest, opts: IdempotencyOptions): Promise<Payment>;
@@ -504,7 +599,7 @@ export class ArcPayClient {
     return this.request<Payment>(
       "POST",
       `/payments/${encodeURIComponent(paymentId)}/capture`,
-      body,
+      normalizeCaptureRequest(body),
       opts,
       true,
     );
@@ -542,7 +637,7 @@ export class ArcPayClient {
     return this.request<Refund>(
       "POST",
       `/payments/${encodeURIComponent(paymentId)}/refunds`,
-      body,
+      normalizeCreateRefundRequest(body),
       opts,
       true,
     );
@@ -556,7 +651,13 @@ export class ArcPayClient {
     body: ChargeSavedCardRequest,
     opts: RequestOptionsInput,
   ): Promise<ExecutePaymentResponse> {
-    return this.request<ExecutePaymentResponse>("POST", "/payments/saved-card", body, opts, true);
+    return this.request<ExecutePaymentResponse>(
+      "POST",
+      "/payments/saved-card",
+      normalizeChargeSavedCardRequest(body),
+      opts,
+      true,
+    );
   }
 
   async executePayment(
@@ -607,7 +708,7 @@ export class ArcPayClient {
 
   async createLink(body: CreateLinkRequest, opts: IdempotencyOptions): Promise<Link>;
   async createLink(body: CreateLinkRequest, opts: RequestOptionsInput): Promise<Link> {
-    return this.request<Link>("POST", "/links", body, opts, true);
+    return this.request<Link>("POST", "/links", normalizeCreateLinkRequest(body), opts, true);
   }
 
   async getLink(linkId: string, opts: RequestOptions = {}): Promise<Link> {
@@ -633,7 +734,13 @@ export class ArcPayClient {
     body: CreateCheckoutSessionRequest,
     opts: RequestOptionsInput,
   ): Promise<CheckoutSession> {
-    return this.request<CheckoutSession>("POST", "/checkout/sessions", body, opts, true);
+    return this.request<CheckoutSession>(
+      "POST",
+      "/checkout/sessions",
+      normalizeCreateCheckoutSessionRequest(body),
+      opts,
+      true,
+    );
   }
 
   private async request<T>(
