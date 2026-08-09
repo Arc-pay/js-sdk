@@ -51,18 +51,39 @@ describe("sanitizeStyle", () => {
     expect(out.base).toEqual({ color: "#fff" });
   });
 
-  it("drops layout and decoration properties that belong to the merchant container", () => {
+  it("keeps safe input box styling and drops container layout properties", () => {
     const out = sanitizeStyle({
       base: {
         color: "#111",
-        border: "1px solid red",
+        border: "0",
+        "border-bottom": "1px solid #fff",
+        "border-color": "#fff",
+        "border-radius": "6px",
+        "box-shadow": "none",
+        "box-sizing": "border-box",
+        height: "44px",
+        outline: "none",
+        "outline-offset": "2px",
         padding: "12px",
         margin: "4px",
-        "box-shadow": "0 0 0 1px red",
         "background-image": "url(https://example.com/a.png)",
       },
     });
-    expect(out.base).toEqual({ color: "#111" });
+    expect(out.base).toEqual({
+      color: "#111",
+      border: "0",
+      "border-bottom": "1px solid #fff",
+      "border-color": "#fff",
+      "border-radius": "6px",
+      "box-shadow": "none",
+      "box-sizing": "border-box",
+      height: "44px",
+      outline: "none",
+      "outline-offset": "2px",
+      padding: "12px",
+    });
+    expect("margin" in out.base).toBe(false);
+    expect("background-image" in out.base).toBe(false);
   });
 
   it("drops disallowed custom properties", () => {
@@ -82,7 +103,7 @@ describe("sanitizeStyle", () => {
       focus: { "border-color": "#06c", transform: "scale(1.1)" },
     });
     expect(out.invalid).toEqual({ color: "#fa755a" });
-    expect(out.focus).toEqual({});
+    expect(out.focus).toEqual({ "border-color": "#06c" });
   });
 
   it("is case-insensitive on property names and returns canonical CSS keys", () => {
@@ -117,6 +138,12 @@ describe("buildStyleFromAppearance", () => {
         colorPlaceholder: "#9ca3af",
         colorDanger: "#dc2626",
         caretColor: "#111827",
+        border: "0",
+        borderRadius: "6px",
+        boxShadow: "none",
+        height: "44px",
+        padding: "10px 12px",
+        outline: "none",
       },
     });
 
@@ -127,6 +154,12 @@ describe("buildStyleFromAppearance", () => {
         color: "#111827",
         "--arcpay-placeholder-color": "#9ca3af",
         "caret-color": "#111827",
+        border: "0",
+        "border-radius": "6px",
+        "box-shadow": "none",
+        height: "44px",
+        padding: "10px 12px",
+        outline: "none",
       },
       invalid: { color: "#dc2626" },
     });
@@ -140,14 +173,14 @@ describe("buildStyleFromAppearance", () => {
       },
       rules: {
         base: { color: "#222", border: "1px solid red" },
-        focus: { "font-weight": "600", transform: "scale(1.2)" },
+        focus: { "font-weight": "600", "box-shadow": "0 0 0 2px #06c", transform: "scale(1.2)" },
         invalid: { color: "#b91c1c" },
       },
     });
 
     expect(out).toEqual({
-      base: { color: "#222" },
-      focus: { "font-weight": "600" },
+      base: { color: "#222", border: "1px solid red" },
+      focus: { "font-weight": "600", "box-shadow": "0 0 0 2px #06c" },
       invalid: { color: "#b91c1c" },
     });
   });

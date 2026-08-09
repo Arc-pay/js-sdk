@@ -17,6 +17,13 @@ export interface HostedFieldsAppearanceVariables {
   colorSuccess?: string;
   colorBackground?: string;
   caretColor?: string;
+  border?: string;
+  borderColor?: string;
+  borderRadius?: string;
+  boxShadow?: string;
+  height?: string;
+  padding?: string;
+  outline?: string;
 }
 
 export type HostedFieldsAppearanceRule = "base" | "focus" | "invalid" | "complete" | "empty";
@@ -24,15 +31,35 @@ export type HostedFieldsAppearanceRule = "base" | "focus" | "invalid" | "complet
 export type HostedFieldsStyleProperty =
   | "--arcpay-placeholder-color"
   | "background-color"
+  | "border"
+  | "border-bottom"
+  | "border-color"
+  | "border-left"
+  | "border-radius"
+  | "border-right"
+  | "border-top"
+  | "box-shadow"
+  | "box-sizing"
   | "caret-color"
   | "color"
   | "font-family"
   | "font-size"
   | "font-style"
   | "font-weight"
+  | "height"
   | "letter-spacing"
   | "line-height"
   | "opacity"
+  | "outline"
+  | "outline-color"
+  | "outline-offset"
+  | "outline-style"
+  | "outline-width"
+  | "padding"
+  | "padding-bottom"
+  | "padding-left"
+  | "padding-right"
+  | "padding-top"
   | "text-align"
   | "text-decoration"
   | "text-transform";
@@ -48,15 +75,35 @@ export interface HostedFieldsAppearance {
 const ALLOWED_PROPERTIES = new Set<HostedFieldsStyleProperty>([
   "--arcpay-placeholder-color",
   "background-color",
+  "border",
+  "border-bottom",
+  "border-color",
+  "border-left",
+  "border-radius",
+  "border-right",
+  "border-top",
+  "box-shadow",
+  "box-sizing",
   "caret-color",
   "color",
   "font-family",
   "font-size",
   "font-style",
   "font-weight",
+  "height",
   "letter-spacing",
   "line-height",
   "opacity",
+  "outline",
+  "outline-color",
+  "outline-offset",
+  "outline-style",
+  "outline-width",
+  "padding",
+  "padding-bottom",
+  "padding-left",
+  "padding-right",
+  "padding-top",
   "text-align",
   "text-decoration",
   "text-transform",
@@ -154,6 +201,13 @@ export const buildStyleFromAppearance = (appearance?: HostedFieldsAppearance): S
     setIfPresent(variableStyle.base, "--arcpay-placeholder-color", variables.colorPlaceholder);
     setIfPresent(variableStyle.base, "background-color", variables.colorBackground);
     setIfPresent(variableStyle.base, "caret-color", variables.caretColor);
+    setIfPresent(variableStyle.base, "border", variables.border);
+    setIfPresent(variableStyle.base, "border-color", variables.borderColor);
+    setIfPresent(variableStyle.base, "border-radius", variables.borderRadius);
+    setIfPresent(variableStyle.base, "box-shadow", variables.boxShadow);
+    setIfPresent(variableStyle.base, "height", variables.height);
+    setIfPresent(variableStyle.base, "padding", variables.padding);
+    setIfPresent(variableStyle.base, "outline", variables.outline);
 
     if (variables.colorText !== undefined && appearance?.theme === "arcpay") {
       variableStyle.focus = { color: variables.colorText };

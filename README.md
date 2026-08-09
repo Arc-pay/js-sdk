@@ -56,6 +56,12 @@ with `Authorization: Bearer <pk_...>`, `Content-Type`, optional
 may use either `Authorization: Bearer <pk_...>` or `X-Api-Key: pk_...` for
 `/payments/{id}/tokenize`.
 
+Hosted Fields formats buyer input inside the secure iframe: card numbers are
+grouped with spaces and expiry dates are displayed as `MM/YY`. The tokenization
+request strips those separators before sending PAN and expiry to Arc Pay, so
+merchant code should not read, mirror, or reformat card details outside the
+iframe.
+
 ### Hosted Fields appearance
 
 Hosted Fields are secure iframe inputs. The merchant page owns layout and
@@ -74,6 +80,12 @@ const elements = arcpay.elements({
       colorPlaceholder: "#9ca3af",
       colorDanger: "#dc2626",
       caretColor: "#111827",
+      border: "0",
+      borderRadius: "6px",
+      boxShadow: "none",
+      height: "44px",
+      padding: "10px 12px",
+      outline: "none",
     },
     rules: {
       focus: { "font-weight": "600" },
@@ -97,9 +109,11 @@ card.mount("#card");
 
 `appearance.theme` defaults to `"none"` so Arc Pay branding is not imposed on
 merchant checkout pages. `theme: "arcpay"` is available for demos and quick
-starts. Supported iframe properties are limited to text, color, caret,
-placeholder, opacity, and `background-color`; container CSS such as border,
-padding, margin, shadow, position, transform, and z-index is intentionally
+starts. Supported iframe properties are limited to input-level text, color,
+caret, placeholder, opacity, background, border, outline, shadow, padding,
+height, and box sizing. This supports flat, bordered, and underline-only fields
+without cropping the iframe or breaking text centering. Container CSS such as
+margin, position, transform, z-index, and background images is intentionally
 dropped. The exported `HostedFieldsStyleProperty` and `HostedFieldsStyleBlock`
 types expose the same allowlist to TypeScript integrations. Use element `change`
 events (`isEmpty`, `isComplete`, `isValid`, `brand`, `lastFour`) to style your

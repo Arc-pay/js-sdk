@@ -309,6 +309,7 @@ describe("Element appearance and commands", () => {
             "font-family": "Inter, system-ui, sans-serif",
             color: "#111827",
             "--arcpay-placeholder-color": "#9ca3af",
+            border: "1px solid red",
           },
           focus: { "font-weight": "600" },
         },
@@ -317,7 +318,7 @@ describe("Element appearance and commands", () => {
       IFRAME_ORIGIN,
     );
     expect(cw.postMessage).toHaveBeenCalledWith(
-      { type: "arcpay:style", payload: { base: { color: "#0f172a" } } },
+      { type: "arcpay:style", payload: { base: { color: "#0f172a", padding: "12px" } } },
       IFRAME_ORIGIN,
     );
     expect(cw.postMessage).toHaveBeenCalledWith(

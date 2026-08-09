@@ -8,8 +8,12 @@ const typedAppearance: HostedFieldsAppearance = {
       "font-family": "Inter, system-ui, sans-serif",
       "caret-color": "#111827",
       "--arcpay-placeholder-color": "#9ca3af",
+      border: "0",
+      "border-radius": "6px",
+      "box-shadow": "none",
+      padding: "10px 12px",
       // @ts-expect-error Container layout belongs to merchant CSS, not iframe input rules.
-      border: "1px solid red",
+      margin: "12px",
     },
   },
 };
