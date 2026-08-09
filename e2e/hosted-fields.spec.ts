@@ -66,8 +66,9 @@ test.describe("Hosted Fields", () => {
           },
           rules: {
             base: {
-              border: "10px solid red",
-              padding: "24px",
+              border: "0",
+              "box-sizing": "border-box",
+              padding: "10px 12px",
               "font-weight": "600",
             },
             focus: {
@@ -95,7 +96,10 @@ test.describe("Hosted Fields", () => {
         color: "rgb(15, 23, 42)",
         "--arcpay-placeholder-color": "rgb(100, 116, 139)",
         "caret-color": "rgb(15, 23, 42)",
+        border: "0",
+        "box-sizing": "border-box",
         "font-weight": "600",
+        padding: "10px 12px",
       },
       focus: {
         color: "rgb(14, 116, 144)",
