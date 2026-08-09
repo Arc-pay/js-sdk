@@ -59,10 +59,11 @@ describe("3DS helpers", () => {
   });
 
   it("builds escaped auto-submit HTML", () => {
-    const html = buildThreeDSAutoSubmitHtml(methodAction);
+    const html = buildThreeDSAutoSubmitHtml(methodAction, { scriptNonce: 'nonce"&<>' });
     expect(html).toContain('target="arcpay-three-ds-method"');
     expect(html).toContain('name="threeDSMethodData"');
     expect(html).toContain('value="abc&amp;&lt;&gt;"');
+    expect(html).toContain('nonce="nonce&quot;&amp;&lt;&gt;"');
     expect(html).toContain("document.forms[0].submit()");
   });
 

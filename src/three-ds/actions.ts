@@ -49,6 +49,10 @@ export interface ThreeDSMountOptions {
   submitter?: (form: HTMLFormElement) => void;
 }
 
+export interface ThreeDSAutoSubmitHtmlOptions {
+  scriptNonce?: string;
+}
+
 export interface RunThreeDSBrowserFlowOptions extends ThreeDSMountOptions {
   completeThreeDSMethod?: (
     completion: ReturnType<typeof buildThreeDSMethodCompletion>,
@@ -708,10 +712,14 @@ const htmlEscape = (value: string): string =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 
-export const buildThreeDSAutoSubmitHtml = (nextAction: PaymentNextAction): string => {
+export const buildThreeDSAutoSubmitHtml = (
+  nextAction: PaymentNextAction,
+  options: ThreeDSAutoSubmitHtmlOptions = {},
+): string => {
   const form = buildThreeDSBrowserForm(nextAction);
   assertHTTPSActionURL(form.action);
   const target = form.target === "hidden_iframe" ? "arcpay-three-ds-method" : "_self";
+  const nonce = options.scriptNonce ? ` nonce="${htmlEscape(options.scriptNonce)}"` : "";
   const inputs = form.fields
     .map(
       (field) =>
@@ -722,5 +730,5 @@ export const buildThreeDSAutoSubmitHtml = (nextAction: PaymentNextAction): strin
     form.target === "hidden_iframe"
       ? '<iframe name="arcpay-three-ds-method" title="3-D Secure method" hidden></iframe>'
       : "";
-  return `<!doctype html><html><head><meta charset="utf-8"></head><body>${iframe}<form method="POST" action="${htmlEscape(form.action)}" target="${target}">${inputs}</form><script>document.forms[0].submit();</script></body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"></head><body>${iframe}<form method="POST" action="${htmlEscape(form.action)}" target="${target}">${inputs}</form><script${nonce}>document.forms[0].submit();</script></body></html>`;
 };
