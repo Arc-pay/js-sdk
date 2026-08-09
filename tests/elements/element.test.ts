@@ -68,6 +68,46 @@ describe("Element.mount", () => {
     expect(iframe.getAttribute("data-arcpay-element")).toBe("card");
     expect(iframe.getAttribute("title")).toBe("Arc Pay secure card details");
     expect(iframe.getAttribute("aria-label")).toBe("Arc Pay secure card details");
+    expect(iframe.style.minHeight).toBe("44px");
+    el.destroy();
+  });
+
+  it("binds merchant-owned labels and descriptions to the secure iframe", () => {
+    const el = new Element(
+      "card",
+      { label: "Card number", describedBy: "card-help card-error" },
+      makeContext(),
+    );
+    el.mount(container);
+
+    const iframe = getIframe();
+    expect(container.getAttribute("role")).toBe("group");
+    expect(container.getAttribute("aria-label")).toBe("Card number");
+    expect(container.getAttribute("aria-describedby")).toBe("card-help card-error");
+    expect(iframe.getAttribute("title")).toBe("Card number");
+    expect(iframe.getAttribute("aria-label")).toBe("Card number");
+    expect(iframe.getAttribute("aria-describedby")).toBe("card-help card-error");
+    el.destroy();
+  });
+
+  it("updates accessible iframe metadata without remounting", () => {
+    const el = new Element(
+      "card",
+      { label: "Card number", describedBy: "card-help" },
+      makeContext(),
+    );
+    el.mount(container);
+
+    const iframe = getIframe();
+    el.update({ label: "Secure card details", describedBy: "card-error" });
+
+    expect(getIframe()).toBe(iframe);
+    expect(iframe.getAttribute("title")).toBe("Secure card details");
+    expect(iframe.getAttribute("aria-label")).toBe("Secure card details");
+    expect(iframe.getAttribute("aria-describedby")).toBe("card-error");
+
+    el.update({ describedBy: "" });
+    expect(iframe.hasAttribute("aria-describedby")).toBe(false);
     el.destroy();
   });
 

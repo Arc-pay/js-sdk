@@ -13,6 +13,10 @@ import { buildStyleFromAppearance, type HostedFieldsAppearance } from "./style";
 export interface ElementOptions {
   /** Iframe-safe input appearance. Container layout remains merchant-owned CSS. */
   appearance?: HostedFieldsAppearance;
+  /** Accessible label for the merchant-owned field group and secure iframe. */
+  label?: string;
+  /** IDs for helper and error text owned by the merchant page. */
+  describedBy?: string;
   placeholder?: string;
 }
 
@@ -42,6 +46,13 @@ const FIELD_TITLES: Record<FieldType, string> = {
 };
 
 const MOUNT_TIMEOUT_MS = 10000;
+const FIELD_MIN_HEIGHT: Record<FieldType, string> = {
+  card: "44px",
+};
+
+function accessibleLabel(field: FieldType, options: ElementOptions): string {
+  return options.label?.trim() || FIELD_TITLES[field];
+}
 
 export interface ElementContext {
   iframeBase: string;
@@ -65,7 +76,7 @@ export class Element {
 
   constructor(
     public readonly field: FieldType,
-    private readonly options: ElementOptions,
+    private options: ElementOptions,
     private readonly context: ElementContext,
   ) {}
 
@@ -93,11 +104,21 @@ export class Element {
     iframeURL.searchParams.set("parent_origin", window.location.origin);
     iframeURL.searchParams.set("publishable_key", this.context.publishableKey);
     iframe.src = iframeURL.toString();
-    iframe.style.cssText = "border:0;width:100%;height:100%;display:block;";
+    iframe.style.cssText = `border:0;width:100%;height:100%;min-height:${FIELD_MIN_HEIGHT[this.field]};display:block;`;
     iframe.setAttribute("allow", "payment");
     iframe.setAttribute("data-arcpay-element", this.field);
-    iframe.setAttribute("title", FIELD_TITLES[this.field]);
-    iframe.setAttribute("aria-label", FIELD_TITLES[this.field]);
+    iframe.setAttribute("title", accessibleLabel(this.field, this.options));
+    iframe.setAttribute("aria-label", accessibleLabel(this.field, this.options));
+    if (this.options.describedBy) {
+      iframe.setAttribute("aria-describedby", this.options.describedBy);
+    }
+    if (this.options.label && !container.getAttribute("role")) {
+      container.setAttribute("role", "group");
+      container.setAttribute("aria-label", this.options.label);
+    }
+    if (this.options.describedBy && !container.getAttribute("aria-describedby")) {
+      container.setAttribute("aria-describedby", this.options.describedBy);
+    }
     container.appendChild(iframe);
     this.iframe = iframe;
 
@@ -186,7 +207,24 @@ export class Element {
     // arcpay:tokenize-result / arcpay:tokenize-error handled by Elements factory (Task 9).
   }
 
-  update(options: { appearance?: HostedFieldsAppearance; placeholder?: string }): void {
+  update(options: {
+    appearance?: HostedFieldsAppearance;
+    label?: string;
+    describedBy?: string;
+    placeholder?: string;
+  }): void {
+    this.options = { ...this.options, ...options };
+    if (this.iframe && "label" in options) {
+      this.iframe.setAttribute("title", accessibleLabel(this.field, this.options));
+      this.iframe.setAttribute("aria-label", accessibleLabel(this.field, this.options));
+    }
+    if (this.iframe && "describedBy" in options) {
+      if (this.options.describedBy) {
+        this.iframe.setAttribute("aria-describedby", this.options.describedBy);
+      } else {
+        this.iframe.removeAttribute("aria-describedby");
+      }
+    }
     if ("appearance" in options) {
       this.send({
         type: "arcpay:style",
