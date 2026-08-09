@@ -13,6 +13,11 @@ export interface ElementsOptions {
 }
 
 const DEFAULT_IFRAME_BASE = "https://sdk.arcpay.space";
+const SPLIT_FIELDS = [
+  "cardNumber",
+  "cardExpiry",
+  "cardCvv",
+] as const satisfies readonly FieldType[];
 
 const createChannelId = (): string => {
   if (!globalThis.crypto?.randomUUID) {
@@ -59,6 +64,24 @@ export class Elements {
   }
 
   create(field: FieldType, options: ElementOptions = {}): Element {
+    if (field === "card" && SPLIT_FIELDS.some((splitField) => this.elementMap.has(splitField))) {
+      throw new ArcPayError({
+        type: "validation_error",
+        code: "mixed_hosted_fields_mode",
+        message:
+          "Use either the composite card Element or split cardNumber/cardExpiry/cardCvv Elements, not both.",
+        retryable: false,
+      });
+    }
+    if (field !== "card" && this.elementMap.has("card")) {
+      throw new ArcPayError({
+        type: "validation_error",
+        code: "mixed_hosted_fields_mode",
+        message:
+          "Use either the composite card Element or split cardNumber/cardExpiry/cardCvv Elements, not both.",
+        retryable: false,
+      });
+    }
     if (this.elementMap.has(field)) {
       throw new ArcPayError({
         type: "validation_error",
@@ -99,27 +122,61 @@ export class Elements {
     }
 
     const card = this.elementMap.get("card");
+    const splitCardNumber = this.elementMap.get("cardNumber");
 
-    if (!card) {
+    if (!card && !splitCardNumber) {
       throw new ArcPayError({
         type: "validation_error",
         code: "incomplete_elements",
-        message: "A secure card element must be created and mounted before tokenize()",
+        message:
+          "Create either a secure card Element or split cardNumber/cardExpiry/cardCvv Elements before tokenize()",
         retryable: false,
       });
     }
-    if (!card.isReady()) {
+    const tokenizeElement = card ?? splitCardNumber;
+    if (!tokenizeElement) {
+      throw new ArcPayError({
+        type: "validation_error",
+        code: "incomplete_elements",
+        message:
+          "Create either a secure card Element or split cardNumber/cardExpiry/cardCvv Elements before tokenize()",
+        retryable: false,
+      });
+    }
+    if (!tokenizeElement.isReady()) {
       throw new ArcPayError({
         type: "validation_error",
         code: "elements_not_ready",
-        message: "Wait for the card element to fire 'ready' event before tokenize()",
+        message: "Wait for all secure card fields to fire 'ready' before tokenize()",
         retryable: false,
       });
+    }
+    if (!card) {
+      for (const splitField of SPLIT_FIELDS) {
+        const element = this.elementMap.get(splitField);
+        if (!element) {
+          throw new ArcPayError({
+            type: "validation_error",
+            code: "incomplete_elements",
+            message:
+              "Split Hosted Fields require cardNumber, cardExpiry, and cardCvv before tokenize()",
+            retryable: false,
+          });
+        }
+        if (!element.isReady()) {
+          throw new ArcPayError({
+            type: "validation_error",
+            code: "elements_not_ready",
+            message: "Wait for all secure card fields to fire 'ready' before tokenize()",
+            retryable: false,
+          });
+        }
+      }
     }
 
     this.tokenizeInFlight = true;
     try {
-      return await this.doTokenize(card, paymentId, idempotencyKey);
+      return await this.doTokenize(tokenizeElement, paymentId, idempotencyKey);
     } finally {
       this.tokenizeInFlight = false;
     }

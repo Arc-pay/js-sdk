@@ -1,6 +1,6 @@
 import { ArcPayError } from "../core/errors";
 
-export type FieldType = "card";
+export type FieldType = "card" | "cardNumber" | "cardExpiry" | "cardCvv";
 
 export interface HostedFieldIssue {
   code: string;
@@ -70,7 +70,7 @@ export interface StyleSubset {
 type TokenizeErrorType = "validation_error" | "configuration_error" | "network_error" | "api_error";
 
 const ARCPAY_TYPE_PREFIX = "arcpay:";
-const FIELDS: readonly FieldType[] = ["card"];
+const FIELDS: readonly FieldType[] = ["card", "cardNumber", "cardExpiry", "cardCvv"];
 const TOKENIZE_ERROR_TYPES: readonly TokenizeErrorType[] = [
   "validation_error",
   "configuration_error",

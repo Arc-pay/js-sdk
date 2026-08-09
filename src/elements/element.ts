@@ -43,11 +43,17 @@ type ElementEventName = ElementEvent["type"];
 
 const FIELD_TITLES: Record<FieldType, string> = {
   card: "Arc Pay secure card details",
+  cardNumber: "Arc Pay secure card number",
+  cardExpiry: "Arc Pay secure card expiry",
+  cardCvv: "Arc Pay secure card security code",
 };
 
 const MOUNT_TIMEOUT_MS = 10000;
 const FIELD_MIN_HEIGHT: Record<FieldType, string> = {
   card: "44px",
+  cardNumber: "44px",
+  cardExpiry: "44px",
+  cardCvv: "44px",
 };
 
 function accessibleLabel(field: FieldType, options: ElementOptions): string {
