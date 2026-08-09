@@ -1,0 +1,58 @@
+<!doctype html>
+<html>
+  <body>
+    <script>
+      let parentOrigin = "";
+
+      function verifiedParentOrigin(event, data) {
+        if (typeof data.origin !== "string") return "";
+        const requestedOrigin = new URL(data.origin).origin;
+        if (
+          event.origin !== requestedOrigin &&
+          event.origin !== window.location.origin &&
+          event.origin !== "null"
+        ) {
+          return "";
+        }
+        return requestedOrigin;
+      }
+
+      window.addEventListener("message", (event) => {
+        const data = event.data || {};
+        if (data.type === "arcpay:hello") {
+          parentOrigin = verifiedParentOrigin(event, data);
+          if (!parentOrigin) return;
+          window.parent.postMessage({ type: "arcpay:ready" }, parentOrigin);
+          return;
+        }
+
+        if (data.type === "arcpay:style") {
+          window.__lastArcPayStyle = data.payload;
+          return;
+        }
+
+        if (data.type === "arcpay:configure") {
+          window.__lastArcPayStyle = data.payload;
+          window.parent.postMessage({ type: "arcpay:configured" }, parentOrigin);
+          return;
+        }
+
+        if (data.type === "arcpay:tokenize") {
+          if (!parentOrigin || event.origin !== window.location.origin) return;
+          window.parent.postMessage(
+            {
+              type: "arcpay:tokenize-result",
+              cardTokenId: "tok_hosted_fields",
+              cardMask: "424242XXXXXX4242",
+              cardScheme: "visa",
+              cardBin: "42424242",
+              expiresIn: 900,
+              expiresAt: "2026-05-12T12:00:00Z",
+            },
+            parentOrigin,
+          );
+        }
+      });
+    </script>
+  </body>
+</html>
