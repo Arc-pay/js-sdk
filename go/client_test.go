@@ -159,6 +159,7 @@ func TestCreatePaymentRequiresUUIDIdempotencyKey(t *testing.T) {
 
 func TestCreatePaymentRetriesTransientErrorsWithSameIdempotencyKey(t *testing.T) {
 	attempts := 0
+	maxNetworkRetries := 1
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		attempts++
 		if got := r.Header.Get("Idempotency-Key"); got != testIdempotencyKey {
@@ -177,7 +178,7 @@ func TestCreatePaymentRetriesTransientErrorsWithSameIdempotencyKey(t *testing.T)
 	client, err := NewClient(ClientOptions{
 		SecretKey:         "sk_test_123",
 		APIBase:           server.URL + "/v1",
-		MaxNetworkRetries: RetryCount(1),
+		MaxNetworkRetries: &maxNetworkRetries,
 		RetryDelay:        func(int, *Error) time.Duration { return 0 },
 	})
 	if err != nil {
@@ -214,6 +215,7 @@ func TestDefaultRetryDelayHonorsRetryAfter(t *testing.T) {
 
 func TestMaxNetworkRetriesZeroDisablesRetries(t *testing.T) {
 	attempts := 0
+	maxNetworkRetries := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		attempts++
 		w.Header().Set("Content-Type", "application/json")
@@ -225,7 +227,7 @@ func TestMaxNetworkRetriesZeroDisablesRetries(t *testing.T) {
 	client, err := NewClient(ClientOptions{
 		SecretKey:         "sk_test_123",
 		APIBase:           server.URL + "/v1",
-		MaxNetworkRetries: RetryCount(0),
+		MaxNetworkRetries: &maxNetworkRetries,
 		RetryDelay:        func(int, *Error) time.Duration { return 0 },
 	})
 	if err != nil {
@@ -251,6 +253,7 @@ func TestMaxNetworkRetriesZeroDisablesRetries(t *testing.T) {
 }
 
 func TestRequestTimeoutReturnsTypedRetryableAPIError(t *testing.T) {
+	maxNetworkRetries := 0
 	client, err := NewClient(ClientOptions{
 		SecretKey: "sk_test_123",
 		APIBase:   "https://api.example.test/v1",
@@ -259,7 +262,7 @@ func TestRequestTimeoutReturnsTypedRetryableAPIError(t *testing.T) {
 			return nil, req.Context().Err()
 		})},
 		Timeout:           time.Millisecond,
-		MaxNetworkRetries: RetryCount(0),
+		MaxNetworkRetries: &maxNetworkRetries,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -282,6 +285,7 @@ func TestRequestTimeoutReturnsTypedRetryableAPIError(t *testing.T) {
 
 func TestCreatePaymentDoesNotRetryArcPayTimeoutResponse(t *testing.T) {
 	attempts := 0
+	maxNetworkRetries := 2
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		attempts++
 		w.Header().Set("Content-Type", "application/json")
@@ -293,7 +297,7 @@ func TestCreatePaymentDoesNotRetryArcPayTimeoutResponse(t *testing.T) {
 	client, err := NewClient(ClientOptions{
 		SecretKey:         "sk_test_123",
 		APIBase:           server.URL + "/v1",
-		MaxNetworkRetries: RetryCount(2),
+		MaxNetworkRetries: &maxNetworkRetries,
 		RetryDelay:        func(int, *Error) time.Duration { return 0 },
 	})
 	if err != nil {

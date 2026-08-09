@@ -59,6 +59,9 @@ type Client struct {
 	retryDelay        RetryDelayFunc
 }
 
+// RetryCount keeps optional retry configuration ergonomic for SDK callers.
+//
+//nolint:modernize // Keep exported pointer helper for SDK callers.
 func RetryCount(value int) *int {
 	return &value
 }
