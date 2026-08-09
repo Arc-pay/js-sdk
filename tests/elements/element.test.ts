@@ -72,6 +72,20 @@ describe("Element.mount", () => {
     el.destroy();
   });
 
+  it("creates split secure field iframes with field-specific metadata", () => {
+    const el = new Element("cardExpiry", {}, makeContext());
+    el.mount(container);
+
+    const iframe = getIframe();
+    expect(iframe.src).toBe(
+      `${IFRAME_BASE}/iframe/cardExpiry?parent_origin=http%3A%2F%2Flocalhost%3A3000&publishable_key=${PK}`,
+    );
+    expect(iframe.getAttribute("data-arcpay-element")).toBe("cardExpiry");
+    expect(iframe.getAttribute("title")).toBe("Arc Pay secure card expiry");
+    expect(iframe.style.minHeight).toBe("44px");
+    el.destroy();
+  });
+
   it("binds merchant-owned labels and descriptions to the secure iframe", () => {
     const el = new Element(
       "card",

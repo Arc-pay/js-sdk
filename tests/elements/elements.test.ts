@@ -10,8 +10,8 @@ function makeElements(iframeBase = IFRAME_BASE): Elements {
   return new Elements({ publishableKey: PK, iframeBase });
 }
 
-function mockIframeContentWindow(): { postMessage: ReturnType<typeof vi.fn> } {
-  const iframe = document.querySelector("iframe") as HTMLIFrameElement | null;
+function mockIframeContentWindow(selector = "iframe"): { postMessage: ReturnType<typeof vi.fn> } {
+  const iframe = document.querySelector(selector) as HTMLIFrameElement | null;
   if (!iframe) throw new Error("No iframe found");
   const mock = { postMessage: vi.fn() };
   Object.defineProperty(iframe, "contentWindow", {
@@ -33,6 +33,18 @@ function mountCard(els: Elements): HTMLElement {
   const container = document.createElement("div");
   document.body.replaceChildren(container);
   els.create("card").mount(container);
+  return container;
+}
+
+function mountSplitCard(els: Elements): HTMLElement {
+  const container = document.createElement("div");
+  document.body.replaceChildren(container);
+  for (const field of ["cardNumber", "cardExpiry", "cardCvv"] as const) {
+    const target = document.createElement("div");
+    target.id = field;
+    container.appendChild(target);
+    els.create(field).mount(target);
+  }
   return container;
 }
 
@@ -59,6 +71,35 @@ describe("Elements.create", () => {
     expect(card.field).toBe("card");
     expect(document.querySelectorAll("iframe")).toHaveLength(1);
     els.destroy();
+  });
+
+  it("returns split secure card Elements for flexible merchant layouts", () => {
+    const els = makeElements();
+    mountSplitCard(els);
+
+    expect(document.querySelectorAll("iframe")).toHaveLength(3);
+    expect(document.querySelector('[data-arcpay-element="cardNumber"]')).toBeInstanceOf(
+      HTMLIFrameElement,
+    );
+    expect(document.querySelector('[data-arcpay-element="cardExpiry"]')).toBeInstanceOf(
+      HTMLIFrameElement,
+    );
+    expect(document.querySelector('[data-arcpay-element="cardCvv"]')).toBeInstanceOf(
+      HTMLIFrameElement,
+    );
+    els.destroy();
+  });
+
+  it("rejects mixing composite and split Hosted Fields modes", () => {
+    const els = makeElements();
+    els.create("card");
+    expect(() => els.create("cardNumber")).toThrowError(ArcPayError);
+    els.destroy();
+
+    const split = makeElements();
+    split.create("cardNumber");
+    expect(() => split.create("card")).toThrowError(ArcPayError);
+    split.destroy();
   });
 
   it("throws ArcPayError(duplicate_element) when the card field is created twice", () => {
@@ -133,6 +174,20 @@ describe("Elements.tokenize validation guards", () => {
     expect(err.code).toBe("elements_not_ready");
     els.destroy();
   });
+
+  it("requires all split Hosted Fields before tokenize()", async () => {
+    const els = makeElements();
+    const container = document.createElement("div");
+    document.body.replaceChildren(container);
+    els.create("cardNumber").mount(container);
+    const cardNumberMock = mockIframeContentWindow();
+    simulateReady(cardNumberMock);
+
+    const err = (await els.tokenize("pay_x", "uuid-3").catch((e: unknown) => e)) as ArcPayError;
+    expect(err).toBeInstanceOf(ArcPayError);
+    expect(err.code).toBe("incomplete_elements");
+    els.destroy();
+  });
 });
 
 describe("Elements.tokenize", () => {
@@ -172,6 +227,48 @@ describe("Elements.tokenize", () => {
     );
 
     await expect(tokenizePromise).resolves.toMatchObject({ cardTokenId: "tok_abc" });
+    els.destroy();
+  });
+
+  it("sends arcpay:tokenize to cardNumber when using split Hosted Fields", async () => {
+    const els = makeElements();
+    mountSplitCard(els);
+    const cardNumberMock = mockIframeContentWindow('[data-arcpay-element="cardNumber"]');
+    const cardExpiryMock = mockIframeContentWindow('[data-arcpay-element="cardExpiry"]');
+    const cardCvvMock = mockIframeContentWindow('[data-arcpay-element="cardCvv"]');
+    simulateReady(cardNumberMock);
+    simulateReady(cardExpiryMock);
+    simulateReady(cardCvvMock);
+
+    const tokenizePromise = els.tokenize("pay_split", "idem-split-1");
+
+    expect(cardNumberMock.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "arcpay:tokenize" }),
+      IFRAME_ORIGIN,
+    );
+    expect(cardExpiryMock.postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "arcpay:tokenize" }),
+      IFRAME_ORIGIN,
+    );
+    expect(cardCvvMock.postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "arcpay:tokenize" }),
+      IFRAME_ORIGIN,
+    );
+
+    dispatchFromIframe(
+      {
+        type: "arcpay:tokenize-result",
+        cardTokenId: "tok_split",
+        cardMask: "427600****1234",
+        cardScheme: "visa",
+        cardBin: "427600",
+        expiresIn: 300,
+        expiresAt: "2028-12-31T23:59:59Z",
+      },
+      cardNumberMock,
+    );
+
+    await expect(tokenizePromise).resolves.toMatchObject({ cardTokenId: "tok_split" });
     els.destroy();
   });
 

@@ -107,6 +107,31 @@ const card = elements.create("card", {
 card.mount("#card");
 ```
 
+For full merchant-owned layout control, use split Hosted Fields. Each field is a
+separate secure iframe, so merchant CSS controls the outer grid, spacing,
+labels, and wrappers independently:
+
+```ts
+const elements = arcpay.elements({ appearance });
+const cardNumber = elements.create("cardNumber", {
+  placeholder: "1234 1234 1234 1234",
+});
+const cardExpiry = elements.create("cardExpiry", { placeholder: "MM/YY" });
+const cardCvv = elements.create("cardCvv", { placeholder: "CVV" });
+
+cardNumber.mount("#card-number");
+cardExpiry.mount("#card-expiry");
+cardCvv.mount("#card-cvv");
+
+const token = await elements.tokenize(paymentId, idempotencyKey);
+```
+
+Do not mix `card` with split fields in one `Elements` instance. In split mode,
+PAN, expiry, and CVV are still kept inside Arc Pay iframes and synchronized only
+over the Arc Pay same-origin channel for tokenization; merchant JavaScript
+receives readiness, focus, validation, brand, and tokenization result events,
+not raw card data.
+
 `appearance.theme` defaults to `"none"` so Arc Pay branding is not imposed on
 merchant checkout pages. `theme: "arcpay"` is available for demos and quick
 starts. Supported iframe properties are limited to input-level text, color,
