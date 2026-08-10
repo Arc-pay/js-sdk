@@ -219,11 +219,12 @@ export class Elements {
       }, 30_000);
 
       const onMessage = (event: MessageEvent) => {
-        // C1: source guard — only accept messages from the card iframe.
-        if (event.source !== cardIframeWindow) return;
         // C4: use parseIncoming for origin + arcpay: prefix guard.
         const data = parseIncoming<IframeToParent>(event, iframeOrigin);
         if (!data) return;
+        const channelId = "channelId" in data ? data.channelId : undefined;
+        if (typeof channelId === "string" && channelId !== this.channelId) return;
+        if (typeof channelId !== "string" && event.source !== cardIframeWindow) return;
 
         if (data.type === "arcpay:tokenize-result") {
           clearTimeout(timer);

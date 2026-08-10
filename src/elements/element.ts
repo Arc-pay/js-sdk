@@ -133,13 +133,10 @@ export class Element {
     const expectedOrigin = new URL(this.context.iframeBase).origin;
 
     this.messageHandler = (event: MessageEvent) => {
-      // C1: source guard — only accept messages from this element's own iframe.
-      // Without this, a sibling iframe at the same origin could trigger handlers
-      // on the secure card element.
-      if (event.source !== this.iframe?.contentWindow) return;
       // C4: use parseIncoming for origin + arcpay: prefix guard.
       const data = parseIncoming<IframeToParent>(event, expectedOrigin);
       if (!data) return;
+      if (!this.acceptsIframeMessage(event, data)) return;
       this.handleMessage(data);
     };
     window.addEventListener("message", this.messageHandler);
@@ -286,6 +283,21 @@ export class Element {
    */
   getIframeContentWindow(): Window | null {
     return this.iframe?.contentWindow ?? null;
+  }
+
+  acceptsIframeMessage(event: MessageEvent, data: IframeToParent): boolean {
+    const channelId = "channelId" in data ? data.channelId : undefined;
+    if (typeof channelId === "string" && channelId !== this.context.channelId) return false;
+
+    const field = "field" in data ? data.field : undefined;
+    if (typeof field === "string" && field !== this.field) return false;
+
+    // New iframe builds route messages by channelId/field. Legacy builds did
+    // not include routing metadata, so keep WindowProxy filtering for those.
+    if (typeof channelId !== "string" && typeof field !== "string") {
+      return event.source === this.iframe?.contentWindow;
+    }
+    return true;
   }
 
   /** Internal: used by Elements factory to send tokenize commands. */
