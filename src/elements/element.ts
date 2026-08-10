@@ -49,6 +49,7 @@ const FIELD_TITLES: Record<FieldType, string> = {
 };
 
 const MOUNT_TIMEOUT_MS = 10000;
+const HELLO_RETRY_INTERVAL_MS = 250;
 const FIELD_MIN_HEIGHT: Record<FieldType, string> = {
   card: "44px",
   cardNumber: "44px",
@@ -79,6 +80,7 @@ export class Element {
   private status: "pending" | "ready" | "error" = "pending";
   private messageHandler: ((e: MessageEvent) => void) | null = null;
   private mountTimer: number | null = null;
+  private helloTimer: number | null = null;
 
   constructor(
     public readonly field: FieldType,
@@ -144,6 +146,7 @@ export class Element {
     this.mountTimer = window.setTimeout(() => {
       if (this.status !== "pending") return;
       this.status = "error";
+      this.clearHelloTimer();
       this.emit({
         type: "loaderror",
         field: this.field,
@@ -156,14 +159,7 @@ export class Element {
     iframe.addEventListener(
       "load",
       () => {
-        if (!this.iframe) return;
-        const hello: ParentToIframe = {
-          type: "arcpay:hello",
-          origin: window.location.origin,
-          publishableKey: this.context.publishableKey,
-          channelId: this.context.channelId,
-        };
-        postToIframe(this.iframe, hello, expectedOrigin);
+        this.startHelloHandshake(expectedOrigin);
       },
       { once: true },
     );
@@ -172,6 +168,7 @@ export class Element {
   private handleMessage(data: IframeToParent): void {
     if (data.type === "arcpay:ready") {
       if (this.status !== "pending") return;
+      this.clearHelloTimer();
       this.send({
         type: "arcpay:configure",
         field: this.field,
@@ -182,10 +179,12 @@ export class Element {
       if (this.status !== "pending") return;
       this.status = "ready";
       this.clearMountTimer();
+      this.clearHelloTimer();
       this.emit({ type: "ready", field: this.field });
     } else if (data.type === "arcpay:rejected") {
       this.status = "error";
       this.clearMountTimer();
+      this.clearHelloTimer();
       this.emit({
         type: "error",
         field: this.field,
@@ -256,6 +255,7 @@ export class Element {
       this.messageHandler = null;
     }
     this.clearMountTimer();
+    this.clearHelloTimer();
     for (const listeners of Object.values(this.listeners)) {
       listeners.clear();
     }
@@ -307,9 +307,36 @@ export class Element {
     }
   }
 
+  private startHelloHandshake(expectedOrigin: string): void {
+    const sendHello = () => {
+      if (!this.iframe || this.status !== "pending") {
+        this.clearHelloTimer();
+        return;
+      }
+      const hello: ParentToIframe = {
+        type: "arcpay:hello",
+        origin: window.location.origin,
+        publishableKey: this.context.publishableKey,
+        channelId: this.context.channelId,
+      };
+      postToIframe(this.iframe, hello, expectedOrigin);
+    };
+
+    this.clearHelloTimer();
+    sendHello();
+    if (this.status !== "pending") return;
+    this.helloTimer = window.setInterval(sendHello, HELLO_RETRY_INTERVAL_MS);
+  }
+
   private clearMountTimer(): void {
     if (!this.mountTimer) return;
     window.clearTimeout(this.mountTimer);
     this.mountTimer = null;
+  }
+
+  private clearHelloTimer(): void {
+    if (!this.helloTimer) return;
+    window.clearInterval(this.helloTimer);
+    this.helloTimer = null;
   }
 }

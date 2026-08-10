@@ -52,6 +52,7 @@ describe("Element.mount", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     document.body.replaceChildren();
     vi.restoreAllMocks();
   });
@@ -125,7 +126,8 @@ describe("Element.mount", () => {
     el.destroy();
   });
 
-  it("sends arcpay:hello to the iframe on load", () => {
+  it("retries arcpay:hello until the iframe acknowledges readiness", () => {
+    vi.useFakeTimers();
     const el = new Element("card", {}, makeContext());
     el.mount(container);
     const iframe = getIframe();
@@ -137,6 +139,14 @@ describe("Element.mount", () => {
       expect.objectContaining({ type: "arcpay:hello", publishableKey: PK, channelId: CHANNEL_ID }),
       IFRAME_ORIGIN,
     );
+    expect(cw.postMessage).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(250);
+    expect(cw.postMessage).toHaveBeenCalledTimes(2);
+
+    dispatchFromIframe({ type: "arcpay:ready" }, cw);
+    vi.advanceTimersByTime(1000);
+    expect(cw.postMessage).toHaveBeenCalledTimes(3);
     el.destroy();
   });
 
@@ -168,6 +178,7 @@ describe("Element events", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     document.body.replaceChildren();
     vi.restoreAllMocks();
   });
