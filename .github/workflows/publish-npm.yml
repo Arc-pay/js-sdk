@@ -85,7 +85,7 @@ jobs:
         working-directory: go
 
       - name: Publish to npm
-        run: npm publish --access public
+        run: npm publish --access public --provenance=false
 
       - name: Commit release version
         run: |
