@@ -1,6 +1,7 @@
 import { ArcPayError } from "../core/errors";
 
 export type FieldType = "card" | "cardNumber" | "cardExpiry" | "cardCvv";
+export type SplitFieldType = Exclude<FieldType, "card">;
 
 export interface HostedFieldIssue {
   code: string;
@@ -28,6 +29,12 @@ export type ParentToIframe =
   | { type: "arcpay:placeholder"; field: FieldType; placeholder: string }
   | { type: "arcpay:focus" }
   | { type: "arcpay:clear" }
+  | {
+      type: "arcpay:split-value-port";
+      role: "collector" | "responder";
+      requestId: string;
+      field: SplitFieldType;
+    }
   | { type: "arcpay:tokenize"; paymentId: string; idempotencyKey: string };
 
 // iframe → parent
@@ -86,6 +93,7 @@ type TokenizeErrorType = "validation_error" | "configuration_error" | "network_e
 
 const ARCPAY_TYPE_PREFIX = "arcpay:";
 const FIELDS: readonly FieldType[] = ["card", "cardNumber", "cardExpiry", "cardCvv"];
+const SPLIT_FIELDS: readonly SplitFieldType[] = ["cardNumber", "cardExpiry", "cardCvv"];
 const TOKENIZE_ERROR_TYPES: readonly TokenizeErrorType[] = [
   "validation_error",
   "configuration_error",
@@ -112,6 +120,9 @@ const isStyleSubset = (value: unknown): value is StyleSubset => {
 
 const isField = (value: unknown): value is FieldType =>
   typeof value === "string" && FIELDS.includes(value as FieldType);
+
+const isSplitField = (value: unknown): value is SplitFieldType =>
+  typeof value === "string" && SPLIT_FIELDS.includes(value as SplitFieldType);
 
 const isTokenizeErrorType = (value: unknown): value is TokenizeErrorType =>
   typeof value === "string" && TOKENIZE_ERROR_TYPES.includes(value as TokenizeErrorType);
@@ -182,6 +193,16 @@ const isKnownArcpayMessage = (data: unknown): data is ParentToIframe | IframeToP
     case "arcpay:ready":
     case "arcpay:configured":
       return hasOptionalRouting(data);
+    case "arcpay:split-value-port":
+      return (
+        "role" in data &&
+        "requestId" in data &&
+        "field" in data &&
+        (data.role === "collector" || data.role === "responder") &&
+        typeof data.requestId === "string" &&
+        data.requestId.trim().length > 0 &&
+        isSplitField(data.field)
+      );
     case "arcpay:tokenize":
       return (
         "paymentId" in data &&
@@ -261,6 +282,7 @@ export const postToIframe = (
   iframe: HTMLIFrameElement,
   message: ParentToIframe,
   targetOrigin: string,
+  transfer?: Transferable[],
 ): void => {
   if (targetOrigin === "*") {
     throw new ArcPayError({
@@ -277,6 +299,10 @@ export const postToIframe = (
       message: "postToIframe: iframe.contentWindow is null (iframe not mounted)",
       retryable: false,
     });
+  }
+  if (transfer && transfer.length > 0) {
+    iframe.contentWindow.postMessage(message, targetOrigin, transfer);
+    return;
   }
   iframe.contentWindow.postMessage(message, targetOrigin);
 };

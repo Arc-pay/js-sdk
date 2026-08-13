@@ -301,7 +301,7 @@ export class Element {
   }
 
   /** Internal: used by Elements factory to send tokenize commands. */
-  send(message: ParentToIframe): void {
+  send(message: ParentToIframe, transfer?: Transferable[]): void {
     if (!this.iframe) {
       throw new ArcPayError({
         type: "validation_error",
@@ -310,7 +310,7 @@ export class Element {
         retryable: false,
       });
     }
-    postToIframe(this.iframe, message, new URL(this.context.iframeBase).origin);
+    postToIframe(this.iframe, message, new URL(this.context.iframeBase).origin, transfer);
   }
 
   private emit(event: ElementEvent): void {
