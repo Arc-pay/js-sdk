@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { ArcPay } from "../../src/core/arcpay";
 
+function channelIdFromElements(elements: unknown): string {
+  return (elements as { channelId: string }).channelId;
+}
+
 describe("ArcPay.load", () => {
   beforeEach(() => ArcPay.__resetForTests());
   afterEach(() => {
@@ -37,9 +41,14 @@ describe("ArcPay.load", () => {
       configurable: true,
       get: () => contentWindow,
     });
+    iframe.dispatchEvent(new Event("load"));
 
     const event = new MessageEvent("message", {
-      data: { type: "arcpay:ready" },
+      data: {
+        type: "arcpay:ready",
+        field: "card",
+        channelId: channelIdFromElements(elements),
+      },
       origin: "https://sdk.arcpay.space",
     });
     Object.defineProperty(event, "source", { value: contentWindow });

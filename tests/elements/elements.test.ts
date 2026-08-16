@@ -6,8 +6,24 @@ const IFRAME_BASE = "http://localhost";
 const IFRAME_ORIGIN = "http://localhost";
 const PK = "pk_test_elements";
 
+function channelIdFromMock(source: object): string {
+  const calls = (source as { postMessage?: { mock?: { calls?: unknown[][] } } }).postMessage?.mock
+    ?.calls;
+  for (const call of calls ?? []) {
+    const message = call[0] as { type?: string; channelId?: string };
+    if (message.type === "arcpay:hello" && typeof message.channelId === "string") {
+      return message.channelId;
+    }
+  }
+  throw new Error("No arcpay:hello channelId found");
+}
+
 function makeElements(iframeBase = IFRAME_BASE): Elements {
   return new Elements({ publishableKey: PK, iframeBase });
+}
+
+function channelIdFromElements(elements: Elements): string {
+  return (elements as unknown as { channelId: string }).channelId;
 }
 
 function mockIframeContentWindow(selector = "iframe"): { postMessage: ReturnType<typeof vi.fn> } {
@@ -21,8 +37,20 @@ function mockIframeContentWindow(selector = "iframe"): { postMessage: ReturnType
   return mock;
 }
 
-function dispatchFromIframe(data: unknown, source?: object | null): void {
-  const event = new MessageEvent("message", { data, origin: IFRAME_ORIGIN });
+function dispatchFromIframe(
+  data: Record<string, unknown>,
+  source?: object | null,
+  channelId?: string,
+): void {
+  const routedData =
+    source && typeof source === "object"
+      ? {
+          field: data.field ?? "card",
+          channelId: data.channelId ?? channelId ?? channelIdFromMock(source),
+          ...data,
+        }
+      : data;
+  const event = new MessageEvent("message", { data: routedData, origin: IFRAME_ORIGIN });
   if (source !== undefined) {
     Object.defineProperty(event, "source", { value: source });
   }
@@ -48,10 +76,10 @@ function mountSplitCard(els: Elements): HTMLElement {
   return container;
 }
 
-function simulateReady(source: object): void {
-  document.querySelector("iframe")?.dispatchEvent(new Event("load"));
-  dispatchFromIframe({ type: "arcpay:ready" }, source);
-  dispatchFromIframe({ type: "arcpay:configured" }, source);
+function simulateReady(elements: Elements, source: object, field = "card"): void {
+  document.querySelector(`[data-arcpay-element="${field}"]`)?.dispatchEvent(new Event("load"));
+  dispatchFromIframe({ type: "arcpay:ready", field }, source, channelIdFromElements(elements));
+  dispatchFromIframe({ type: "arcpay:configured", field }, source, channelIdFromElements(elements));
 }
 
 describe("Elements.create", () => {
@@ -131,7 +159,7 @@ describe("Elements.create", () => {
     card.mount(container);
     const mock = mockIframeContentWindow();
 
-    dispatchFromIframe({ type: "arcpay:ready" }, mock);
+    simulateReady(els, mock);
 
     expect(mock.postMessage).toHaveBeenCalledWith(
       { type: "arcpay:configure", field: "card", payload: { base: { color: "#0f766e" } } },
@@ -181,7 +209,7 @@ describe("Elements.tokenize validation guards", () => {
     document.body.replaceChildren(container);
     els.create("cardNumber").mount(container);
     const cardNumberMock = mockIframeContentWindow();
-    simulateReady(cardNumberMock);
+    simulateReady(els, cardNumberMock, "cardNumber");
 
     const err = (await els.tokenize("pay_x", "uuid-3").catch((e: unknown) => e)) as ArcPayError;
     expect(err).toBeInstanceOf(ArcPayError);
@@ -204,7 +232,7 @@ describe("Elements.tokenize", () => {
     const els = makeElements();
     mountCard(els);
     const cardMock = mockIframeContentWindow();
-    simulateReady(cardMock);
+    simulateReady(els, cardMock);
 
     const tokenizePromise = els.tokenize("pay_abc", "idem-key-1");
 
@@ -236,9 +264,9 @@ describe("Elements.tokenize", () => {
     const cardNumberMock = mockIframeContentWindow('[data-arcpay-element="cardNumber"]');
     const cardExpiryMock = mockIframeContentWindow('[data-arcpay-element="cardExpiry"]');
     const cardCvvMock = mockIframeContentWindow('[data-arcpay-element="cardCvv"]');
-    simulateReady(cardNumberMock);
-    simulateReady(cardExpiryMock);
-    simulateReady(cardCvvMock);
+    simulateReady(els, cardNumberMock, "cardNumber");
+    simulateReady(els, cardExpiryMock, "cardExpiry");
+    simulateReady(els, cardCvvMock, "cardCvv");
 
     const tokenizePromise = els.tokenize("pay_split", "idem-split-1");
 
@@ -312,7 +340,7 @@ describe("Elements.tokenize", () => {
     const els = makeElements();
     mountCard(els);
     const cardMock = mockIframeContentWindow();
-    simulateReady(cardMock);
+    simulateReady(els, cardMock);
 
     const tokenizePromise = els.tokenize("pay_abc", "idem-key-2");
     dispatchFromIframe(
@@ -338,7 +366,7 @@ describe("Elements.tokenize", () => {
     const els = makeElements();
     mountCard(els);
     const cardMock = mockIframeContentWindow();
-    simulateReady(cardMock);
+    simulateReady(els, cardMock);
 
     const tokenizePromise = els.tokenize("pay_abc", "idem-key-3");
 
@@ -360,6 +388,7 @@ describe("Elements.tokenize", () => {
     dispatchFromIframe(
       {
         type: "arcpay:tokenize-result",
+        channelId: channelIdFromElements(els),
         cardTokenId: "tok_wrong_source",
         cardMask: "...",
         cardScheme: "visa",
@@ -391,7 +420,7 @@ describe("Elements.tokenize", () => {
     const els = makeElements();
     mountCard(els);
     const cardMock = mockIframeContentWindow();
-    simulateReady(cardMock);
+    simulateReady(els, cardMock);
     Object.defineProperty(document.querySelector("iframe") as HTMLIFrameElement, "contentWindow", {
       configurable: true,
       get: () => null,
@@ -409,7 +438,7 @@ describe("Elements.tokenize", () => {
     const els = makeElements();
     mountCard(els);
     const cardMock = mockIframeContentWindow();
-    simulateReady(cardMock);
+    simulateReady(els, cardMock);
 
     const first = els.tokenize("pay_c2a", "idem-c2-1");
     const err = (await els
@@ -451,7 +480,7 @@ describe("Elements.tokenize timeout", () => {
     const els = makeElements();
     mountCard(els);
     const cardMock = mockIframeContentWindow();
-    simulateReady(cardMock);
+    simulateReady(els, cardMock);
 
     const tokenizePromise = els.tokenize("pay_timeout", "idem-timeout-1");
     vi.advanceTimersByTime(30_001);
