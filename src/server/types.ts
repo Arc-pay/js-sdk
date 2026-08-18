@@ -425,14 +425,21 @@ export interface CheckoutSession {
 export interface ListPaymentsQuery {
   cursor?: string;
   page_size?: number;
-  status?: PaymentStatus;
-  payment_method?: PaymentMethod;
-  bank_code?: string;
+  statuses?: PaymentStatus[];
+  payment_methods?: PaymentMethod[];
+  bank_codes?: string[];
+  bank_terminal_ids?: string[];
+  payment_flow_ids?: string[];
+  payment_ids?: string[];
+  bank_payment_ids?: string[];
+  currencies?: string[];
   decline_code?: string;
-  payment_flow_id?: string;
   search?: string;
   date_from?: string;
   date_to?: string;
+  organization_id?: string;
+  amount_min_inclusive?: number;
+  amount_max_inclusive?: number;
 }
 
 export interface ListAvailablePaymentMethodsQuery {

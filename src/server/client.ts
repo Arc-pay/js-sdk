@@ -303,6 +303,14 @@ const appendQuery = (path: string, query?: object): string => {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query)) {
     if (value === undefined || value === null || value === "") continue;
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (item !== undefined && item !== null && item !== "") {
+          params.append(key, String(item));
+        }
+      }
+      continue;
+    }
     params.set(key, String(value));
   }
   const encoded = params.toString();

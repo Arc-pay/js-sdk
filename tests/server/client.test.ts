@@ -762,14 +762,15 @@ describe("server ArcPayClient", () => {
     });
 
     await client.listPayments({
-      status: "captured",
-      payment_method: "bank_card",
+      statuses: ["captured"],
+      payment_methods: ["bank_card"],
+      organization_id: "org-1",
       search: "order-1",
     });
 
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe(
-      "https://api.example.test/v1/payments?status=captured&payment_method=bank_card&search=order-1",
+      "https://api.example.test/v1/payments?statuses=captured&payment_methods=bank_card&organization_id=org-1&search=order-1",
     );
     expect(init.method).toBe("GET");
   });

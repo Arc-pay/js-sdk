@@ -452,16 +452,23 @@ type CheckoutSession struct {
 }
 
 type ListPaymentsQuery struct {
-	Cursor        string
-	PageSize      int
-	Status        PaymentStatus
-	PaymentMethod PaymentMethod
-	BankCode      string
-	DeclineCode   string
-	PaymentFlowID string
-	Search        string
-	DateFrom      string
-	DateTo        string
+	Cursor             string
+	PageSize           int
+	Statuses           []PaymentStatus
+	PaymentMethods     []PaymentMethod
+	BankCodes          []string
+	BankTerminalIDs    []string
+	PaymentFlowIDs     []string
+	PaymentIDs         []string
+	BankPaymentIDs     []string
+	Currencies         []string
+	DeclineCode        string
+	Search             string
+	DateFrom           string
+	DateTo             string
+	OrganizationID     string
+	AmountMinInclusive *int64
+	AmountMaxInclusive *int64
 }
 
 type ListAvailablePaymentMethodsQuery struct {
