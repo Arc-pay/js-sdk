@@ -8,6 +8,3 @@ overrides:
 
 allowBuilds:
   esbuild: true
-
-minimumReleaseAgeExclude:
-  - js-yaml@5.4.0
