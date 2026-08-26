@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ArcPayError } from "../../src/core/errors";
 import { Elements } from "../../src/elements/elements";
 
-const IFRAME_BASE = "http://localhost";
-const IFRAME_ORIGIN = "http://localhost";
+const IFRAME_BASE = "https://localhost";
+const IFRAME_ORIGIN = "https://localhost";
 const PK = "pk_test_elements";
 
 function channelIdFromMock(source: object): string {
