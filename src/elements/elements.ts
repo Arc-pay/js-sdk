@@ -259,40 +259,8 @@ export class Elements {
       };
 
       window.addEventListener("message", onMessage);
-      this.connectSplitValuePorts(card);
       card.send({ type: "arcpay:tokenize", paymentId, idempotencyKey });
     });
-  }
-
-  private connectSplitValuePorts(collector: Element): void {
-    if (collector.field !== "cardNumber" || typeof MessageChannel === "undefined") return;
-
-    for (const field of SPLIT_FIELDS) {
-      if (field === "cardNumber") continue;
-      const responder = this.elementMap.get(field);
-      if (!responder) continue;
-
-      const channel = new MessageChannel();
-      const requestId = createChannelId();
-      collector.send(
-        {
-          type: "arcpay:split-value-port",
-          role: "collector",
-          requestId,
-          field,
-        },
-        [channel.port1],
-      );
-      responder.send(
-        {
-          type: "arcpay:split-value-port",
-          role: "responder",
-          requestId,
-          field,
-        },
-        [channel.port2],
-      );
-    }
   }
 
   destroy(): void {

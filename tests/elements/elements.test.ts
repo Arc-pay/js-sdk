@@ -270,42 +270,13 @@ describe("Elements.tokenize", () => {
 
     const tokenizePromise = els.tokenize("pay_split", "idem-split-1");
 
-    expect(cardNumberMock.postMessage).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: "arcpay:split-value-port",
-        role: "collector",
-        field: "cardExpiry",
-      }),
-      IFRAME_ORIGIN,
-      [expect.any(MessagePort)],
-    );
-    expect(cardNumberMock.postMessage).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: "arcpay:split-value-port",
-        role: "collector",
-        field: "cardCvv",
-      }),
-      IFRAME_ORIGIN,
-      [expect.any(MessagePort)],
-    );
-    expect(cardExpiryMock.postMessage).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: "arcpay:split-value-port",
-        role: "responder",
-        field: "cardExpiry",
-      }),
-      IFRAME_ORIGIN,
-      [expect.any(MessagePort)],
-    );
-    expect(cardCvvMock.postMessage).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: "arcpay:split-value-port",
-        role: "responder",
-        field: "cardCvv",
-      }),
-      IFRAME_ORIGIN,
-      [expect.any(MessagePort)],
-    );
+    for (const target of [cardNumberMock, cardExpiryMock, cardCvvMock]) {
+      expect(
+        target.postMessage.mock.calls.some(
+          ([message]) => message.type === "arcpay:split-value-port",
+        ),
+      ).toBe(false);
+    }
     expect(cardNumberMock.postMessage).toHaveBeenCalledWith(
       expect.objectContaining({ type: "arcpay:tokenize" }),
       IFRAME_ORIGIN,
