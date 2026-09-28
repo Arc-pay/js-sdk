@@ -408,3 +408,20 @@ Leave `MaxNetworkRetries` unset to use the SDK default, or pass
 ## License
 
 MIT.
+
+## Customer transfers
+
+On the merchant backend, call `createCustomerTransferSession` with a secret key
+and a UUIDv7 idempotency key. Supply only bank-required payer fields in `payer`;
+PSB uses `payer_account`. The recipient never receives the merchant payer profile.
+The server SDK also exposes `listCustomerDisbursements`, `getCustomerDisbursement`
+and `refreshCustomerDisbursement`, including reconciliation and retry diagnostics.
+
+Use the returned hosted URL, or import `createCustomerTransferSessionClient`
+from the browser SDK for the recipient journey. `tokenizeCard` accepts PAN plus
+optional recipient/sender metadata; payout tokenization does not accept expiry
+or CVV. The session client supports retrieval, optional OTP, card or SBP
+attachment and submission. Bank capabilities determine available rails. The
+provided PSB B2C document supports CARD_OCT; other PSB rails require their bank
+contracts. Choose the deployment API URL separately from the key's sandbox/live
+business mode. An unknown outcome must be reconciled before a new attempt.

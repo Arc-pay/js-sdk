@@ -5,7 +5,7 @@ const API_VERSION = "2026-05-06";
 
 interface ClientConfig {
   apiBase: string;
-  publishableKey: string;
+  publishableKey?: string;
 }
 
 export interface RequestOptions {
@@ -38,14 +38,14 @@ const isApiErrorTypeString = (t: unknown): t is ArcPayError["type"] =>
   t === "api_error";
 
 const buildHeaders = (
-  publishableKey: string,
+  publishableKey: string | undefined,
   idempotencyKey: string | undefined,
 ): Record<string, string> => {
   const headers: Record<string, string> = {
-    Authorization: `Bearer ${publishableKey}`,
     "X-Arc-Pay-API-Version": API_VERSION,
     "Content-Type": "application/json",
   };
+  if (publishableKey) headers.Authorization = `Bearer ${publishableKey}`;
   if (idempotencyKey) {
     if (!isIdempotencyKey(idempotencyKey)) {
       throw new ArcPayError({

@@ -65,3 +65,15 @@ export type {
   HostedFieldsAppearanceVariables,
   HostedFieldsTheme,
 } from "./elements/style";
+export { createCustomerTransferSessionClient } from "./customer-transfers";
+export type {
+  CustomerTransferCardInput,
+  CustomerTransferCardToken,
+  PayoutPartyProfile,
+} from "./customer-transfers";
+export type {
+  CustomerTransferSession,
+  CustomerDisbursement,
+  CustomerTransferRail,
+  CustomerTransferStatus,
+} from "./server/customer-transfers";

@@ -48,6 +48,32 @@ describe("server ArcPayClient", () => {
     }
   });
 
+  it("creates customer transfer sessions with merchant payer metadata and idempotency", async () => {
+    fetchMock.mockResolvedValue(ok({ session_id: "session", status: "active" }));
+    const client = createArcPayClient({
+      secretKey: "sk_test_fixture",
+      apiBase: "https://dev-api.arcpay.space/v1",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+    await client.createCustomerTransferSession(
+      {
+        amount: 100,
+        currency: "RUB",
+        external_reference: "order",
+        purpose_code: "customer_transfer",
+        allowed_rails: ["card_oct"],
+        payer: { payer_account: "bank-issued-account" },
+      },
+      { idempotencyKey: IDEMPOTENCY_KEY },
+    );
+    const [url, request] = fetchMock.mock.calls[0]!;
+    expect(url).toBe("https://dev-api.arcpay.space/v1/customer-transfer-sessions");
+    expect(request.headers["Idempotency-Key"]).toBe(IDEMPOTENCY_KEY);
+    const body = JSON.parse(request.body);
+    expect(body.payer).toEqual({ payer_account: "bank-issued-account" });
+    expect(body).not.toHaveProperty("cvv");
+  });
+
   it("rejects publishable keys on server APIs", () => {
     expect(() =>
       createArcPayClient({ secretKey: "pk_test_x", fetch: fetchMock as unknown as typeof fetch }),

@@ -1,3 +1,18 @@
+import type {
+  CreateCustomerTransferSessionRequest,
+  CustomerTransferSession,
+  CustomerDisbursement,
+  CustomerDisbursementList,
+  CustomerTransferStatus,
+} from "./customer-transfers";
+export type {
+  CreateCustomerTransferSessionRequest,
+  CustomerTransferSession,
+  CustomerDisbursement,
+  CustomerDisbursementList,
+  CustomerTransferRail,
+  CustomerTransferStatus,
+} from "./customer-transfers";
 import { ArcPayError, type ArcPayErrorType } from "../core/errors";
 import { isIdempotencyKey } from "../core/idempotency";
 import type {
@@ -748,6 +763,49 @@ export class ArcPayClient {
       normalizeCreateCheckoutSessionRequest(body),
       opts,
       true,
+    );
+  }
+
+  async createCustomerTransferSession(
+    body: CreateCustomerTransferSessionRequest,
+    opts: IdempotencyOptions,
+  ): Promise<CustomerTransferSession> {
+    return this.request("POST", "/customer-transfer-sessions", body, opts, true);
+  }
+
+  async getCustomerDisbursement(id: string, opts?: RequestOptions): Promise<CustomerDisbursement> {
+    return this.request(
+      "GET",
+      `/customer-disbursements/${encodeURIComponent(id)}`,
+      undefined,
+      opts,
+    );
+  }
+
+  async refreshCustomerDisbursement(
+    id: string,
+    opts?: RequestOptions,
+  ): Promise<CustomerDisbursement> {
+    return this.request(
+      "POST",
+      `/customer-disbursements/${encodeURIComponent(id)}/refresh`,
+      undefined,
+      opts,
+    );
+  }
+
+  async listCustomerDisbursements(
+    query: { cursor?: string; page_size?: number; status?: CustomerTransferStatus } = {},
+    opts?: RequestOptions,
+  ): Promise<CustomerDisbursementList> {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(query))
+      if (value !== undefined) params.set(key, String(value));
+    return this.request(
+      "GET",
+      `/customer-disbursements${params.size ? `?${params}` : ""}`,
+      undefined,
+      opts,
     );
   }
 
