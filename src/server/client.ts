@@ -4,6 +4,10 @@ import type {
   CustomerDisbursement,
   CustomerDisbursementList,
   CustomerTransferStatus,
+  CreateCustomerDisbursementRequest,
+  TokenizeCustomerDisbursementCardRequest,
+  TokenizeCustomerDisbursementCardResponse,
+  CancelCustomerDisbursementRequest,
 } from "./customer-transfers";
 export type {
   CreateCustomerTransferSessionRequest,
@@ -12,6 +16,10 @@ export type {
   CustomerDisbursementList,
   CustomerTransferRail,
   CustomerTransferStatus,
+  CreateCustomerDisbursementRequest,
+  TokenizeCustomerDisbursementCardRequest,
+  TokenizeCustomerDisbursementCardResponse,
+  CancelCustomerDisbursementRequest,
 } from "./customer-transfers";
 import { ArcPayError, type ArcPayErrorType } from "../core/errors";
 import { isIdempotencyKey } from "../core/idempotency";
@@ -773,6 +781,25 @@ export class ArcPayClient {
     return this.request("POST", "/customer-transfer-sessions", body, opts, true);
   }
 
+  async createCustomerDisbursement(
+    body: CreateCustomerDisbursementRequest,
+    opts: IdempotencyOptions,
+  ): Promise<CustomerDisbursement>;
+  async createCustomerDisbursement(
+    body: CreateCustomerDisbursementRequest,
+    opts: RequestOptionsInput,
+  ): Promise<CustomerDisbursement> {
+    return this.request("POST", "/customer-disbursements", body, opts, true);
+  }
+
+  /** Tokenizes a recipient PAN through the server-only PAN boundary. */
+  async tokenizeCustomerDisbursementCard(
+    body: TokenizeCustomerDisbursementCardRequest,
+    opts: RequestOptions = {},
+  ): Promise<TokenizeCustomerDisbursementCardResponse> {
+    return this.request("POST", "/customer-disbursements/tokenize", body, opts);
+  }
+
   async getCustomerDisbursement(id: string, opts?: RequestOptions): Promise<CustomerDisbursement> {
     return this.request(
       "GET",
@@ -791,6 +818,25 @@ export class ArcPayClient {
       `/customer-disbursements/${encodeURIComponent(id)}/refresh`,
       undefined,
       opts,
+    );
+  }
+
+  async cancelCustomerDisbursement(
+    id: string,
+    body: CancelCustomerDisbursementRequest,
+    opts: IdempotencyOptions,
+  ): Promise<CustomerDisbursement>;
+  async cancelCustomerDisbursement(
+    id: string,
+    body: CancelCustomerDisbursementRequest,
+    opts: RequestOptionsInput,
+  ): Promise<CustomerDisbursement> {
+    return this.request(
+      "POST",
+      `/customer-disbursements/${encodeURIComponent(id)}/cancel`,
+      body,
+      opts,
+      true,
     );
   }
 

@@ -45,6 +45,58 @@ export interface CustomerTransferSession {
   otp_required?: boolean;
   otp_status?: string;
 }
+
+export interface PayoutPartyProfile {
+  first_name?: string;
+  middle_name?: string;
+  last_name?: string;
+  street?: string;
+  city?: string;
+  state_code?: string;
+  country?: string;
+  postal_code?: string;
+  phone?: string;
+  date_of_birth?: string;
+  identity_type?: string;
+  identity_id?: string;
+  identity_country?: string;
+  identity_expiry_date?: string;
+  nationality?: string;
+  country_of_birth?: string;
+}
+
+/** Direct API B2C intent. Route, source, payer authority and bank credentials are server-owned. */
+export interface CreateCustomerDisbursementRequest {
+  amount: number;
+  currency: string;
+  purpose_code: string;
+  card_token_id: string;
+  external_reference?: string;
+  customer_reference?: string;
+  description?: string;
+  bank_backref?: string;
+  recipient_email?: string;
+  recipient_phone?: string;
+  recipient_profile?: PayoutPartyProfile;
+  sender_profile?: PayoutPartyProfile;
+}
+
+export interface TokenizeCustomerDisbursementCardRequest {
+  pan: string;
+  customer_reference?: string;
+}
+
+export interface TokenizeCustomerDisbursementCardResponse {
+  card_token_id: string;
+  card_mask: string;
+  card_scheme: string;
+  card_bin: string;
+}
+
+export interface CancelCustomerDisbursementRequest {
+  expected_version: number;
+  reason?: string;
+}
 export interface CustomerDisbursement {
   disbursement_id: string;
   amount: number;
