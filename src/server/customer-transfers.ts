@@ -10,6 +10,7 @@ export type CustomerTransferStatus =
   | "canceled"
   | "outcome_unknown"
   | "returned";
+export type CustomerTransferEnvironment = "sandbox" | "live";
 export interface CreateCustomerTransferSessionRequest {
   amount: number;
   currency: string;
@@ -33,6 +34,7 @@ export interface CustomerTransferSession {
   currency: string;
   purpose_code: string;
   status: string;
+  environment?: CustomerTransferEnvironment;
   expires_at: string;
   hosted_url?: string;
   external_reference?: string;
