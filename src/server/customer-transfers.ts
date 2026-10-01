@@ -34,7 +34,7 @@ export interface CustomerTransferSession {
   currency: string;
   purpose_code: string;
   status: string;
-  environment?: CustomerTransferEnvironment;
+  environment: CustomerTransferEnvironment;
   expires_at: string;
   hosted_url?: string;
   external_reference?: string;
