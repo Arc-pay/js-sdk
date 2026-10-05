@@ -125,21 +125,26 @@ describe("server ArcPayClient", () => {
     expect(JSON.parse(request.body)).not.toHaveProperty("expiry_month");
   });
 
-  it("cancels a direct customer transfer with an idempotency key", async () => {
-    fetchMock.mockResolvedValue(ok({ disbursement_id: "disb-1", status: "canceled" }));
+  it("cancels a direct customer transfer using the current API version", async () => {
+    fetchMock
+      .mockResolvedValueOnce(ok({ disbursement_id: "disb-1", status: "reserved", version: 2 }))
+      .mockResolvedValueOnce(ok({ disbursement_id: "disb-1", status: "canceled", version: 3 }));
     const client = createArcPayClient({
       secretKey: "sk_test_fixture",
       apiBase: "https://dev-api.arcpay.space/v1",
       fetch: fetchMock as unknown as typeof fetch,
     });
 
-    await client.cancelCustomerDisbursement(
+    const current = await client.getCustomerDisbursement("disb-1");
+    expect(current.version).toBe(2);
+    const canceled = await client.cancelCustomerDisbursement(
       "disb-1",
-      { expected_version: 2, reason: "operator_requested" },
+      { expected_version: current.version!, reason: "operator_requested" },
       { idempotencyKey: CUSTOMER_TRANSFER_IDEMPOTENCY_KEY },
     );
 
-    const [url, request] = fetchMock.mock.calls[0]!;
+    expect(canceled.version).toBe(3);
+    const [url, request] = fetchMock.mock.calls[1]!;
     expect(url).toBe("https://dev-api.arcpay.space/v1/customer-disbursements/disb-1/cancel");
     expect(request.headers["Idempotency-Key"]).toBe(CUSTOMER_TRANSFER_IDEMPOTENCY_KEY);
     expect(JSON.parse(request.body)).toEqual({ expected_version: 2, reason: "operator_requested" });

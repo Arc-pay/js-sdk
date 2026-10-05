@@ -126,6 +126,8 @@ export interface CancelCustomerDisbursementRequest {
 }
 export interface CustomerDisbursement {
   disbursement_id: string;
+  /** Current version to supply as expected_version when canceling. */
+  version?: number;
   amount: number;
   source_debit?: number;
   fee?: number;
