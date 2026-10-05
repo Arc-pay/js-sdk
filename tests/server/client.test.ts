@@ -64,6 +64,9 @@ describe("server ArcPayClient", () => {
         purpose_code: "customer_transfer",
         allowed_rails: ["card_oct"],
         payer: { payer_account: "bank-issued-account" },
+        recipient_email: "recipient@example.test",
+        recipient_profile: { first_name: "Ada" },
+        sender_profile: { first_name: "Merchant" },
       },
       { idempotencyKey: IDEMPOTENCY_KEY },
     );
@@ -72,6 +75,9 @@ describe("server ArcPayClient", () => {
     expect(request.headers["Idempotency-Key"]).toBe(IDEMPOTENCY_KEY);
     const body = JSON.parse(request.body);
     expect(body.payer).toEqual({ payer_account: "bank-issued-account" });
+    expect(body.recipient_email).toBe("recipient@example.test");
+    expect(body.recipient_profile).toEqual({ first_name: "Ada" });
+    expect(body.sender_profile).toEqual({ first_name: "Merchant" });
     expect(body).not.toHaveProperty("cvv");
   });
 

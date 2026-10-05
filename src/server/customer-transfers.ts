@@ -24,6 +24,10 @@ export interface CreateCustomerTransferSessionRequest {
   allowed_rails?: CustomerTransferRail[];
   expires_in_hours?: number;
   recipient_phone?: string;
+  /** Optional merchant-bound metadata; values are kept private by the hosted session. */
+  recipient_email?: string;
+  recipient_profile?: PayoutPartyProfile;
+  sender_profile?: PayoutPartyProfile;
   payer?: { payer_account?: string; payer_inn?: string; income_type_code?: string };
 }
 export interface CustomerTransferSession {
