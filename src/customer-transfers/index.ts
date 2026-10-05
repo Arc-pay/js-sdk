@@ -44,6 +44,18 @@ export interface CustomerTransferCardToken {
   expires_at: string;
 }
 
+function compactPayoutPartyProfile(
+  profile: PayoutPartyProfile | undefined,
+): PayoutPartyProfile | undefined {
+  if (!profile) return undefined;
+  const compact: PayoutPartyProfile = {};
+  for (const [key, value] of Object.entries(profile)) {
+    const trimmed = value?.trim();
+    if (trimmed) compact[key as keyof PayoutPartyProfile] = trimmed;
+  }
+  return Object.keys(compact).length > 0 ? compact : undefined;
+}
+
 /** Recipient-side session capability; requires no merchant secret or card expiry/CVV. */
 export function createCustomerTransferSessionClient(
   sessionId: string,
@@ -62,7 +74,29 @@ export function createCustomerTransferSessionClient(
           retryable: false,
         });
       }
-      return client.post<CustomerTransferCardToken>(`${path}/tokenize`, input);
+      // Optional party metadata is omitted when blank so the API and selected
+      // adapter can distinguish absent fields from explicitly supplied data.
+      const payload: Record<string, unknown> = { pan: input.pan };
+      const optionalStrings: Record<string, string | undefined> = {
+        recipient_first_name: input.recipient_first_name,
+        recipient_last_name: input.recipient_last_name,
+        recipient_middle_name: input.recipient_middle_name,
+        recipient_email: input.recipient_email,
+        recipient_phone: input.recipient_phone,
+        sender_name: input.sender_name,
+        sender_address: input.sender_address,
+        sender_country: input.sender_country,
+        sender_city: input.sender_city,
+      };
+      for (const [key, value] of Object.entries(optionalStrings)) {
+        const trimmed = value?.trim();
+        if (trimmed) payload[key] = trimmed;
+      }
+      const recipientProfile = compactPayoutPartyProfile(input.recipient_profile);
+      const senderProfile = compactPayoutPartyProfile(input.sender_profile);
+      if (recipientProfile) payload.recipient_profile = recipientProfile;
+      if (senderProfile) payload.sender_profile = senderProfile;
+      return client.post<CustomerTransferCardToken>(`${path}/tokenize`, payload);
     },
     sendOTP: () =>
       client.post<{ session: CustomerTransferSession; retry_after: string }>(

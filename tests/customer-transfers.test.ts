@@ -33,6 +33,29 @@ it("does not submit invalid recipient PAN", () => {
   expect(fetchSpy).not.toHaveBeenCalled();
 });
 
+it("omits blank optional metadata from recipient tokenization", async () => {
+  const fetchSpy = vi.fn().mockResolvedValue(
+    new Response(JSON.stringify({ card_token_id: "token", card_mask: "masked" }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }),
+  );
+  vi.stubGlobal("fetch", fetchSpy);
+  await createCustomerTransferSessionClient("session").tokenizeCard({
+    pan: "4532015112830366",
+    recipient_first_name: " ",
+    recipient_email: "",
+    sender_name: " Merchant LLC ",
+    recipient_profile: { first_name: " ", city: " Moscow " },
+  });
+  const request = fetchSpy.mock.calls[0]![1];
+  expect(JSON.parse(request.body)).toEqual({
+    pan: "4532015112830366",
+    sender_name: "Merchant LLC",
+    recipient_profile: { city: "Moscow" },
+  });
+});
+
 it("preserves hosted outcome and review metadata for automatic recipient updates", async () => {
   const payload: CustomerTransferSession = {
     session_id: "session",
