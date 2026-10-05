@@ -46,6 +46,31 @@ export interface CustomerTransferSession {
   description?: string;
   otp_required?: boolean;
   otp_status?: string;
+  disbursement_status?: CustomerTransferStatus;
+  reservation_status?: string;
+  manual_reconciliation_required?: boolean;
+  retry_policy?: string;
+  next_check_at?: string;
+  merchant_name?: string;
+  recipient_phone_mask?: string;
+  success_url?: string;
+  fail_url?: string;
+  created_at?: string;
+  updated_at?: string;
+  version?: number;
+  card?: {
+    card_mask?: string;
+    card_scheme?: string;
+    recipient_first_name?: string;
+    recipient_middle_name?: string;
+    recipient_last_name?: string;
+    recipient_email?: string;
+    recipient_phone?: string;
+    sender_name?: string;
+    sender_address?: string;
+    sender_country?: string;
+    sender_city?: string;
+  };
 }
 
 export interface PayoutPartyProfile {

@@ -1,4 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
+import type { CustomerTransferSession } from "../src/server/customer-transfers";
 import { createCustomerTransferSessionClient } from "../src/customer-transfers/index";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -30,4 +31,35 @@ it("does not submit invalid recipient PAN", () => {
     createCustomerTransferSessionClient("session").tokenizeCard({ pan: "invalid" }),
   ).toThrow("Invalid recipient PAN");
   expect(fetchSpy).not.toHaveBeenCalled();
+});
+
+it("preserves hosted outcome and review metadata for automatic recipient updates", async () => {
+  const payload: CustomerTransferSession = {
+    session_id: "session",
+    amount: 100,
+    source_debit: 100,
+    fee: 0,
+    currency: "RUB",
+    purpose_code: "customer_refund",
+    status: "submitted",
+    environment: "sandbox",
+    expires_at: "2026-10-07T00:00:00Z",
+    disbursement_status: "outcome_unknown",
+    reservation_status: "consumed",
+    manual_reconciliation_required: true,
+    retry_policy: "contact_support",
+    merchant_name: "Test merchant",
+    next_check_at: "2026-10-06T00:05:00Z",
+    card: { card_mask: "411111******1111" },
+  };
+  const fetchSpy = vi.fn().mockResolvedValue(Response.json(payload));
+  vi.stubGlobal("fetch", fetchSpy);
+  const result = await createCustomerTransferSessionClient(
+    "session",
+    "https://dev-api.arcpay.space",
+  ).get();
+  expect(result).toEqual(payload);
+  expect(result.disbursement_status).toBe("outcome_unknown");
+  expect(result.manual_reconciliation_required).toBe(true);
+  expect(fetchSpy).toHaveBeenCalledTimes(1);
 });
