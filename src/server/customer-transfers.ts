@@ -62,18 +62,11 @@ export interface CustomerTransferSession {
   created_at?: string;
   updated_at?: string;
   version?: number;
+  /** Safe indicators only; merchant-bound values are never returned. */
+  bound_recipient_fields?: Array<"first_name" | "last_name" | "middle_name" | "email">;
   card?: {
     card_mask?: string;
     card_scheme?: string;
-    recipient_first_name?: string;
-    recipient_middle_name?: string;
-    recipient_last_name?: string;
-    recipient_email?: string;
-    recipient_phone?: string;
-    sender_name?: string;
-    sender_address?: string;
-    sender_country?: string;
-    sender_city?: string;
   };
 }
 

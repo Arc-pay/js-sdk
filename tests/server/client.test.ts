@@ -49,6 +49,25 @@ describe("server ArcPayClient", () => {
     }
   });
 
+  it("sends the documented customer transfer limit and cursor", async () => {
+    fetchMock.mockResolvedValue(ok({ disbursements: [], next_cursor: "next" }));
+    const client = new ArcPayClient({
+      secretKey: "sk_test_fixture",
+      apiBase: "https://dev-api.arcpay.space",
+      fetch: fetchMock,
+    });
+    await client.listCustomerDisbursements({
+      limit: 37,
+      cursor: "opaque+cursor",
+      status: "completed",
+    });
+    const url = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(url.searchParams.get("limit")).toBe("37");
+    expect(url.searchParams.get("cursor")).toBe("opaque+cursor");
+    expect(url.searchParams.get("status")).toBe("completed");
+    expect(url.searchParams.has("page_size")).toBe(false);
+  });
+
   it("creates customer transfer sessions with merchant payer metadata and idempotency", async () => {
     fetchMock.mockResolvedValue(ok({ session_id: "session", status: "active" }));
     const client = createArcPayClient({

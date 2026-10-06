@@ -841,7 +841,7 @@ export class ArcPayClient {
   }
 
   async listCustomerDisbursements(
-    query: { cursor?: string; page_size?: number; status?: CustomerTransferStatus } = {},
+    query: { cursor?: string; limit?: number; status?: CustomerTransferStatus } = {},
     opts?: RequestOptions,
   ): Promise<CustomerDisbursementList> {
     const params = new URLSearchParams();
