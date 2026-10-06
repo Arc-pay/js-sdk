@@ -419,15 +419,18 @@ selected bank requires it; these fields are optional and are never returned to
 the hosted recipient page as raw values:
 
 ```ts
-await client.createCustomerTransferSession({
-  amount: 1000,
-  currency: "RUB",
-  external_reference: "order-123",
-  purpose_code: "customer_transfer",
-  recipient_email: "recipient@example.test",
-  recipient_profile: { first_name: "Ada", last_name: "Lovelace" },
-  sender_profile: { first_name: "Merchant" },
-}, { idempotencyKey });
+await client.createCustomerTransferSession(
+  {
+    amount: 1000,
+    currency: "RUB",
+    external_reference: "order-123",
+    purpose_code: "customer_transfer",
+    recipient_email: "recipient@example.test",
+    recipient_profile: { first_name: "Ada", last_name: "Lovelace" },
+    sender_profile: { first_name: "Merchant" },
+  },
+  { idempotencyKey },
+);
 ```
 
 Omit fields that are not available; the hosted form asks only for recipient
