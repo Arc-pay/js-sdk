@@ -527,7 +527,7 @@ func decodeResponse(res *http.Response, out any) *Error {
 	code := envelope.Error.Code
 	requestID := envelope.Error.RequestID
 	if requestID == "" {
-		requestID = res.Header.Get("x-request-id")
+		requestID = res.Header.Get("X-Request-Id")
 	}
 	message := envelope.Error.Message
 	if message == "" {
