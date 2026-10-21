@@ -1,40 +1,59 @@
-name: Publish SDK to npm
+name: Prepare and publish SDK release
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - "go/v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing reviewed go/vMAJOR.MINOR.PATCH tag
+        required: true
+        type: string
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
-  group: npm-publish-${{ github.event.release.tag_name }}
+  group: npm-publish-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
+env:
+  PACKAGE_NAME: "@thavguard/arc-pay"
+
 jobs:
-  publish:
-    if: ${{ github.event.action == 'published' }}
+  prepare:
+    name: Build and prepare draft release
     runs-on: ubuntu-latest
-    environment: sdk-npm-release
-    timeout-minutes: 30
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+      commit: ${{ steps.source.outputs.commit }}
+      tarball: ${{ steps.pack.outputs.tarball }}
+      checksum: ${{ steps.pack.outputs.checksum }}
+      digest: ${{ steps.pack.outputs.digest }}
     steps:
       - name: Resolve release tag
         id: release
         env:
-          EVENT_TAG: ${{ github.event.release.tag_name }}
+          EVENT_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          WORKFLOW_REF: ${{ github.ref }}
         run: |
           set -euo pipefail
           tag="$EVENT_TAG"
-          case "$tag" in
-            go/v[0-9]*.[0-9]*.[0-9]*) ;;
-            *) echo "release tag must use go/vSEMVER: $tag" >&2; exit 1 ;;
-          esac
-          version="${tag#go/v}"
-          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "release tag must contain stable semver: $tag" >&2
+          if [[ ! "$tag" =~ ^go/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "release tag must use go/v<MAJOR>.<MINOR>.<PATCH>: $tag" >&2
             exit 1
           fi
+          expected_ref="refs/tags/$tag"
+          if [[ "$WORKFLOW_REF" != "$expected_ref" ]]; then
+            echo "release workflow must run from the exact reviewed tag ref: expected $expected_ref, got $WORKFLOW_REF" >&2
+            exit 1
+          fi
+          version="${tag#go/v}"
           {
             echo "tag=$tag"
             echo "version=$version"
@@ -47,13 +66,16 @@ jobs:
           persist-credentials: false
 
       - name: Verify reviewed main ancestry
+        id: source
         env:
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
         run: |
           set -euo pipefail
           git fetch --no-tags origin main
-          test "$(git rev-parse HEAD)" = "$(git rev-list -n1 "$RELEASE_TAG^{commit}")"
-          git merge-base --is-ancestor HEAD origin/main
+          commit="$(git rev-parse HEAD)"
+          test "$commit" = "$(git rev-list -n1 "$RELEASE_TAG^{commit}")"
+          git merge-base --is-ancestor "$commit" origin/main
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
@@ -74,30 +96,188 @@ jobs:
       - name: Verify committed release version
         run: node scripts/prepare-release-version.mjs --version "${{ steps.release.outputs.version }}"
 
-      - name: Build and verify SDK
+      - name: Run release checks
         env:
           GOMAXPROCS: 2
           GOFLAGS: -p=2
         run: |
+          pnpm lint
           pnpm typecheck
           pnpm test -- --maxWorkers=1 --no-file-parallelism
           pnpm build:all
           pnpm size
+          (cd go && go test -p 2 ./...)
 
-      - name: Go tests
-        env:
-          GOMAXPROCS: 2
-          GOFLAGS: -p=2
-        run: go test -p 2 ./...
-        working-directory: go
-
-      - name: Pack release artifact
+      - name: Pack exact release artifact
         id: pack
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: |
           set -euo pipefail
-          tarball="$(npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP" | tail -n1)"
-          test -f "$RUNNER_TEMP/$tarball"
-          echo "tarball=$RUNNER_TEMP/$tarball" >> "$GITHUB_OUTPUT"
+          output_dir="$RUNNER_TEMP/sdk-release"
+          mkdir -p "$output_dir"
+          packed="$(npm pack --ignore-scripts --pack-destination "$output_dir" | tail -n1)"
+          test -f "$output_dir/$packed"
+          tarball="arc-pay-sdk-${RELEASE_VERSION}.tgz"
+          checksum="${tarball}.sha256"
+          mv "$output_dir/$packed" "$output_dir/$tarball"
+          (cd "$output_dir" && sha256sum "$tarball" > "$checksum")
+          digest="$(sha256sum "$output_dir/$tarball" | awk '{print $1}')"
+          {
+            echo "tarball=$tarball"
+            echo "checksum=$checksum"
+            echo "digest=$digest"
+          } >> "$GITHUB_OUTPUT"
 
-      - name: Publish the verified tarball
-        run: npm publish "${{ steps.pack.outputs.tarball }}" --access public --provenance --ignore-scripts
+      - name: Create or reconcile draft GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_COMMIT: ${{ steps.source.outputs.commit }}
+          TARBALL: ${{ steps.pack.outputs.tarball }}
+          CHECKSUM: ${{ steps.pack.outputs.checksum }}
+        run: |
+          set -euo pipefail
+          release_dir="$RUNNER_TEMP/sdk-release"
+          api_path="repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}"
+          probe="$RUNNER_TEMP/release-probe"
+          probe_err="$RUNNER_TEMP/release-probe.err"
+          set +e
+          gh api --include "$api_path" > "$probe" 2> "$probe_err"
+          rc=$?
+          set -e
+          if [[ "$rc" -eq 0 ]]; then
+            body="$(awk 'BEGIN { body=0 } /^\r?$/{ body=1; next } body { print }' "$probe")"
+            draft="$(jq -r '.draft' <<< "$body")"
+            target="$(jq -r '.target_commitish' <<< "$body")"
+            [[ "$draft" == true ]] || { echo "release $RELEASE_TAG already published" >&2; exit 1; }
+            if [[ "$target" =~ ^[0-9a-f]{40}$ && "$target" != "$RELEASE_COMMIT" ]]; then
+              echo "draft release target mismatch: expected $RELEASE_COMMIT, got $target" >&2
+              exit 1
+            fi
+          elif rg -q 'HTTP/[^ ]+ 404' "$probe"; then
+            gh release create "$RELEASE_TAG" \
+              --draft \
+              --target "$RELEASE_COMMIT" \
+              --title "@thavguard/arc-pay $RELEASE_VERSION" \
+              --notes "Prepared from reviewed main commit $RELEASE_COMMIT. npm publication is protected by the sdk-npm-release environment." \
+              --repo "$GITHUB_REPOSITORY"
+          else
+            cat "$probe_err" >&2
+            cat "$probe" >&2
+            exit "$rc"
+          fi
+          gh release upload "$RELEASE_TAG" \
+            "$release_dir/$TARBALL#$TARBALL" \
+            "$release_dir/$CHECKSUM#$CHECKSUM" \
+            --clobber \
+            --repo "$GITHUB_REPOSITORY"
+
+  publish:
+    name: Publish verified SDK release
+    needs: prepare
+    if: ${{ needs.prepare.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: sdk-npm-release
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Revalidate reviewed tag before publication
+        env:
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+          PREPARED_COMMIT: ${{ needs.prepare.outputs.commit }}
+        run: |
+          set -euo pipefail
+          commit="$(git rev-parse HEAD)"
+          test "$commit" = "$PREPARED_COMMIT"
+          test "$commit" = "$(git rev-list -n1 "$RELEASE_TAG^{commit}")"
+
+      - name: Download and verify the prepared tarball
+        id: artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+          TARBALL: ${{ needs.prepare.outputs.tarball }}
+          CHECKSUM: ${{ needs.prepare.outputs.checksum }}
+          EXPECTED_DIGEST: ${{ needs.prepare.outputs.digest }}
+        run: |
+          set -euo pipefail
+          release_dir="$RUNNER_TEMP/sdk-release"
+          mkdir -p "$release_dir"
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "$TARBALL" \
+            --pattern "$CHECKSUM" \
+            --dir "$release_dir"
+          actual_digest="$(sha256sum "$release_dir/$TARBALL" | awk '{print $1}')"
+          test "$actual_digest" = "$EXPECTED_DIGEST"
+          (cd "$release_dir" && sha256sum --check "$CHECKSUM")
+          echo "path=$release_dir/$TARBALL" >> "$GITHUB_OUTPUT"
+
+      - name: Reconcile npm version before publication
+        id: npm
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+          CANDIDATE: ${{ steps.artifact.outputs.path }}
+        run: |
+          set -euo pipefail
+          metadata="$RUNNER_TEMP/npm-metadata.json"
+          metadata_err="$RUNNER_TEMP/npm-metadata.err"
+          set +e
+          npm view "${PACKAGE_NAME}@${RELEASE_VERSION}" version dist.integrity --json > "$metadata" 2> "$metadata_err"
+          rc=$?
+          set -e
+          if [[ "$rc" -eq 0 ]]; then
+            published_version="$(node -e 'const m=require(process.argv[1]); process.stdout.write(m.version || "")' "$metadata")"
+            published_integrity="$(node -e 'const m=require(process.argv[1]); process.stdout.write(m["dist.integrity"] || "")' "$metadata")"
+            [[ "$published_version" == "$RELEASE_VERSION" && "$published_integrity" =~ ^sha512-[A-Za-z0-9+/]+=*$ ]] || {
+              echo "npm metadata is inconsistent for ${PACKAGE_NAME}@${RELEASE_VERSION}" >&2
+              exit 1
+            }
+            node - "$CANDIDATE" "$published_integrity" <<'NODE'
+          const fs = require("node:fs");
+          const crypto = require("node:crypto");
+          const [file, expected] = process.argv.slice(2);
+          const actual = `sha512-${crypto.createHash("sha512").update(fs.readFileSync(file)).digest("base64")}`;
+          if (actual !== expected) {
+            console.error(`npm already contains the requested version with a different tarball: ${actual}`);
+            process.exit(1);
+          }
+          NODE
+            echo "already_published=true" >> "$GITHUB_OUTPUT"
+          else
+            if node -e 'const m=require(process.argv[1]); process.exit(m.error?.code === "E404" ? 0 : 1)' "$metadata" 2>/dev/null; then
+              echo "already_published=false" >> "$GITHUB_OUTPUT"
+            else
+              cat "$metadata_err" >&2
+              cat "$metadata" >&2
+              echo "could not establish npm version state; publication status is unknown" >&2
+              exit "$rc"
+            fi
+          fi
+
+      - name: Publish the exact verified tarball with npm OIDC provenance
+        if: ${{ steps.npm.outputs.already_published != 'true' }}
+        env:
+          CANDIDATE: ${{ steps.artifact.outputs.path }}
+        run: npm publish "$CANDIDATE" --access public --provenance --ignore-scripts
+
+      - name: Publish the prepared GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+        run: gh release edit "$RELEASE_TAG" --draft=false --repo "$GITHUB_REPOSITORY"
