@@ -1,73 +1,59 @@
 #!/usr/bin/env node
-import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 
 const packagePath = new URL("../package.json", import.meta.url);
-const sdkIndexPath = new URL("../src/index.ts", import.meta.url);
-const reactIndexPath = new URL("../src/react/index.ts", import.meta.url);
-const serverClientPath = new URL("../src/server/client.ts", import.meta.url);
-const goClientPath = new URL("../go/client.go", import.meta.url);
+const goModulePath = new URL("../go/go.mod", import.meta.url);
+const runtimeFiles = [
+  [new URL("../src/index.ts", import.meta.url), "SDK_VERSION"],
+  [new URL("../src/react/index.ts", import.meta.url), "REACT_WRAPPER_VERSION"],
+  [new URL("../src/server/client.ts", import.meta.url), "SERVER_SDK_VERSION"],
+  [new URL("../go/client.go", import.meta.url), "goSDKVersion"],
+];
 
 function parseVersion(version) {
   const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version);
   if (!match) {
-    throw new Error(`Unsupported semver version: ${version}`);
+    throw new Error(`Unsupported stable semver version: ${version}`);
   }
   return match.slice(1).map((part) => Number.parseInt(part, 10));
 }
 
-function compareVersions(left, right) {
-  const a = parseVersion(left);
-  const b = parseVersion(right);
-  for (let index = 0; index < a.length; index += 1) {
-    if (a[index] > b[index]) return 1;
-    if (a[index] < b[index]) return -1;
-  }
-  return 0;
-}
-
-function bumpPatch(version) {
-  const [major, minor, patch] = parseVersion(version);
-  return `${major}.${minor}.${patch + 1}`;
-}
-
-function latestPublishedVersion(packageName) {
-  try {
-    return execFileSync("npm", ["view", packageName, "version", "--silent"], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    }).trim();
-  } catch {
-    return "";
-  }
-}
-
-function updateRuntimeVersion(fileUrl, exportName, nextVersion) {
+function readRuntimeVersion(fileUrl, exportName) {
   const source = readFileSync(fileUrl, "utf8");
-  const pattern = new RegExp(`(export\\s+)?(?:const\\s+)?${exportName}(\\s*=\\s*)"[^"]+";?`);
-  if (!pattern.test(source)) {
+  const pattern = new RegExp(`(export\\s+)?(?:const\\s+)?${exportName}(\\s*=\\s*)"([^"]+)";?`);
+  const match = pattern.exec(source);
+  if (!match) {
     throw new Error(`Could not find ${exportName} in ${fileUrl.pathname}`);
   }
-  const nextSource = source.replace(pattern, (_match, exportPrefix = "", separator = " = ") => {
-    const suffix = fileUrl.pathname.endsWith(".go") ? "" : ";";
-    const keyword = fileUrl.pathname.endsWith(".go") ? "" : "const ";
-    return `${exportPrefix}${keyword}${exportName}${separator}"${nextVersion}"${suffix}`;
-  });
-  writeFileSync(fileUrl, nextSource);
+  return match[3];
 }
 
+const versionFlag = process.argv.indexOf("--version");
+const expectedVersion = versionFlag >= 0 ? process.argv[versionFlag + 1] : undefined;
+if (
+  !expectedVersion ||
+  versionFlag + 2 < process.argv.length ||
+  process.argv.filter((argument) => argument === "--version").length !== 1
+) {
+  throw new Error("Usage: prepare-release-version.mjs --version X.Y.Z");
+}
+parseVersion(expectedVersion);
+
 const pkg = JSON.parse(readFileSync(packagePath, "utf8"));
-const publishedVersion = latestPublishedVersion(pkg.name);
-const nextVersion =
-  publishedVersion && compareVersions(pkg.version, publishedVersion) <= 0
-    ? bumpPatch(publishedVersion)
-    : pkg.version;
+const versions = [["package.json", pkg.version]];
+for (const [fileUrl, exportName] of runtimeFiles) {
+  versions.push([fileUrl.pathname, readRuntimeVersion(fileUrl, exportName)]);
+}
+for (const [file, version] of versions) {
+  parseVersion(version);
+  if (version !== expectedVersion) {
+    throw new Error(`${file} has ${version}; expected ${expectedVersion}`);
+  }
+}
 
-pkg.version = nextVersion;
-writeFileSync(packagePath, `${JSON.stringify(pkg, null, 2)}\n`);
-updateRuntimeVersion(sdkIndexPath, "SDK_VERSION", nextVersion);
-updateRuntimeVersion(reactIndexPath, "REACT_WRAPPER_VERSION", nextVersion);
-updateRuntimeVersion(serverClientPath, "SERVER_SDK_VERSION", nextVersion);
-updateRuntimeVersion(goClientPath, "goSDKVersion", nextVersion);
+const goModule = readFileSync(goModulePath, "utf8");
+if (!/^module github\.com\/Arc-pay\/js-sdk\/go$/m.test(goModule)) {
+  throw new Error("Go SDK module path must remain github.com/Arc-pay/js-sdk/go");
+}
 
-console.log(nextVersion);
+console.log(expectedVersion);

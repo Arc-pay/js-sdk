@@ -54,6 +54,7 @@ export interface CustomerTransferSession {
   reservation_status?: string;
   manual_reconciliation_required?: boolean;
   retry_policy?: string;
+  failure_reason?: "issuer_amount_limit" | "issuer_count_limit";
   next_check_at?: string;
   merchant_name?: string;
   recipient_phone_mask?: string;

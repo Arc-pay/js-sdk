@@ -20,7 +20,7 @@ import (
 const (
 	defaultAPIBase           = "https://api.arcpay.space/v1"
 	apiVersion               = "2026-05-06"
-	goSDKVersion             = "0.1.48"
+	goSDKVersion             = "0.1.50"
 	defaultTimeout           = 30 * time.Second
 	defaultMaxNetworkRetries = 1
 	defaultPollInterval      = 1500 * time.Millisecond
@@ -527,7 +527,7 @@ func decodeResponse(res *http.Response, out any) *Error {
 	code := envelope.Error.Code
 	requestID := envelope.Error.RequestID
 	if requestID == "" {
-		requestID = res.Header.Get("x-request-id")
+		requestID = res.Header.Get("X-Request-ID")
 	}
 	message := envelope.Error.Message
 	if message == "" {
