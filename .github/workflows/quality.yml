@@ -1,0 +1,64 @@
+name: SDK quality
+
+on:
+  pull_request:
+    branches: [dev, debug, main]
+  push:
+    branches:
+      - 'feat/**'
+      - 'fix/**'
+      - 'chore/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sdk-quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test -- --maxWorkers=1 --no-file-parallelism
+
+      - name: Build and check size
+        run: |
+          pnpm build:all
+          pnpm size
+
+      - name: Go tests
+        env:
+          GOMAXPROCS: 2
+          GOFLAGS: -p=2
+        run: go test -p 2 ./...
+        working-directory: go
