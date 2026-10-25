@@ -126,6 +126,13 @@ cardCvv.mount("#card-cvv");
 const token = await elements.tokenize(paymentId, idempotencyKey);
 ```
 
+The caller owns `idempotencyKey`: generate one key for each payment and
+tokenization attempt, then pass that same key when replaying an unresolved
+request. If the outcome is unknown (for example, a timeout), reconcile the
+payment before deciding what to do next; a retryable error must replay with the
+same key and must not silently start a fresh authorization. Generate a new key
+only for an explicitly new payment attempt or a different `paymentId`.
+
 Do not mix `card` with split fields in one `Elements` instance. In split mode,
 PAN, expiry, and CVV are still kept inside Arc Pay iframes and synchronized only
 over the Arc Pay same-origin channel for tokenization; merchant JavaScript
