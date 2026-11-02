@@ -66,7 +66,6 @@
     "typecheck": "tsc --noEmit && tsc -p tsconfig.typecheck.json",
     "size": "node ./scripts/check-bundle-size.mjs",
     "prepack": "pnpm typecheck && pnpm test && pnpm build:all && pnpm size",
-    "prepublishOnly": "pnpm prepack",
     "e2e": "pnpm build:all && playwright test --config=e2e/playwright.config.ts",
     "e2e:install": "playwright install --with-deps chromium firefox webkit",
     "e2e:headed": "playwright test --config=e2e/playwright.config.ts --headed"
