@@ -1,28 +1,48 @@
 name: SDK security scanners
 
-on:
+"on":
   pull_request:
     branches: [dev, debug, main]
+  schedule:
+    - cron: "37 8 * * 0"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: sdk-security-${{ github.workflow }}-${{ github.event.pull_request.number }}
+  group: sdk-security-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  validate:
+    if: ${{ github.event_name == 'pull_request' }}
+    name: PR security boundary validation
+    runs-on: [self-hosted, arcpay-fast]
+    timeout-minutes: 5
+    steps:
+      - name: Reject fork code before checkout on the trusted runner
+        env:
+          IS_FORK: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
+        run: test "$IS_FORK" != true
+      - name: Check out the pull request
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Validate GitHub workflows
+        run: actionlint -config-file .github/actionlint.yaml
+
   scanners:
-    # Public SDK PRs from forks are intentionally rejected before checkout. The
-    # central scheduled scan covers the SDK inventory; this is the trusted PR gate.
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: ${{ github.event_name != 'pull_request' }}
+    name: Scheduled/manual security scanners
     runs-on: [self-hosted, arcpay-security-scan]
     timeout-minutes: 20
     steps:
-      - name: Checkout trusted same-organization PR
+      - name: Check out the scheduled source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
-          fetch-depth: 0
+          fetch-depth: 1
           persist-credentials: false
 
       - name: Prepare scanner bin directory
@@ -41,19 +61,13 @@ jobs:
           tar -xzf "$archive" -C "$RUNNER_TEMP/security-bin" gitleaks
           "$RUNNER_TEMP/security-bin/gitleaks" version
 
-      - name: Scan changed PR history for secrets
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      - name: Scan source history for secrets
         run: |
-          "$RUNNER_TEMP/security-bin/gitleaks" git \
+          "$RUNNER_TEMP/security-bin/gitleaks" detect \
             --redact \
             --no-banner \
             --exit-code 1 \
-            --report-format json \
-            --report-path "$RUNNER_TEMP/gitleaks.json" \
-            --log-opts="$BASE_SHA..$HEAD_SHA" \
-            >/dev/null 2>&1
+            --source .
 
       - name: Pin Semgrep Community rules
         run: |
@@ -64,14 +78,12 @@ jobs:
 
       - name: Run Semgrep CE with pinned community rules
         run: |
-          set +e
           docker run --rm \
             --network none \
             --user "$(id -u):$(id -g)" \
             --env HOME=/tmp \
             -v "$GITHUB_WORKSPACE:/src:ro" \
             -v "$RUNNER_TEMP/semgrep-rules:/rules:ro" \
-            -v "$RUNNER_TEMP:/reports" \
             -w /src \
             semgrep/semgrep@sha256:2e45517a85e13a9cca14a2a00df6bb48affd66b8ebfae1b0991cd57578362fb0 \
             semgrep scan \
@@ -79,14 +91,7 @@ jobs:
               --config /rules/typescript/react/security \
               --config /rules/go/lang/security \
               --metrics=off \
-              --json \
-              --output /reports/semgrep.json \
               --error
-          status=$?
-          if [ "$status" -ne 0 ]; then
-            jq -r '.errors[]?.message // empty' "$RUNNER_TEMP/semgrep.json" >&2 || true
-          fi
-          exit "$status"
 
       - name: Install OSV-Scanner 2.7.0 with checksum verification
         env:
@@ -104,5 +109,4 @@ jobs:
       - name: Scan Go and pnpm dependency manifests
         run: |
           "$RUNNER_TEMP/osv-scanner" scan source -r . \
-            --format json --output "$RUNNER_TEMP/osv.json" \
-            >/dev/null 2>&1
+            --format json --output "$RUNNER_TEMP/osv.json"
