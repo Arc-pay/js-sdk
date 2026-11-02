@@ -1,4 +1,0 @@
-self-hosted-runner:
-  labels:
-    - arcpay-fast
-    - arcpay-security-scan
