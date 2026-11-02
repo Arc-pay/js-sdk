@@ -20,7 +20,7 @@ env:
 jobs:
   quality:
     if: ${{ github.event_name == 'pull_request' }}
-    name: PR validation
+    name: quality
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
