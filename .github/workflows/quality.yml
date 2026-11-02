@@ -18,7 +18,7 @@ env:
   NODE_VERSION: 24
 
 jobs:
-  fast:
+  quality:
     if: ${{ github.event_name == 'pull_request' }}
     name: PR validation
     runs-on: ubuntu-latest
