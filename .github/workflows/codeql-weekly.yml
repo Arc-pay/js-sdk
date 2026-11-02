@@ -1,0 +1,63 @@
+name: SDK CodeQL
+
+"on":
+  schedule:
+    - cron: "47 8 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: sdk-codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ${{ fromJSON('["self-hosted","arcpay-security-scan"]') }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        language: [actions, go, javascript-typescript]
+    env:
+      GOMAXPROCS: 2
+      GOFLAGS: -p=2
+    steps:
+      - name: Check out scheduled source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Go 1.26.10
+        if: ${{ matrix.language == 'go' }}
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: "1.26.10"
+          cache: false
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended
+
+      - name: Build Go module for CodeQL
+        if: ${{ matrix.language == 'go' }}
+        working-directory: go
+        env:
+          GOCACHE: ${{ runner.temp }}/codeql-gocache-${{ github.run_id }}
+        run: |
+          rm -rf "$GOCACHE"
+          mkdir -p "$GOCACHE"
+          go version
+          go build -p 2 ./...
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4
+        with:
+          category: /language:${{ matrix.language }}
