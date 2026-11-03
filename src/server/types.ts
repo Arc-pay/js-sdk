@@ -51,17 +51,6 @@ export interface PaymentOperationSummary {
   completed_at?: string;
 }
 
-export interface PaymentPreparationError {
-  code: string;
-  message: string;
-  stage: string;
-  retryable: boolean;
-  occurred_at: string;
-  min_amount?: number;
-  max_amount?: number;
-  currency: Currency;
-}
-
 export type TerminalPaymentStatus =
   | "authorized"
   | "captured"
@@ -98,7 +87,6 @@ export interface Payment {
   redirect_url?: string;
   payment_mode?: PaymentFlowMode;
   capture_mode?: CaptureMode;
-  preparation_error?: PaymentPreparationError;
   created_at: string;
   updated_at: string;
   metadata?: Record<string, string>;

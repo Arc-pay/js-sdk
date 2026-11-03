@@ -69,7 +69,6 @@ export type {
   PaymentList,
   PaymentMethod,
   PaymentStatus,
-  PaymentPreparationError,
   Refund,
   TerminalPaymentStatus,
   VoidRequest,

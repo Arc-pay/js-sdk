@@ -6,7 +6,6 @@ export type {
   RequestOptions,
   Payment,
   PaymentList,
-  PaymentPreparationError,
   PaymentMethod,
   PaymentStatus,
   PaymentFlowMode,
