@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   metadata:
-    name: Validate SDK metadata
+    name: quality
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
