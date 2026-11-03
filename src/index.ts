@@ -51,7 +51,7 @@ export type {
   WaitForPaymentTerminalRequest,
   WalletNextAction,
 } from "./three-ds";
-export const SDK_VERSION = "0.1.49";
+export const SDK_VERSION = "0.1.50";
 
 export type { FieldType } from "./elements/postmessage";
 export type { ElementOptions, ElementEvent } from "./elements/element";
@@ -65,3 +65,15 @@ export type {
   HostedFieldsAppearanceVariables,
   HostedFieldsTheme,
 } from "./elements/style";
+export { createCustomerTransferSessionClient } from "./customer-transfers";
+export type {
+  CustomerTransferCardInput,
+  CustomerTransferCardToken,
+  PayoutPartyProfile,
+} from "./customer-transfers";
+export type {
+  CustomerTransferSession,
+  CustomerDisbursement,
+  CustomerTransferRail,
+  CustomerTransferStatus,
+} from "./server/customer-transfers";

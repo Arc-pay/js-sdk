@@ -130,7 +130,9 @@ Do not mix `card` with split fields in one `Elements` instance. In split mode,
 PAN, expiry, and CVV are still kept inside Arc Pay iframes and synchronized only
 over the Arc Pay same-origin channel for tokenization; merchant JavaScript
 receives readiness, focus, validation, brand, and tokenization result events,
-not raw card data.
+not raw card data. Split fields require browser `BroadcastChannel` support.
+The channel is restricted to the Arc Pay iframe origin and the current top-level
+site partition; merchant-provided MessagePorts are never used for field values.
 
 `appearance.theme` defaults to `"none"` so Arc Pay branding is not imposed on
 merchant checkout pages. `theme: "arcpay"` is available for demos and quick
@@ -406,3 +408,41 @@ Leave `MaxNetworkRetries` unset to use the SDK default, or pass
 ## License
 
 MIT.
+
+## Customer transfers
+
+On the merchant backend, call `createCustomerTransferSession` with a secret key
+and a UUIDv7 idempotency key. Supply only bank-required payer fields in `payer`;
+PSB uses `payer_account`. The recipient never receives the merchant payer profile.
+Recipient contact and identity data can be bound at session creation when the
+selected bank requires it; these fields are optional and are never returned to
+the hosted recipient page as raw values:
+
+```ts
+await client.createCustomerTransferSession(
+  {
+    amount: 1000,
+    currency: "RUB",
+    external_reference: "order-123",
+    purpose_code: "customer_transfer",
+    recipient_email: "recipient@example.test",
+    recipient_profile: { first_name: "Ada", last_name: "Lovelace" },
+    sender_profile: { first_name: "Merchant" },
+  },
+  { idempotencyKey },
+);
+```
+
+Omit fields that are not available; the hosted form asks only for recipient
+fields not already bound by the merchant.
+The server SDK also exposes `listCustomerDisbursements`, `getCustomerDisbursement`
+and `refreshCustomerDisbursement`, including reconciliation and retry diagnostics.
+
+Use the returned hosted URL, or import `createCustomerTransferSessionClient`
+from the browser SDK for the recipient journey. `tokenizeCard` accepts PAN plus
+optional recipient/sender metadata; payout tokenization does not accept expiry
+or CVV. The session client supports retrieval, optional OTP, card or SBP
+attachment and submission. Bank capabilities determine available rails. The
+provided PSB B2C document supports CARD_OCT; other PSB rails require their bank
+contracts. Choose the deployment API URL separately from the key's sandbox/live
+business mode. An unknown outcome must be reconciled before a new attempt.

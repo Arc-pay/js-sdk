@@ -29,7 +29,7 @@ export default defineConfig(
         treeshake: true,
         splitting: false,
         target: "es2018",
-        minify: false,
+        minify: true,
         external: ["react"],
         outExtension({ format }) {
           return { js: format === "esm" ? ".mjs" : ".cjs" };

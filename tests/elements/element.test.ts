@@ -34,8 +34,12 @@ function mockIframeContentWindow(iframe: HTMLIFrameElement): {
   return mock;
 }
 
-function dispatchFromIframe(data: IframeToParent, source?: object | null): void {
-  const event = new MessageEvent("message", { data, origin: IFRAME_ORIGIN });
+function dispatchFromIframe(
+  data: Partial<IframeToParent> & { type: IframeToParent["type"] },
+  source?: object | null,
+): void {
+  const routedData = { field: "card", channelId: CHANNEL_ID, ...data };
+  const event = new MessageEvent("message", { data: routedData, origin: IFRAME_ORIGIN });
   if (source !== undefined) {
     Object.defineProperty(event, "source", { value: source });
   }

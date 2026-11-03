@@ -1,3 +1,26 @@
+import type {
+  CreateCustomerTransferSessionRequest,
+  CustomerTransferSession,
+  CustomerDisbursement,
+  CustomerDisbursementList,
+  CustomerTransferStatus,
+  CreateCustomerDisbursementRequest,
+  TokenizeCustomerDisbursementCardRequest,
+  TokenizeCustomerDisbursementCardResponse,
+  CancelCustomerDisbursementRequest,
+} from "./customer-transfers";
+export type {
+  CreateCustomerTransferSessionRequest,
+  CustomerTransferSession,
+  CustomerDisbursement,
+  CustomerDisbursementList,
+  CustomerTransferRail,
+  CustomerTransferStatus,
+  CreateCustomerDisbursementRequest,
+  TokenizeCustomerDisbursementCardRequest,
+  TokenizeCustomerDisbursementCardResponse,
+  CancelCustomerDisbursementRequest,
+} from "./customer-transfers";
 import { ArcPayError, type ArcPayErrorType } from "../core/errors";
 import { isIdempotencyKey } from "../core/idempotency";
 import type {
@@ -77,7 +100,7 @@ export interface RequestOptions {
 
 const DEFAULT_API_BASE = "https://api.arcpay.space/v1";
 const API_VERSION = "2026-05-06";
-const SERVER_SDK_VERSION = "0.1.49";
+const SERVER_SDK_VERSION = "0.1.50";
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_NETWORK_RETRIES = 1;
 const DEFAULT_POLL_INTERVAL_MS = 1500;
@@ -303,6 +326,14 @@ const appendQuery = (path: string, query?: object): string => {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query)) {
     if (value === undefined || value === null || value === "") continue;
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (item !== undefined && item !== null && item !== "") {
+          params.append(key, String(item));
+        }
+      }
+      continue;
+    }
     params.set(key, String(value));
   }
   const encoded = params.toString();
@@ -740,6 +771,87 @@ export class ArcPayClient {
       normalizeCreateCheckoutSessionRequest(body),
       opts,
       true,
+    );
+  }
+
+  async createCustomerTransferSession(
+    body: CreateCustomerTransferSessionRequest,
+    opts: IdempotencyOptions,
+  ): Promise<CustomerTransferSession> {
+    return this.request("POST", "/customer-transfer-sessions", body, opts, true);
+  }
+
+  async createCustomerDisbursement(
+    body: CreateCustomerDisbursementRequest,
+    opts: IdempotencyOptions,
+  ): Promise<CustomerDisbursement>;
+  async createCustomerDisbursement(
+    body: CreateCustomerDisbursementRequest,
+    opts: RequestOptionsInput,
+  ): Promise<CustomerDisbursement> {
+    return this.request("POST", "/customer-disbursements", body, opts, true);
+  }
+
+  /** Tokenizes a recipient PAN through the server-only PAN boundary. */
+  async tokenizeCustomerDisbursementCard(
+    body: TokenizeCustomerDisbursementCardRequest,
+    opts: RequestOptions = {},
+  ): Promise<TokenizeCustomerDisbursementCardResponse> {
+    return this.request("POST", "/customer-disbursements/tokenize", body, opts);
+  }
+
+  async getCustomerDisbursement(id: string, opts?: RequestOptions): Promise<CustomerDisbursement> {
+    return this.request(
+      "GET",
+      `/customer-disbursements/${encodeURIComponent(id)}`,
+      undefined,
+      opts,
+    );
+  }
+
+  async refreshCustomerDisbursement(
+    id: string,
+    opts?: RequestOptions,
+  ): Promise<CustomerDisbursement> {
+    return this.request(
+      "POST",
+      `/customer-disbursements/${encodeURIComponent(id)}/refresh`,
+      undefined,
+      opts,
+    );
+  }
+
+  async cancelCustomerDisbursement(
+    id: string,
+    body: CancelCustomerDisbursementRequest,
+    opts: IdempotencyOptions,
+  ): Promise<CustomerDisbursement>;
+  async cancelCustomerDisbursement(
+    id: string,
+    body: CancelCustomerDisbursementRequest,
+    opts: RequestOptionsInput,
+  ): Promise<CustomerDisbursement> {
+    return this.request(
+      "POST",
+      `/customer-disbursements/${encodeURIComponent(id)}/cancel`,
+      body,
+      opts,
+      true,
+    );
+  }
+
+  async listCustomerDisbursements(
+    query: { cursor?: string; limit?: number; status?: CustomerTransferStatus } = {},
+    opts?: RequestOptions,
+  ): Promise<CustomerDisbursementList> {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(query))
+      if (value !== undefined) params.set(key, String(value));
+    return this.request(
+      "GET",
+      `/customer-disbursements${params.size ? `?${params}` : ""}`,
+      undefined,
+      opts,
     );
   }
 

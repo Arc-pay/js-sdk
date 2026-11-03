@@ -1,6 +1,6 @@
 import { ArcPayError } from "../core/errors";
 import { Element, type ElementContext, type ElementOptions } from "./element";
-import type { FieldType, IframeToParent } from "./postmessage";
+import type { FieldType, IframeToParent, SplitFieldType } from "./postmessage";
 import { parseIncoming } from "./postmessage";
 import type { TokenizeResult } from "../tokenize/tokenize";
 import type { HostedFieldsAppearance } from "./style";
@@ -17,7 +17,7 @@ const SPLIT_FIELDS = [
   "cardNumber",
   "cardExpiry",
   "cardCvv",
-] as const satisfies readonly FieldType[];
+] as const satisfies readonly SplitFieldType[];
 
 const createChannelId = (): string => {
   if (!globalThis.crypto?.randomUUID) {
@@ -143,7 +143,7 @@ export class Elements {
         retryable: false,
       });
     }
-    if (!tokenizeElement.isReady()) {
+    if (card && !tokenizeElement.isReady()) {
       throw new ArcPayError({
         type: "validation_error",
         code: "elements_not_ready",
@@ -223,8 +223,8 @@ export class Elements {
         const data = parseIncoming<IframeToParent>(event, iframeOrigin);
         if (!data) return;
         const channelId = "channelId" in data ? data.channelId : undefined;
-        if (typeof channelId === "string" && channelId !== this.channelId) return;
-        if (typeof channelId !== "string" && event.source !== cardIframeWindow) return;
+        if (typeof channelId !== "string" || channelId !== this.channelId) return;
+        if (event.source !== cardIframeWindow) return;
 
         if (data.type === "arcpay:tokenize-result") {
           clearTimeout(timer);

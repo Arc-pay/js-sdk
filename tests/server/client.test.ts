@@ -7,6 +7,7 @@ const IDEMPOTENCY_KEY = "018f2f6a-4f53-7b9b-8f7b-2f0d9f6f2a31";
 const CAPTURE_IDEMPOTENCY_KEY = "018f2f6a-4f53-7b9b-8f7b-2f0d9f6f2a32";
 const EXECUTE_IDEMPOTENCY_KEY = "018f2f6a-4f53-7b9b-8f7b-2f0d9f6f2a33";
 const CHECKOUT_IDEMPOTENCY_KEY = "018f2f6a-4f53-7b9b-8f7b-2f0d9f6f2a34";
+const CUSTOMER_TRANSFER_IDEMPOTENCY_KEY = "018f2f6a-4f53-7b9b-8f7b-2f0d9f6f2a35";
 
 const ok = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), {
@@ -46,6 +47,132 @@ describe("server ArcPayClient", () => {
     } else {
       delete (globalThis as { document?: unknown }).document;
     }
+  });
+
+  it("sends the documented customer transfer limit and cursor", async () => {
+    fetchMock.mockResolvedValue(ok({ disbursements: [], next_cursor: "next" }));
+    const client = new ArcPayClient({
+      secretKey: "sk_test_fixture",
+      apiBase: "https://dev-api.arcpay.space",
+      fetch: fetchMock,
+    });
+    await client.listCustomerDisbursements({
+      limit: 37,
+      cursor: "opaque+cursor",
+      status: "completed",
+    });
+    const url = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(url.searchParams.get("limit")).toBe("37");
+    expect(url.searchParams.get("cursor")).toBe("opaque+cursor");
+    expect(url.searchParams.get("status")).toBe("completed");
+    expect(url.searchParams.has("page_size")).toBe(false);
+  });
+
+  it("creates customer transfer sessions with merchant payer metadata and idempotency", async () => {
+    fetchMock.mockResolvedValue(ok({ session_id: "session", status: "active" }));
+    const client = createArcPayClient({
+      secretKey: "sk_test_fixture",
+      apiBase: "https://dev-api.arcpay.space/v1",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+    await client.createCustomerTransferSession(
+      {
+        amount: 100,
+        currency: "RUB",
+        external_reference: "order",
+        purpose_code: "customer_transfer",
+        allowed_rails: ["card_oct"],
+        payer: { payer_account: "bank-issued-account" },
+        recipient_email: "recipient@example.test",
+        recipient_profile: { first_name: "Ada" },
+        sender_profile: { first_name: "Merchant" },
+      },
+      { idempotencyKey: IDEMPOTENCY_KEY },
+    );
+    const [url, request] = fetchMock.mock.calls[0]!;
+    expect(url).toBe("https://dev-api.arcpay.space/v1/customer-transfer-sessions");
+    expect(request.headers["Idempotency-Key"]).toBe(IDEMPOTENCY_KEY);
+    const body = JSON.parse(request.body);
+    expect(body.payer).toEqual({ payer_account: "bank-issued-account" });
+    expect(body.recipient_email).toBe("recipient@example.test");
+    expect(body.recipient_profile).toEqual({ first_name: "Ada" });
+    expect(body.sender_profile).toEqual({ first_name: "Merchant" });
+    expect(body).not.toHaveProperty("cvv");
+  });
+
+  it("submits a direct B2C customer transfer with idempotency and no payer override", async () => {
+    fetchMock.mockResolvedValue(ok({ disbursement_id: "disb-1", amount: 100, status: "reserved" }));
+    const client = createArcPayClient({
+      secretKey: "sk_test_fixture",
+      apiBase: "https://dev-api.arcpay.space/v1",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+
+    await client.createCustomerDisbursement(
+      {
+        amount: 100,
+        currency: "RUB",
+        purpose_code: "customer_transfer",
+        card_token_id: "11111111-1111-7111-8111-111111111111",
+        customer_reference: "customer-1",
+      },
+      { idempotencyKey: CUSTOMER_TRANSFER_IDEMPOTENCY_KEY },
+    );
+
+    const [url, request] = fetchMock.mock.calls[0]!;
+    expect(url).toBe("https://dev-api.arcpay.space/v1/customer-disbursements");
+    expect(request.headers["Idempotency-Key"]).toBe(CUSTOMER_TRANSFER_IDEMPOTENCY_KEY);
+    expect(JSON.parse(request.body)).not.toHaveProperty("payer");
+    expect(JSON.parse(request.body)).not.toHaveProperty("bank_terminal_id");
+  });
+
+  it("tokenizes a B2C recipient PAN through the server-only endpoint", async () => {
+    fetchMock.mockResolvedValue(
+      ok({
+        card_token_id: "11111111-1111-7111-8111-111111111111",
+        card_mask: "411111******1111",
+        card_scheme: "visa",
+        card_bin: "41111111",
+      }),
+    );
+    const client = createArcPayClient({
+      secretKey: "sk_test_fixture",
+      apiBase: "https://dev-api.arcpay.space/v1",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+
+    await client.tokenizeCustomerDisbursementCard({ pan: "4111111111111111" });
+
+    const [url, request] = fetchMock.mock.calls[0]!;
+    expect(url).toBe("https://dev-api.arcpay.space/v1/customer-disbursements/tokenize");
+    expect(JSON.parse(request.body)).toEqual({ pan: "4111111111111111" });
+    expect(JSON.parse(request.body)).not.toHaveProperty("cvv");
+    expect(JSON.parse(request.body)).not.toHaveProperty("expiry_month");
+  });
+
+  it("cancels a direct customer transfer using the current API version", async () => {
+    fetchMock
+      .mockResolvedValueOnce(ok({ disbursement_id: "disb-1", status: "reserved", version: 2 }))
+      .mockResolvedValueOnce(ok({ disbursement_id: "disb-1", status: "canceled", version: 3 }));
+    const client = createArcPayClient({
+      secretKey: "sk_test_fixture",
+      apiBase: "https://dev-api.arcpay.space/v1",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+
+    const current = await client.getCustomerDisbursement("disb-1");
+    expect(current.version).toBe(2);
+    const canceled = await client.cancelCustomerDisbursement(
+      "disb-1",
+      { expected_version: current.version!, reason: "operator_requested" },
+      { idempotencyKey: CUSTOMER_TRANSFER_IDEMPOTENCY_KEY },
+    );
+
+    expect(canceled.version).toBe(3);
+    const [url, request] = fetchMock.mock.calls[1]!;
+    expect(url).toBe("https://dev-api.arcpay.space/v1/customer-disbursements/disb-1/cancel");
+    expect(request.headers["Idempotency-Key"]).toBe(CUSTOMER_TRANSFER_IDEMPOTENCY_KEY);
+    expect(JSON.parse(request.body)).toEqual({ expected_version: 2, reason: "operator_requested" });
   });
 
   it("rejects publishable keys on server APIs", () => {
@@ -762,14 +889,15 @@ describe("server ArcPayClient", () => {
     });
 
     await client.listPayments({
-      status: "captured",
-      payment_method: "bank_card",
+      statuses: ["captured"],
+      payment_methods: ["bank_card"],
+      organization_id: "org-1",
       search: "order-1",
     });
 
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe(
-      "https://api.example.test/v1/payments?status=captured&payment_method=bank_card&search=order-1",
+      "https://api.example.test/v1/payments?statuses=captured&payment_methods=bank_card&organization_id=org-1&search=order-1",
     );
     expect(init.method).toBe("GET");
   });

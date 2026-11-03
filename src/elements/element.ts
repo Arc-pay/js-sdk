@@ -287,21 +287,16 @@ export class Element {
 
   acceptsIframeMessage(event: MessageEvent, data: IframeToParent): boolean {
     const channelId = "channelId" in data ? data.channelId : undefined;
-    if (typeof channelId === "string" && channelId !== this.context.channelId) return false;
+    if (typeof channelId !== "string" || channelId !== this.context.channelId) return false;
 
     const field = "field" in data ? data.field : undefined;
-    if (typeof field === "string" && field !== this.field) return false;
+    if (typeof field !== "string" || field !== this.field) return false;
 
-    // New iframe builds route messages by channelId/field. Legacy builds did
-    // not include routing metadata, so keep WindowProxy filtering for those.
-    if (typeof channelId !== "string" && typeof field !== "string") {
-      return event.source === this.iframe?.contentWindow;
-    }
-    return true;
+    return event.source === this.iframe?.contentWindow;
   }
 
   /** Internal: used by Elements factory to send tokenize commands. */
-  send(message: ParentToIframe): void {
+  send(message: ParentToIframe, transfer?: Transferable[]): void {
     if (!this.iframe) {
       throw new ArcPayError({
         type: "validation_error",
@@ -310,7 +305,7 @@ export class Element {
         retryable: false,
       });
     }
-    postToIframe(this.iframe, message, new URL(this.context.iframeBase).origin);
+    postToIframe(this.iframe, message, new URL(this.context.iframeBase).origin, transfer);
   }
 
   private emit(event: ElementEvent): void {
