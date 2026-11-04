@@ -116,8 +116,6 @@ export interface TokenizeCustomerDisbursementCardResponse {
   card_mask: string;
   card_scheme: string;
   card_bin: string;
-  /** Effective customer reference; generated if omitted. Use it to delete the token. */
-  customer_reference: string;
 }
 
 export interface CancelCustomerDisbursementRequest {
