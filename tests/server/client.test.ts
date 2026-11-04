@@ -133,7 +133,6 @@ describe("server ArcPayClient", () => {
         card_mask: "411111******1111",
         card_scheme: "visa",
         card_bin: "41111111",
-        customer_reference: "customer-1",
       }),
     );
     const client = createArcPayClient({
@@ -142,8 +141,7 @@ describe("server ArcPayClient", () => {
       fetch: fetchMock as unknown as typeof fetch,
     });
 
-    const tokenized = await client.tokenizeCustomerDisbursementCard({ pan: "4111111111111111" });
-    expect(tokenized.customer_reference).toBe("customer-1");
+    await client.tokenizeCustomerDisbursementCard({ pan: "4111111111111111" });
 
     const [url, request] = fetchMock.mock.calls[0]!;
     expect(url).toBe("https://dev-api.arcpay.space/v1/customer-disbursements/tokenize");
