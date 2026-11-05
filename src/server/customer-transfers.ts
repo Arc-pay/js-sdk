@@ -112,6 +112,8 @@ export interface TokenizeCustomerDisbursementCardRequest {
 }
 
 export interface TokenizeCustomerDisbursementCardResponse {
+  /** Confirmed token owner for customer-scoped deletion; older deployments may omit it. */
+  customer_reference?: string;
   card_token_id: string;
   card_mask: string;
   card_scheme: string;
