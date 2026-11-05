@@ -22,8 +22,17 @@ env:
   PACKAGE_NAME: "@thavguard/arc-pay"
 
 jobs:
+  security-scan:
+    name: Security scan exact release source
+    uses: ./.github/workflows/security-scanners.yml
+    with:
+      release_tag: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      release_sha: ${{ github.sha }}
+
   prepare:
     name: Build and prepare draft release
+    needs: security-scan
+    if: ${{ needs.security-scan.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
