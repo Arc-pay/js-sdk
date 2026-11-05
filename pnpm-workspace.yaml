@@ -2,7 +2,7 @@ packages:
   - "."
 
 overrides:
-  minimatch: "10.2.5"
+  minimatch: "11.0.1"
   brace-expansion: "5.0.12"
   vite: "8.1.6"
   esbuild: "0.28.1"
