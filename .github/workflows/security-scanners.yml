@@ -4,6 +4,18 @@ name: SDK security scanners
   schedule:
     - cron: "37 8 * * 0"
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      release_tag:
+        description: Exact reviewed release tag to scan when called by publication.
+        required: false
+        type: string
+        default: ""
+      release_sha:
+        description: Exact commit SHA expected for release_tag when called by publication.
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -14,15 +26,29 @@ concurrency:
 
 jobs:
   scanners:
-    name: Scheduled/manual security scanners
+    name: Source security scanners
     runs-on: [self-hosted, arcpay-security-scan]
     timeout-minutes: 20
     steps:
-      - name: Check out the scheduled source
+      - name: Check out exact source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
+          ref: ${{ inputs.release_tag != '' && inputs.release_tag || github.ref }}
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Verify exact release source when called by publication
+        if: ${{ inputs.release_tag != '' || inputs.release_sha != '' }}
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_SHA: ${{ inputs.release_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^go/v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          test "$(git rev-list -n1 "$RELEASE_TAG^{commit}")" = "$RELEASE_SHA"
 
       - name: Prepare scanner bin directory
         run: mkdir -p "$RUNNER_TEMP/security-bin"
