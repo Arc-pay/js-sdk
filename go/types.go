@@ -221,15 +221,16 @@ type Refund struct {
 	CreatedAt string   `json:"created_at"`
 }
 
+// CardBrowserInfo is optional: Arc Pay fills defaults and normalizes every field server-side.
 type CardBrowserInfo struct {
-	AcceptHeader          string `json:"accept_header"`
-	Language              string `json:"language"`
-	ScreenWidth           int    `json:"screen_width"`
-	ScreenHeight          int    `json:"screen_height"`
-	ColorDepth            int    `json:"color_depth"`
-	TimezoneOffsetMinutes int    `json:"timezone_offset_minutes"`
+	AcceptHeader          string `json:"accept_header,omitempty"`
+	Language              string `json:"language,omitempty"`
+	ScreenWidth           int    `json:"screen_width,omitempty"`
+	ScreenHeight          int    `json:"screen_height,omitempty"`
+	ColorDepth            int    `json:"color_depth,omitempty"`
+	TimezoneOffsetMinutes int    `json:"timezone_offset_minutes,omitempty"`
 	JavaEnabled           *bool  `json:"java_enabled,omitempty"`
-	UserAgent             string `json:"user_agent"`
+	UserAgent             string `json:"user_agent,omitempty"`
 	WindowSize            string `json:"window_size,omitempty"`
 }
 

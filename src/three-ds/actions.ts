@@ -195,9 +195,9 @@ export type ConfirmWalletPaymentResult =
 
 const supportedColorDepths = [1, 4, 8, 15, 16, 24, 32, 48] as const;
 
-const normalizeColorDepth = (value: number): BrowserInfo["color_depth"] =>
-  supportedColorDepths.includes(value as BrowserInfo["color_depth"])
-    ? (value as BrowserInfo["color_depth"])
+const normalizeColorDepth = (value: number): NonNullable<BrowserInfo["color_depth"]> =>
+  supportedColorDepths.includes(value as NonNullable<BrowserInfo["color_depth"]>)
+    ? (value as NonNullable<BrowserInfo["color_depth"]>)
     : 24;
 
 const resolveWindowSize = (width: number): NonNullable<BrowserInfo["window_size"]> => {
