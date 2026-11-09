@@ -188,6 +188,11 @@ something in the browser. The shape is bank-agnostic: integrations branch only
 on `next_action.type`, `next_action.three_ds.phase`, and Arc Pay payment
 statuses. Do not branch on Sber, PSB, Alfa, Tinkoff, or any other adapter field.
 
+`browser_info` is optional on the wire: every field may be omitted and Arc Pay
+fills defaults and normalizes the values server-side (see the H2H guide).
+`collectBrowserInfo()` still gathers the real browser values, which gives the
+issuer the best frictionless decision.
+
 Run `executePayment` only on your backend with a secret key. For the browser
 handoff, prefer `confirmPayment()`: it collects `browser_info`, calls your
 backend execute proxy, runs 3DS Method/challenge actions, optionally waits for a

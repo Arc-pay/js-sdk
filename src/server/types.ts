@@ -202,15 +202,22 @@ export interface WalletAction {
   params?: Record<string, string>;
 }
 
+/**
+ * Browser data for EMV 3DS 2.x. Every field is optional: Arc Pay fills defaults
+ * and normalizes the values server-side (accept_header, language, screen size,
+ * color_depth, timezone_offset_minutes, user_agent from the request header,
+ * window_size). `collectBrowserInfo()` still gathers the real browser values,
+ * which gives the issuer the best frictionless decision.
+ */
 export interface CardBrowserInfo {
-  accept_header: string;
-  language: string;
-  screen_width: number;
-  screen_height: number;
-  color_depth: 1 | 4 | 8 | 15 | 16 | 24 | 32 | 48;
-  timezone_offset_minutes: number;
+  accept_header?: string;
+  language?: string;
+  screen_width?: number;
+  screen_height?: number;
+  color_depth?: 1 | 4 | 8 | 15 | 16 | 24 | 32 | 48;
+  timezone_offset_minutes?: number;
   java_enabled?: boolean;
-  user_agent: string;
+  user_agent?: string;
   window_size?: "01" | "02" | "03" | "04" | "05";
 }
 
@@ -218,7 +225,7 @@ export interface CardExecutePaymentRequest {
   payment_method: "bank_card";
   card_token_id: string;
   payment_mode: "h2h";
-  browser_info: CardBrowserInfo;
+  browser_info?: CardBrowserInfo;
 }
 
 export interface WalletExecutePaymentRequest {
