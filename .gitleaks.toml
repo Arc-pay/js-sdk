@@ -1,0 +1,16 @@
+title = "Arc Pay js-sdk Gitleaks configuration"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Random UUID idempotency keys used as fixtures in unit tests and README examples; a UUID is an opaque request identifier, not a credential"
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "secret"
+paths = [
+  '''(?:^|/)(?:tests|src)/.*\.test\.ts$''',
+  '''^go/client_test\.go$''',
+  '''^README\.md$''',
+]
+regexes = ['''^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$''']
