@@ -82,44 +82,46 @@ describe("server ArcPayClient", () => {
     ).toThrowError(ArcPayError);
   });
 
-  it("creates a payment with secret key, API version, and idempotency key", async () => {
-    fetchMock.mockResolvedValue(
-      ok({
-        id: "11111111-1111-1111-1111-111111111111",
-        amount: 10000,
-        currency: "RUB",
-        payment_method: "bank_card",
-        status: "created",
-        created_at: "2026-05-12T09:00:00Z",
-        updated_at: "2026-05-12T09:00:00Z",
-      }),
-    );
-    const client = new ArcPayClient({
-      secretKey: "sk_test_x",
-      apiBase: "https://api.example.test/v1/",
-      fetch: fetchMock as unknown as typeof fetch,
-    });
+  it.each([IDEMPOTENCY_KEY, "550e8400-e29b-41d4-a716-446655440000"])(
+    "creates a payment forwarding idempotency key %s",
+    async (idempotencyKey) => {
+      fetchMock.mockResolvedValue(
+        ok({
+          id: "11111111-1111-1111-1111-111111111111",
+          amount: 10000,
+          currency: "RUB",
+          payment_method: "bank_card",
+          status: "created",
+          created_at: "2026-05-12T09:00:00Z",
+          updated_at: "2026-05-12T09:00:00Z",
+        }),
+      );
+      const client = new ArcPayClient({
+        secretKey: "sk_test_x",
+        apiBase: "https://api.example.test/v1/",
+        fetch: fetchMock as unknown as typeof fetch,
+      });
 
-    await client.createPayment(
-      {
-        amount: 10000,
-        currency: "RUB",
-        payment_method: "bank_card",
-        external_id: "order-1",
-        capture_mode: "one_stage",
-      },
-      { idempotencyKey: IDEMPOTENCY_KEY },
-    );
+      await client.createPayment(
+        {
+          amount: 10000,
+          currency: "RUB",
+          payment_method: "bank_card",
+          external_id: "order-1",
+          capture_mode: "one_stage",
+        },
+        { idempotencyKey },
+      );
 
-    const [url, init] = fetchMock.mock.calls[0]!;
-    expect(url).toBe("https://api.example.test/v1/payments");
-    expect(init.method).toBe("POST");
-    expect(init.headers.Authorization).toBe("Bearer sk_test_x");
-    expect(init.headers["X-Arc-Pay-API-Version"]).toBe("2026-05-06");
-    expect(init.headers["Idempotency-Key"]).toBe(IDEMPOTENCY_KEY);
-    expect(init.headers["User-Agent"]).toBe(`ArcPay-JS/${SDK_VERSION}`);
-  });
-
+      const [url, init] = fetchMock.mock.calls[0]!;
+      expect(url).toBe("https://api.example.test/v1/payments");
+      expect(init.method).toBe("POST");
+      expect(init.headers.Authorization).toBe("Bearer sk_test_x");
+      expect(init.headers["X-Arc-Pay-API-Version"]).toBe("2026-05-06");
+      expect(init.headers["Idempotency-Key"]).toBe(idempotencyKey);
+      expect(init.headers["User-Agent"]).toBe(`ArcPay-JS/${SDK_VERSION}`);
+    },
+  );
   it("creates an SBP payment with optional bank return URL", async () => {
     fetchMock.mockResolvedValue(
       ok({
@@ -577,7 +579,7 @@ describe("server ArcPayClient", () => {
         code: "invalid_idempotency_key",
       });
       await expect(
-        method.invoke({ idempotencyKey: "00000000-0000-4000-8000-000000000001" }),
+        method.invoke({ idempotencyKey: "00000000-0000-9000-8000-000000000001" }),
       ).rejects.toMatchObject({
         type: "validation_error",
         code: "invalid_idempotency_key",

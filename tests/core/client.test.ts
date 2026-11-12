@@ -44,7 +44,15 @@ describe("client", () => {
     expect(init.headers["Idempotency-Key"]).toBe(IDEMPOTENCY_KEY);
   });
 
-  it("rejects non-UUIDv7 idempotency keys before sending", async () => {
+  it("forwards UUIDv4 idempotency keys unchanged", async () => {
+    fetchMock.mockResolvedValue(ok({}));
+    const c = createClient({ apiBase: "https://api.arcpay.space", publishableKey: "pk_test_x" });
+    const key = "550e8400-e29b-41d4-a716-446655440000";
+    await c.post("/v1/payments/pay_123/execute", {}, { idempotencyKey: key });
+    expect(fetchMock.mock.calls[0]![1].headers["Idempotency-Key"]).toBe(key);
+  });
+
+  it("rejects invalid UUID idempotency keys before sending", async () => {
     const c = createClient({ apiBase: "https://api.arcpay.space", publishableKey: "pk_test_x" });
 
     await expect(
@@ -58,7 +66,7 @@ describe("client", () => {
         "/v1/payments/pay_123/execute",
         {},
         {
-          idempotencyKey: "00000000-0000-4000-8000-000000000001",
+          idempotencyKey: "00000000-0000-9000-8000-000000000001",
         },
       ),
     ).rejects.toMatchObject({
