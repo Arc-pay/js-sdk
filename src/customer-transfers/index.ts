@@ -1,5 +1,6 @@
 import { createClient } from "../core/client";
 import { ArcPayError } from "../core/errors";
+import { submitCardToCardEntry } from "../tokenize/card-entry";
 import { luhnCheck } from "../tokenize/luhn";
 import type { CustomerTransferSession, CustomerDisbursement } from "../server/customer-transfers";
 
@@ -76,7 +77,7 @@ export function createCustomerTransferSessionClient(
       }
       // Optional party metadata is omitted when blank so the API and selected
       // adapter can distinguish absent fields from explicitly supplied data.
-      const payload: Record<string, unknown> = { pan: input.pan };
+      const payload: Record<string, unknown> = {};
       const optionalStrings: Record<string, string | undefined> = {
         recipient_first_name: input.recipient_first_name,
         recipient_last_name: input.recipient_last_name,
@@ -96,7 +97,20 @@ export function createCustomerTransferSessionClient(
       const senderProfile = compactPayoutPartyProfile(input.sender_profile);
       if (recipientProfile) payload.recipient_profile = recipientProfile;
       if (senderProfile) payload.sender_profile = senderProfile;
-      return client.post<CustomerTransferCardToken>(`${path}/tokenize`, payload);
+      // The PAN goes only to card-entry; recipient/sender metadata and the
+      // resulting token id go to the API's attach step (no card data).
+      return (async () => {
+        const entered = await submitCardToCardEntry<{ card_token_id: string }>(
+          client,
+          `${path}/card-entry-ticket`,
+          {},
+          { pan: input.pan },
+        );
+        return client.post<CustomerTransferCardToken>(`${path}/card`, {
+          ...payload,
+          card_token_id: entered.card_token_id,
+        });
+      })();
     },
     sendOTP: () =>
       client.post<{ session: CustomerTransferSession; retry_after: string }>(

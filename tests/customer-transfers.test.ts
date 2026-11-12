@@ -3,26 +3,48 @@ import type { CustomerTransferSession } from "../src/server/customer-transfers";
 import { createCustomerTransferSessionClient } from "../src/customer-transfers/index";
 
 afterEach(() => vi.unstubAllGlobals());
-it("sends PAN-only recipient tokenization without merchant credentials", async () => {
-  const fetchSpy = vi.fn().mockResolvedValue(
-    new Response(JSON.stringify({ card_token_id: "token", card_mask: "masked" }), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    }),
-  );
+const jsonResponse = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+const CARD_ENTRY = "https://cards.example.test/v1/card-entry/transfer-pan";
+const transferFetch = () =>
+  vi
+    .fn()
+    .mockResolvedValueOnce(
+      jsonResponse({ ticket: "tkt", card_entry_url: CARD_ENTRY, expires_at: "2030-01-01T00:00:00Z" }),
+    )
+    .mockResolvedValueOnce(jsonResponse({ card_token_id: "token" }))
+    .mockResolvedValueOnce(jsonResponse({ card_token_id: "token", card_mask: "masked" }));
+
+it("sends the PAN only to card-entry and attaches the token without merchant credentials", async () => {
+  const fetchSpy = transferFetch();
   vi.stubGlobal("fetch", fetchSpy);
   const session = createCustomerTransferSessionClient("session", "https://dev-api.arcpay.space");
   await session.tokenizeCard({
     pan: "4532015112830366",
     recipient_email: "recipient@example.test",
   });
-  const [url, request] = fetchSpy.mock.calls[0]!;
-  expect(url).toBe("https://dev-api.arcpay.space/v1/customer-transfer-sessions/session/tokenize");
-  expect(request.headers).not.toHaveProperty("Authorization");
-  const payload = JSON.parse(request.body);
-  expect(Object.keys(payload).sort()).toEqual(["pan", "recipient_email"]);
+  const [ticketUrl, ticketRequest] = fetchSpy.mock.calls[0]!;
+  expect(ticketUrl).toBe(
+    "https://dev-api.arcpay.space/v1/customer-transfer-sessions/session/card-entry-ticket",
+  );
+  expect(JSON.parse(ticketRequest.body)).toEqual({});
+
+  const [cardUrl, cardRequest] = fetchSpy.mock.calls[1]!;
+  expect(cardUrl).toBe(CARD_ENTRY);
+  expect(JSON.parse(cardRequest.body)).toEqual({ pan: "4532015112830366" });
+  expect(cardRequest.headers).toMatchObject({ "X-Card-Entry-Ticket": "tkt" });
+  expect(cardRequest.headers).not.toHaveProperty("Authorization");
+
+  const [attachUrl, attachRequest] = fetchSpy.mock.calls[2]!;
+  expect(attachUrl).toBe("https://dev-api.arcpay.space/v1/customer-transfer-sessions/session/card");
+  expect(attachRequest.headers).not.toHaveProperty("Authorization");
+  const payload = JSON.parse(attachRequest.body);
+  expect(payload).toEqual({ recipient_email: "recipient@example.test", card_token_id: "token" });
+  expect(payload).not.toHaveProperty("pan");
   expect(payload).not.toHaveProperty("cvv");
-  expect(payload).not.toHaveProperty("expiry_month");
 });
 it("does not submit invalid recipient PAN", () => {
   const fetchSpy = vi.fn();
@@ -33,13 +55,8 @@ it("does not submit invalid recipient PAN", () => {
   expect(fetchSpy).not.toHaveBeenCalled();
 });
 
-it("omits blank optional metadata from recipient tokenization", async () => {
-  const fetchSpy = vi.fn().mockResolvedValue(
-    new Response(JSON.stringify({ card_token_id: "token", card_mask: "masked" }), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    }),
-  );
+it("omits blank optional metadata from the attach step", async () => {
+  const fetchSpy = transferFetch();
   vi.stubGlobal("fetch", fetchSpy);
   await createCustomerTransferSessionClient("session").tokenizeCard({
     pan: "4532015112830366",
@@ -48,9 +65,9 @@ it("omits blank optional metadata from recipient tokenization", async () => {
     sender_name: " Merchant LLC ",
     recipient_profile: { first_name: " ", city: " Moscow " },
   });
-  const request = fetchSpy.mock.calls[0]![1];
+  const request = fetchSpy.mock.calls[2]![1];
   expect(JSON.parse(request.body)).toEqual({
-    pan: "4532015112830366",
+    card_token_id: "token",
     sender_name: "Merchant LLC",
     recipient_profile: { city: "Moscow" },
   });
