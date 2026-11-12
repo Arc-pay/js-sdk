@@ -424,7 +424,7 @@ MIT.
 ## Customer transfers
 
 On the merchant backend, call `createCustomerTransferSession` with a secret key
-and a UUIDv7 idempotency key. Supply only bank-required payer fields in `payer`;
+and a UUID idempotency key (versions 1–8 accepted; UUIDv7 recommended). Supply only bank-required payer fields in `payer`;
 PSB uses `payer_account`. The recipient never receives the merchant payer profile.
 Recipient contact and identity data can be bound at session creation when the
 selected bank requires it; these fields are optional and are never returned to
