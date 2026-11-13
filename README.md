@@ -316,6 +316,10 @@ if (execution.wallet_action?.action === "qr") {
 }
 ```
 
+`currency` is any ISO 4217 alphabetic code, and `amount` is an integer in that
+currency's minor unit: `1234` is 12.34 RUB, 1234 JPY (no minor unit) or 1.234
+KWD. Which currencies a payment method processes is merchant configuration.
+
 For browser checkouts, use `confirmWalletPayment()` to call your backend execute
 proxy and receive a browser-friendly `walletAction` object. The helper keeps
 the public API request in snake_case and normalizes the returned action to
