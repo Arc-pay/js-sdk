@@ -1,4 +1,5 @@
 import type { Client } from "../core/client";
+import { submitCardToCardEntry } from "./card-entry";
 import { type TokenizeRequestInput, validateTokenizeRequest } from "./validate";
 
 export interface TokenizeResult {
@@ -32,8 +33,10 @@ export const tokenize = async (client: Client, req: TokenizeRequest): Promise<To
     expiry_year: req.expiryYear,
   };
 
-  const res = await client.post<TokenizeResponseBody>(
-    `/v1/payments/${encodeURIComponent(req.paymentId)}/tokenize`,
+  const res = await submitCardToCardEntry<TokenizeResponseBody>(
+    client,
+    `/v1/payments/${encodeURIComponent(req.paymentId)}/card-entry-ticket`,
+    {},
     body,
   );
   return {

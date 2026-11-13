@@ -50,11 +50,11 @@ host or disable browser telemetry at your application layer.
 Hosted Fields performs a browser settings check against Arc Pay API before
 mounting fields. That check is internal to the SDK; merchants should configure
 CSP for the public origins above, not call the settings endpoint directly.
-Tokenization requests are sent from `https://sdk.arcpay.space` to the public API
-with `Authorization: Bearer <pk_...>`, `Content-Type`, optional
-`Idempotency-Key`, `sentry-trace`, and `baggage` headers. Direct REST callers
-may use either `Authorization: Bearer <pk_...>` or `X-Api-Key: pk_...` for
-`/payments/{id}/tokenize`.
+Tokenization is two requests from `https://sdk.arcpay.space`: a ticket request to the
+public API (`POST /payments/{id}/card-entry-ticket`, no card data, authenticated
+with the publishable key), then the card itself straight to the card-entry
+endpoint named in the ticket response (`X-Card-Entry-Ticket` and `Content-Type`
+headers only). Card data never reaches the public API host or the merchant page.
 
 Hosted Fields formats buyer input inside the secure iframe: card numbers are
 grouped with spaces and expiry dates are displayed as `MM/YY`. The tokenization
@@ -453,7 +453,9 @@ and `refreshCustomerDisbursement`, including reconciliation and retry diagnostic
 Use the returned hosted URL, or import `createCustomerTransferSessionClient`
 from the browser SDK for the recipient journey. `tokenizeCard` accepts PAN plus
 optional recipient/sender metadata; payout tokenization does not accept expiry
-or CVV. The session client supports retrieval, optional OTP, card or SBP
+or CVV. The PAN is sent only to the card-entry endpoint returned with a ticket
+(pages using it must allow that host in `connect-src`); the API receives just
+the token id and the metadata. The session client supports retrieval, optional OTP, card or SBP
 attachment and submission. Bank capabilities determine available rails. The
 provided PSB B2C document supports CARD_OCT; other PSB rails require their bank
 contracts. Choose the deployment API URL separately from the key's sandbox/live
