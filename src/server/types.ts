@@ -1,4 +1,13 @@
-export type Currency = "RUB" | "KZT" | "UZS";
+/** Currencies with built-in autocomplete. Any ISO 4217 code is accepted, see {@link Currency}. */
+export type KnownCurrency = "RUB" | "KZT" | "UZS" | "USD" | "EUR" | "TRY";
+
+/**
+ * ISO 4217 alphabetic currency code, for example "RUB", "JPY" or "KWD". Every
+ * ISO 4217 currency is accepted; the amount is an integer in the currency's
+ * minor unit (JPY has none, RUB two decimals, KWD three). Whether a payment
+ * flow processes a currency is merchant configuration, not part of the type.
+ */
+export type Currency = KnownCurrency | (string & {});
 
 export type PaymentMethod =
   | "bank_card"
