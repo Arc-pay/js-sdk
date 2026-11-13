@@ -47,4 +47,17 @@ export type {
   ThreeDSBrowserStep,
 } from "../three-ds";
 
-export type * from "./customer-transfers";
+export type {
+  CustomerTransferRail,
+  CustomerTransferStatus,
+  CustomerTransferEnvironment,
+  CreateCustomerTransferSessionRequest,
+  CustomerTransferSession,
+  PayoutPartyProfile,
+  CreateCustomerDisbursementRequest,
+  TokenizeCustomerDisbursementCardRequest,
+  TokenizeCustomerDisbursementCardResponse,
+  CancelCustomerDisbursementRequest,
+  CustomerDisbursement,
+  CustomerDisbursementList,
+} from "./customer-transfers";
