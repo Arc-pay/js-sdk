@@ -180,7 +180,7 @@ const requireIdempotencyKey = (opts: RequestOptionsWithOptionalIdempotency): str
     throw new ArcPayError({
       type: "validation_error",
       code: "invalid_idempotency_key",
-      message: "idempotencyKey must be a valid UUIDv7",
+      message: "idempotencyKey must be a valid UUID",
       retryable: false,
     });
   }

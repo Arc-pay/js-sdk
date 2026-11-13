@@ -9,7 +9,23 @@ describe("idempotency helpers", () => {
     expect(isIdempotencyKey(key)).toBe(true);
   });
 
-  it("rejects UUIDv4 idempotency keys", () => {
-    expect(isIdempotencyKey("00000000-0000-4000-8000-000000000001")).toBe(false);
+  it.each([1, 2, 3, 4, 5, 6, 7, 8])("accepts API-compatible UUID v%i", (version) => {
+    expect(isIdempotencyKey(`550e8400-e29b-${version}1d4-a716-446655440000`)).toBe(true);
+  });
+
+  it("accepts uppercase UUIDs", () => {
+    expect(isIdempotencyKey("550E8400-E29B-41D4-A716-446655440000")).toBe(true);
+  });
+
+  it.each([
+    "550e8400-e29b-01d4-a716-446655440000",
+    "550e8400-e29b-91d4-a716-446655440000",
+    "550e8400-e29b-41d4-7716-446655440000",
+    "550e8400-e29b-41d4-c716-446655440000",
+    "550e8400e29b41d4a716446655440000",
+    "550e8400-e29b-41d4-a716-446655440000\n",
+    "",
+  ])("rejects invalid UUID %j", (key) => {
+    expect(isIdempotencyKey(key)).toBe(false);
   });
 });
