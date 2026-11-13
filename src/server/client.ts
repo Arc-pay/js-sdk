@@ -77,7 +77,7 @@ export interface RequestOptions {
 
 const DEFAULT_API_BASE = "https://api.arcpay.space/v1";
 const API_VERSION = "2026-05-06";
-const SERVER_SDK_VERSION = "0.1.49";
+const SERVER_SDK_VERSION = "0.1.52";
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_NETWORK_RETRIES = 1;
 const DEFAULT_POLL_INTERVAL_MS = 1500;
@@ -156,7 +156,7 @@ const requireIdempotencyKey = (opts: RequestOptionsWithOptionalIdempotency): str
     throw new ArcPayError({
       type: "validation_error",
       code: "invalid_idempotency_key",
-      message: "idempotencyKey must be a valid UUIDv7",
+      message: "idempotencyKey must be a valid UUID",
       retryable: false,
     });
   }
