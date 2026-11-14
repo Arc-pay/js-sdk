@@ -1,0 +1,23 @@
+name: Pin frontend composition
+
+# Every push to dev pins this repository in the frontend composition, so the
+# DEV image build (dispatched by the frontend push) needs no hand-made pin PR.
+
+"on":
+  push:
+    branches: [dev]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pin-frontend-${{ github.repository }}
+  cancel-in-progress: true
+
+jobs:
+  pin:
+    uses: Arc-pay/infra/.github/workflows/frontend-composition-pin.yml@da0b48b6d61441535d67e4cb761d80d7bd73e466 # v1.1.8
+    with:
+      app_name: js-sdk
+    secrets:
+      OP_CONNECT_TOKEN_DEV: ${{ secrets.OP_CONNECT_TOKEN_DEV }}
