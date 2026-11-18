@@ -15,7 +15,8 @@ export interface CreateCustomerTransferSessionRequest {
   amount: number;
   currency: string;
   external_reference: string;
-  purpose_code: string;
+  /** Optional; not used by pricing, routing or banks. */
+  purpose_code?: string;
   customer_reference?: string;
   description?: string;
   success_url?: string;
@@ -94,7 +95,8 @@ export interface PayoutPartyProfile {
 export interface CreateCustomerDisbursementRequest {
   amount: number;
   currency: string;
-  purpose_code: string;
+  /** Optional; not used by pricing, routing or banks. */
+  purpose_code?: string;
   card_token_id: string;
   external_reference?: string;
   customer_reference?: string;
