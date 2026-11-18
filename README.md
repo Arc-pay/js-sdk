@@ -440,7 +440,7 @@ await client.createCustomerTransferSession(
     amount: 1000,
     currency: "RUB",
     external_reference: "order-123",
-    purpose_code: "customer_transfer",
+    description: "Payout for order 123",
     recipient_email: "recipient@example.test",
     recipient_profile: { first_name: "Ada", last_name: "Lovelace" },
     sender_profile: { first_name: "Merchant" },
@@ -451,6 +451,11 @@ await client.createCustomerTransferSession(
 
 Omit fields that are not available; the hosted form asks only for recipient
 fields not already bound by the merchant.
+
+`purpose_code` is optional for sessions and direct transfers; it is not used by
+pricing, routing or banks, and the session response may return it as an empty
+string. `description` is the bank payment purpose text (PSB B2C: 1-150
+characters).
 The server SDK also exposes `listCustomerDisbursements`, `getCustomerDisbursement`
 and `refreshCustomerDisbursement`, including reconciliation and retry diagnostics.
 

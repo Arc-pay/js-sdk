@@ -80,7 +80,6 @@ describe("server ArcPayClient", () => {
         amount: 100,
         currency: "RUB",
         external_reference: "order",
-        purpose_code: "customer_transfer",
         allowed_rails: ["card_oct"],
         payer: { payer_account: "bank-issued-account" },
         recipient_email: "recipient@example.test",
@@ -93,6 +92,7 @@ describe("server ArcPayClient", () => {
     expect(url).toBe("https://dev-api.arcpay.space/v1/customer-transfer-sessions");
     expect(request.headers["Idempotency-Key"]).toBe(IDEMPOTENCY_KEY);
     const body = JSON.parse(request.body);
+    expect(body).not.toHaveProperty("purpose_code");
     expect(body.payer).toEqual({ payer_account: "bank-issued-account" });
     expect(body.recipient_email).toBe("recipient@example.test");
     expect(body.recipient_profile).toEqual({ first_name: "Ada" });
@@ -112,7 +112,6 @@ describe("server ArcPayClient", () => {
       {
         amount: 100,
         currency: "RUB",
-        purpose_code: "customer_transfer",
         card_token_id: "11111111-1111-7111-8111-111111111111",
         customer_reference: "customer-1",
       },
@@ -122,6 +121,7 @@ describe("server ArcPayClient", () => {
     const [url, request] = fetchMock.mock.calls[0]!;
     expect(url).toBe("https://dev-api.arcpay.space/v1/customer-disbursements");
     expect(request.headers["Idempotency-Key"]).toBe(CUSTOMER_TRANSFER_IDEMPOTENCY_KEY);
+    expect(JSON.parse(request.body)).not.toHaveProperty("purpose_code");
     expect(JSON.parse(request.body)).not.toHaveProperty("payer");
     expect(JSON.parse(request.body)).not.toHaveProperty("bank_terminal_id");
   });
