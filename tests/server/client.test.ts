@@ -49,6 +49,33 @@ describe("server ArcPayClient", () => {
     }
   });
 
+  it("forwards stored-credential recurring fields on saved-card charges", async () => {
+    fetchMock.mockResolvedValue(ok({ payment_id: "pay_1", status: "pending" }));
+    const client = new ArcPayClient({
+      secretKey: "sk_test_fixture",
+      apiBase: "https://dev-api.arcpay.space",
+      fetch: fetchMock,
+    });
+    await client.chargeSavedCard(
+      {
+        amount: 10000,
+        currency: "RUB",
+        card_token_id: "card_tok_1",
+        customer_id: "cust_1",
+        stored_credential_reason: "recurring",
+        recurring_frequency_days: 30,
+        recurring_expiry: "20271231",
+      },
+      { idempotencyKey: CAPTURE_IDEMPOTENCY_KEY },
+    );
+    const [, init] = fetchMock.mock.calls[0]!;
+    expect(JSON.parse(init.body)).toMatchObject({
+      stored_credential_reason: "recurring",
+      recurring_frequency_days: 30,
+      recurring_expiry: "20271231",
+    });
+  });
+
   it("sends the documented customer transfer limit and cursor", async () => {
     fetchMock.mockResolvedValue(ok({ disbursements: [], next_cursor: "next" }));
     const client = new ArcPayClient({

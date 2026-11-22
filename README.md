@@ -47,9 +47,21 @@ and API connections to `https://api.arcpay.space`. If your Content Security
 Policy also governs telemetry, allow connections to your configured Sentry ingest
 host or disable browser telemetry at your application layer.
 
+Card data never goes to the API host. When card data is posted straight from the
+page (for example the customer-transfer session client), the page must also
+allow the card-entry origin in `connect-src`. The host comes from the
+`card_entry_url` in the ticket response: `https://cards.arcpay.space` in
+production, `https://dev-cards.arcpay.space:30444` on dev and
+`https://debug-cards.arcpay.space:30444` on debug. Hosted Fields keep card data
+inside the `https://sdk.arcpay.space` iframe, so the merchant page needs only
+the `frame-src` and API `connect-src` entries above.
+
 Hosted Fields performs a browser settings check against Arc Pay API before
 mounting fields. That check is internal to the SDK; merchants should configure
 CSP for the public origins above, not call the settings endpoint directly.
+Client-side validation can reject a card before any request with the local
+codes `invalid_card_number`, `invalid_cvv`, `invalid_expiry` and `card_expired`
+(expiry month already past); these are raised by the SDK, not returned by the API.
 Tokenization is two requests from `https://sdk.arcpay.space`: a ticket request to the
 public API (`POST /payments/{id}/card-entry-ticket`, no card data, authenticated
 with the publishable key), then the card itself straight to the card-entry
@@ -463,8 +475,15 @@ Use the returned hosted URL, or import `createCustomerTransferSessionClient`
 from the browser SDK for the recipient journey. `tokenizeCard` accepts PAN plus
 optional recipient/sender metadata; payout tokenization does not accept expiry
 or CVV. The PAN is sent only to the card-entry endpoint returned with a ticket
-(pages using it must allow that host in `connect-src`); the API receives just
-the token id and the metadata. The session client supports retrieval, optional OTP, card or SBP
+(pages using it must allow that host in `connect-src`, see the CSP notes
+above); the API receives just the token id and the metadata. The card-entry host
+only accepts platform origins: the Arc Pay hosted page, the SDK iframe or
+Elements, and White Label hosts attested by the HPP ticket. Hosted Fields work
+from a merchant page because the card is entered inside the SDK iframe. The
+session client's `tokenizeCard` posts from the page itself, so it works only on
+a platform-origin page (the hosted session URL) and not from a merchant-owned
+origin; from a merchant origin, redirect the recipient to the hosted URL for
+card entry. The other session client calls go to the API host only. The session client supports retrieval, optional OTP, card or SBP
 attachment and submission. Bank capabilities determine available rails. The
 provided PSB B2C document supports CARD_OCT; other PSB rails require their bank
 contracts. Choose the deployment API URL separately from the key's sandbox/live

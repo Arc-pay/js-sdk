@@ -547,7 +547,7 @@ func decodeResponse(res *http.Response, out any) *Error {
 
 func publicErrorType(value string, status int) ErrorType {
 	switch ErrorType(value) {
-	case ValidationError, AuthenticationError, AuthorizationError, StateError, RateLimitError, APIError, NetworkError:
+	case ValidationError, AuthenticationError, AuthorizationError, StateError, RateLimitError, APIError, NetworkError, ConfigurationError:
 		return ErrorType(value)
 	}
 	if status >= httpStatusServerError {

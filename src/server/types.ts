@@ -285,6 +285,12 @@ export interface ChargeSavedCardRequest {
   customer_email?: string;
   customer_phone?: string;
   merchant_inn?: string;
+  /** Merchant-initiated stored-credential reason. Omit for unscheduled COF. */
+  stored_credential_reason?: "unscheduled_cof" | "recurring";
+  /** Required when `stored_credential_reason` is `recurring` (minimum 1). */
+  recurring_frequency_days?: number;
+  /** Optional recurring authorization expiry date, `YYYYMMDD`. */
+  recurring_expiry?: string;
   fiscal_items?: FiscalItem[];
 }
 

@@ -10,6 +10,33 @@ export type CustomerTransferStatus =
   | "canceled"
   | "outcome_unknown"
   | "returned";
+/** Hosted session lifecycle state. Unknown future values remain assignable. */
+export type CustomerTransferSessionStatus =
+  | "created"
+  | "destination_attached"
+  | "submitted"
+  | "expired"
+  | "creating"
+  | "active"
+  | "otp_pending"
+  | "otp_verified"
+  | "submitting"
+  | "canceled"
+  | "failed"
+  | (string & {});
+export type CustomerTransferSessionOtpStatus =
+  | "not_required"
+  | "pending"
+  | "verified"
+  | "locked"
+  | (string & {});
+export type CustomerTransferSessionReservationStatus =
+  | "pending"
+  | "reserved"
+  | "consumed"
+  | "released"
+  | "failed"
+  | (string & {});
 export type CustomerTransferEnvironment = "sandbox" | "live";
 export interface CreateCustomerTransferSessionRequest {
   amount: number;
@@ -38,7 +65,7 @@ export interface CustomerTransferSession {
   fee: number;
   currency: string;
   purpose_code: string;
-  status: string;
+  status: CustomerTransferSessionStatus;
   environment: CustomerTransferEnvironment;
   expires_at: string;
   hosted_url?: string;
@@ -50,9 +77,9 @@ export interface CustomerTransferSession {
   rail?: CustomerTransferRail;
   description?: string;
   otp_required?: boolean;
-  otp_status?: string;
+  otp_status?: CustomerTransferSessionOtpStatus;
   disbursement_status?: CustomerTransferStatus;
-  reservation_status?: string;
+  reservation_status?: CustomerTransferSessionReservationStatus;
   manual_reconciliation_required?: boolean;
   retry_policy?: string;
   failure_reason?: "issuer_amount_limit" | "issuer_count_limit";
@@ -130,12 +157,20 @@ export interface CustomerDisbursement {
   disbursement_id: string;
   /** Current version to supply as expected_version when canceling. */
   version?: number;
+  /** Merchant-owned order or transfer reference. */
+  external_reference?: string;
+  customer_reference?: string;
+  /** Merchant or provider reference for the selected recipient destination. */
+  recipient_reference?: string;
   amount: number;
-  source_debit?: number;
-  fee?: number;
+  source_debit: number;
+  fee: number;
   currency: string;
+  /** Omitted when none was supplied. */
+  purpose_code?: string;
+  description?: string;
   status: CustomerTransferStatus;
-  rail?: CustomerTransferRail;
+  rail: CustomerTransferRail;
   provider_operation_id?: string;
   failed_reason?: string;
   retry_policy?:
@@ -145,6 +180,8 @@ export interface CustomerDisbursement {
   bank_rrn?: string;
   bank_internal_ref?: string;
   bank_auth_code?: string;
+  /** Masked recipient card (first six and last four digits) for card rails. */
+  card_mask?: string;
   created_at: string;
   updated_at: string;
   completed_at?: string;

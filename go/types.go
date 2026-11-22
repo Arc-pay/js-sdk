@@ -253,6 +253,8 @@ type WalletAction struct {
 	QRContentType string        `json:"qr_content_type,omitempty"`
 	BankInvoiceID string        `json:"bank_invoice_id,omitempty"`
 	BackURL       string        `json:"back_url,omitempty"`
+	// Params is provider-specific render metadata; treat keys as opaque hints.
+	Params map[string]string `json:"params,omitempty"`
 }
 
 type ExecutePaymentRequest interface {
@@ -325,7 +327,14 @@ type ChargeSavedCardRequest struct {
 	CustomerEmail string            `json:"customer_email,omitempty"`
 	CustomerPhone string            `json:"customer_phone,omitempty"`
 	MerchantINN   string            `json:"merchant_inn,omitempty"`
-	FiscalItems   []FiscalItem      `json:"fiscal_items,omitempty"`
+	// StoredCredentialReason is the merchant-initiated transaction reason:
+	// "unscheduled_cof" or "recurring". Omit for unscheduled COF.
+	StoredCredentialReason string `json:"stored_credential_reason,omitempty"`
+	// RecurringFrequencyDays is required (minimum 1) when StoredCredentialReason is "recurring".
+	RecurringFrequencyDays int `json:"recurring_frequency_days,omitempty"`
+	// RecurringExpiry is an optional recurring authorization expiry date, YYYYMMDD.
+	RecurringExpiry string       `json:"recurring_expiry,omitempty"`
+	FiscalItems     []FiscalItem `json:"fiscal_items,omitempty"`
 }
 
 type CompleteThreeDSMethodRequest struct {
