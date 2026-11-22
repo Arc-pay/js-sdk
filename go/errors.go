@@ -12,6 +12,7 @@ const (
 	RateLimitError      ErrorType = "rate_limit_error"
 	APIError            ErrorType = "api_error"
 	NetworkError        ErrorType = "network_error"
+	ConfigurationError  ErrorType = "configuration_error"
 )
 
 type Error struct {

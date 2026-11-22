@@ -4,7 +4,9 @@ import { ArcPayError } from "../core/errors";
 interface CardEntryTicketResponse {
   ticket: string;
   card_entry_url: string;
-  expires_at?: string;
+  expires_at: string;
+  /** Present on HPP-session tickets: the payment prepared for the session. */
+  payment_id?: string;
 }
 
 const isTicketResponse = (v: unknown): v is CardEntryTicketResponse =>

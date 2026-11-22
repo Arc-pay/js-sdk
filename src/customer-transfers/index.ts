@@ -57,7 +57,16 @@ function compactPayoutPartyProfile(
   return Object.keys(compact).length > 0 ? compact : undefined;
 }
 
-/** Recipient-side session capability; requires no merchant secret or card expiry/CVV. */
+/**
+ * Recipient-side session capability; requires no merchant secret or card expiry/CVV.
+ *
+ * `tokenizeCard` posts the PAN straight to the card-entry host named in the
+ * ticket response (`https://cards.arcpay.space` in production; the page's CSP
+ * `connect-src` must allow it). That host only accepts platform origins (the
+ * Arc Pay hosted session page, the SDK iframe/Elements and White Label hosts
+ * attested by the ticket), so `tokenizeCard` cannot succeed from a
+ * merchant-owned origin: use the hosted session URL for card entry there.
+ */
 export function createCustomerTransferSessionClient(
   sessionId: string,
   apiBase = "https://api.arcpay.space",
