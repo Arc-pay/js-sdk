@@ -341,6 +341,26 @@ func TestExecutePaymentRequiresH2HMode(t *testing.T) {
 	}
 }
 
+func TestCardExecutePaymentRequestBrowserInfoIsOptional(t *testing.T) {
+	omitted, err := json.Marshal(CardExecutePaymentRequest{PaymentMethod: BankCard, CardTokenID: "tok_1", PaymentMode: H2H})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(omitted), "browser_info") {
+		t.Fatalf("nil BrowserInfo must be omitted, got %s", omitted)
+	}
+	set, err := json.Marshal(CardExecutePaymentRequest{
+		PaymentMethod: BankCard, CardTokenID: "tok_1", PaymentMode: H2H,
+		BrowserInfo: &CardBrowserInfo{Language: "ru-RU", ScreenWidth: 1920},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(set), `"browser_info":{"language":"ru-RU","screen_width":1920}`) {
+		t.Fatalf("BrowserInfo must be sent when set, got %s", set)
+	}
+}
+
 func TestExecutePaymentDecodesTypedWalletAction(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
