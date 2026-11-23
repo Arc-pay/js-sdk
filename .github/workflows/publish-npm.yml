@@ -165,7 +165,7 @@ jobs:
               echo "draft release target mismatch: expected $RELEASE_COMMIT, got $target" >&2
               exit 1
             fi
-          elif rg -q 'HTTP/[^ ]+ 404' "$probe"; then
+          elif grep -Eq 'HTTP/[^ ]+ 404' "$probe"; then
             gh release create "$RELEASE_TAG" \
               --draft \
               --target "$RELEASE_COMMIT" \
