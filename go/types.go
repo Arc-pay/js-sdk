@@ -265,7 +265,8 @@ type CardExecutePaymentRequest struct {
 	PaymentMethod PaymentMethod   `json:"payment_method"`
 	CardTokenID   string          `json:"card_token_id"`
 	PaymentMode   PaymentFlowMode `json:"payment_mode"`
-	BrowserInfo   CardBrowserInfo `json:"browser_info"`
+	// BrowserInfo is optional; nil omits the field and Arc Pay uses its defaults.
+	BrowserInfo *CardBrowserInfo `json:"browser_info,omitempty"`
 }
 
 func (CardExecutePaymentRequest) executePaymentRequest() {}
