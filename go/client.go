@@ -20,7 +20,7 @@ import (
 const (
 	defaultAPIBase           = "https://api.arcpay.space/v1"
 	apiVersion               = "2026-05-06"
-	goSDKVersion             = "0.1.52"
+	goSDKVersion             = "0.1.53"
 	defaultTimeout           = 30 * time.Second
 	defaultMaxNetworkRetries = 1
 	defaultPollInterval      = 1500 * time.Millisecond
@@ -527,7 +527,7 @@ func decodeResponse(res *http.Response, out any) *Error {
 	code := envelope.Error.Code
 	requestID := envelope.Error.RequestID
 	if requestID == "" {
-		requestID = res.Header.Get("x-request-id")
+		requestID = res.Header.Get("X-Request-ID")
 	}
 	message := envelope.Error.Message
 	if message == "" {
@@ -547,7 +547,7 @@ func decodeResponse(res *http.Response, out any) *Error {
 
 func publicErrorType(value string, status int) ErrorType {
 	switch ErrorType(value) {
-	case ValidationError, AuthenticationError, AuthorizationError, StateError, RateLimitError, APIError, NetworkError:
+	case ValidationError, AuthenticationError, AuthorizationError, StateError, RateLimitError, APIError, NetworkError, ConfigurationError:
 		return ErrorType(value)
 	}
 	if status >= httpStatusServerError {
@@ -592,20 +592,8 @@ func appendPaymentsQuery(path string, query ListPaymentsQuery) string {
 	if query.PageSize > 0 {
 		values.Set("page_size", strconv.Itoa(query.PageSize))
 	}
-	if query.Status != "" {
-		values.Set("status", string(query.Status))
-	}
-	if query.PaymentMethod != "" {
-		values.Set("payment_method", string(query.PaymentMethod))
-	}
-	if query.BankCode != "" {
-		values.Set("bank_code", query.BankCode)
-	}
 	if query.DeclineCode != "" {
 		values.Set("decline_code", query.DeclineCode)
-	}
-	if query.PaymentFlowID != "" {
-		values.Set("payment_flow_id", query.PaymentFlowID)
 	}
 	if query.Search != "" {
 		values.Set("search", query.Search)
@@ -616,8 +604,35 @@ func appendPaymentsQuery(path string, query ListPaymentsQuery) string {
 	if query.DateTo != "" {
 		values.Set("date_to", query.DateTo)
 	}
+	if query.OrganizationID != "" {
+		values.Set("organization_id", query.OrganizationID)
+	}
+	for _, status := range query.Statuses {
+		values.Add("statuses", string(status))
+	}
+	for _, method := range query.PaymentMethods {
+		values.Add("payment_methods", string(method))
+	}
+	addStringQueryValues(values, "bank_codes", query.BankCodes)
+	addStringQueryValues(values, "bank_terminal_ids", query.BankTerminalIDs)
+	addStringQueryValues(values, "payment_flow_ids", query.PaymentFlowIDs)
+	addStringQueryValues(values, "payment_ids", query.PaymentIDs)
+	addStringQueryValues(values, "bank_payment_ids", query.BankPaymentIDs)
+	addStringQueryValues(values, "currencies", query.Currencies)
+	if query.AmountMinInclusive != nil {
+		values.Set("amount_min_inclusive", strconv.FormatInt(*query.AmountMinInclusive, 10))
+	}
+	if query.AmountMaxInclusive != nil {
+		values.Set("amount_max_inclusive", strconv.FormatInt(*query.AmountMaxInclusive, 10))
+	}
 	if encoded := values.Encode(); encoded != "" {
 		return path + "?" + encoded
 	}
 	return path
+}
+
+func addStringQueryValues(values url.Values, key string, items []string) {
+	for _, item := range items {
+		values.Add(key, item)
+	}
 }

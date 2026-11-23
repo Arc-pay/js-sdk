@@ -1,6 +1,7 @@
 import { ArcPayError } from "../core/errors";
 
 export type FieldType = "card" | "cardNumber" | "cardExpiry" | "cardCvv";
+export type SplitFieldType = Exclude<FieldType, "card">;
 
 export interface HostedFieldIssue {
   code: string;
@@ -32,22 +33,22 @@ export type ParentToIframe =
 
 // iframe → parent
 export type IframeToParent =
-  | { type: "arcpay:ready"; field?: FieldType; channelId?: string }
-  | { type: "arcpay:configured"; field?: FieldType; channelId?: string }
+  | { type: "arcpay:ready"; field: FieldType; channelId: string }
+  | { type: "arcpay:configured"; field: FieldType; channelId: string }
   | {
       type: "arcpay:rejected";
       reason: string;
       code?: string;
       retryable?: boolean;
-      field?: FieldType;
-      channelId?: string;
+      field: FieldType;
+      channelId: string;
     }
-  | { type: "arcpay:focus"; field: FieldType; help: HostedFieldHelp | null; channelId?: string }
-  | { type: "arcpay:blur"; field: FieldType; issue: HostedFieldIssue | null; channelId?: string }
+  | { type: "arcpay:focus"; field: FieldType; help: HostedFieldHelp | null; channelId: string }
+  | { type: "arcpay:blur"; field: FieldType; issue: HostedFieldIssue | null; channelId: string }
   | {
       type: "arcpay:change";
       field: FieldType;
-      channelId?: string;
+      channelId: string;
       isValid: boolean;
       isEmpty: boolean;
       isComplete: boolean;
@@ -58,20 +59,22 @@ export type IframeToParent =
     }
   | {
       type: "arcpay:tokenize-result";
+      field: FieldType;
       cardTokenId: string;
       cardMask: string;
       cardScheme: string;
       cardBin: string;
       expiresIn: number;
       expiresAt: string;
-      channelId?: string;
+      channelId: string;
     }
   | {
       type: "arcpay:tokenize-error";
+      field: FieldType;
       errorType: string;
       code?: string;
       message: string;
-      channelId?: string;
+      channelId: string;
     };
 
 export interface StyleSubset {
@@ -116,9 +119,11 @@ const isField = (value: unknown): value is FieldType =>
 const isTokenizeErrorType = (value: unknown): value is TokenizeErrorType =>
   typeof value === "string" && TOKENIZE_ERROR_TYPES.includes(value as TokenizeErrorType);
 
-const hasOptionalRouting = (data: Record<string, unknown>): boolean =>
-  (!("channelId" in data) || data.channelId === undefined || typeof data.channelId === "string") &&
-  (!("field" in data) || data.field === undefined || isField(data.field));
+const hasRequiredRouting = (data: Record<string, unknown>): boolean =>
+  "channelId" in data &&
+  "field" in data &&
+  typeof data.channelId === "string" &&
+  isField(data.field);
 
 const isHostedFieldIssue = (value: unknown): value is HostedFieldIssue =>
   isRecord(value) &&
@@ -174,14 +179,16 @@ const isKnownArcpayMessage = (data: unknown): data is ParentToIframe | IframeToP
           "field" in data &&
           "help" in data &&
           isField(data.field) &&
+          hasRequiredRouting(data) &&
           (data.help === null || isHostedFieldHelp(data.help))
         );
       }
       return true;
     case "arcpay:clear":
+      return true;
     case "arcpay:ready":
     case "arcpay:configured":
-      return hasOptionalRouting(data);
+      return hasRequiredRouting(data);
     case "arcpay:tokenize":
       return (
         "paymentId" in data &&
@@ -193,7 +200,7 @@ const isKnownArcpayMessage = (data: unknown): data is ParentToIframe | IframeToP
       return (
         "reason" in data &&
         typeof data.reason === "string" &&
-        hasOptionalRouting(data) &&
+        hasRequiredRouting(data) &&
         (!("code" in data) || data.code === undefined || typeof data.code === "string") &&
         (!("retryable" in data) ||
           data.retryable === undefined ||
@@ -204,6 +211,7 @@ const isKnownArcpayMessage = (data: unknown): data is ParentToIframe | IframeToP
         "field" in data &&
         "issue" in data &&
         isField(data.field) &&
+        hasRequiredRouting(data) &&
         (data.issue === null || isHostedFieldIssue(data.issue))
       );
     case "arcpay:change":
@@ -215,7 +223,7 @@ const isKnownArcpayMessage = (data: unknown): data is ParentToIframe | IframeToP
         "issue" in data &&
         "help" in data &&
         isField(data.field) &&
-        hasOptionalRouting(data) &&
+        hasRequiredRouting(data) &&
         typeof data.isValid === "boolean" &&
         typeof data.isEmpty === "boolean" &&
         typeof data.isComplete === "boolean" &&
@@ -241,14 +249,14 @@ const isKnownArcpayMessage = (data: unknown): data is ParentToIframe | IframeToP
         typeof data.expiresIn === "number" &&
         Number.isFinite(data.expiresIn) &&
         typeof data.expiresAt === "string" &&
-        hasOptionalRouting(data)
+        hasRequiredRouting(data)
       );
     case "arcpay:tokenize-error":
       return (
         "errorType" in data &&
         "message" in data &&
         isTokenizeErrorType(data.errorType) &&
-        hasOptionalRouting(data) &&
+        hasRequiredRouting(data) &&
         (!("code" in data) || data.code === undefined || typeof data.code === "string") &&
         typeof data.message === "string"
       );
@@ -261,6 +269,7 @@ export const postToIframe = (
   iframe: HTMLIFrameElement,
   message: ParentToIframe,
   targetOrigin: string,
+  transfer?: Transferable[],
 ): void => {
   if (targetOrigin === "*") {
     throw new ArcPayError({
@@ -277,6 +286,10 @@ export const postToIframe = (
       message: "postToIframe: iframe.contentWindow is null (iframe not mounted)",
       retryable: false,
     });
+  }
+  if (transfer && transfer.length > 0) {
+    iframe.contentWindow.postMessage(message, targetOrigin, transfer);
+    return;
   }
   iframe.contentWindow.postMessage(message, targetOrigin);
 };

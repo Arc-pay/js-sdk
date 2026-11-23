@@ -154,7 +154,7 @@ describe("parseIncoming", () => {
   });
 
   it("returns the typed message for matching origin and arcpay: type", () => {
-    const data = { type: "arcpay:ready" as const };
+    const data = { type: "arcpay:ready" as const, field: "card" as const, channelId: "channel-1" };
     const event = makeMessageEvent(data, EXPECTED_ORIGIN);
     expect(parseIncoming(event, EXPECTED_ORIGIN)).toBe(data);
   });
@@ -169,6 +169,7 @@ describe("parseIncoming", () => {
     const data = {
       type: "arcpay:focus" as const,
       field: "card" as const,
+      channelId: "channel-1",
       help: { code: "card_brand_detected", message: "Card brand detected", brand: "visa" },
     };
     const event = makeMessageEvent(data, EXPECTED_ORIGIN);
@@ -222,6 +223,7 @@ describe("parseIncoming", () => {
     const data = {
       type: "arcpay:change" as const,
       field: "card" as const,
+      channelId: "channel-1",
       isValid: true,
       isEmpty: false,
       isComplete: true,

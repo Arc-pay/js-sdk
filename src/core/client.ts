@@ -5,7 +5,7 @@ const API_VERSION = "2026-05-06";
 
 interface ClientConfig {
   apiBase: string;
-  publishableKey: string;
+  publishableKey?: string;
 }
 
 export interface RequestOptions {
@@ -16,6 +16,17 @@ export interface RequestOptions {
 export interface Client {
   post<T = unknown>(path: string, body: unknown, opts?: RequestOptions): Promise<T>;
   get<T = unknown>(path: string, opts?: RequestOptions): Promise<T>;
+  /**
+   * POSTs raw card data to the CDE-only card-entry URL named by a signed
+   * ticket response. It never carries the API key or an idempotency key and
+   * refuses any URL that is not a TLS host other than the API host.
+   */
+  postCardEntry<T = unknown>(
+    cardEntryUrl: string,
+    ticket: string,
+    body: unknown,
+    opts?: Pick<RequestOptions, "signal">,
+  ): Promise<T>;
 }
 
 interface ApiErrorBody {
@@ -38,14 +49,14 @@ const isApiErrorTypeString = (t: unknown): t is ArcPayError["type"] =>
   t === "api_error";
 
 const buildHeaders = (
-  publishableKey: string,
+  publishableKey: string | undefined,
   idempotencyKey: string | undefined,
 ): Record<string, string> => {
   const headers: Record<string, string> = {
-    Authorization: `Bearer ${publishableKey}`,
     "X-Arc-Pay-API-Version": API_VERSION,
     "Content-Type": "application/json",
   };
+  if (publishableKey) headers.Authorization = `Bearer ${publishableKey}`;
   if (idempotencyKey) {
     if (!isIdempotencyKey(idempotencyKey)) {
       throw new ArcPayError({
@@ -142,7 +153,58 @@ export const createClient = (config: ClientConfig): Client => {
     return parseSuccessResponse<T>(res);
   };
 
+  const postCardEntry = async <T>(
+    cardEntryUrl: string,
+    ticket: string,
+    body: unknown,
+    opts?: Pick<RequestOptions, "signal">,
+  ): Promise<T> => {
+    let url: URL;
+    try {
+      url = new URL(cardEntryUrl);
+    } catch {
+      url = new URL("about:blank");
+    }
+    if (
+      url.protocol !== "https:" ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash ||
+      url.origin === new URL(config.apiBase).origin
+    ) {
+      throw new ArcPayError({
+        type: "api_error",
+        code: "invalid_card_entry_url",
+        message: "Invalid card entry endpoint",
+        retryable: false,
+      });
+    }
+    let res: Response;
+    try {
+      res = await fetch(url.toString(), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Arc-Pay-API-Version": API_VERSION,
+          "X-Card-Entry-Ticket": ticket,
+        },
+        body: JSON.stringify(body),
+        signal: opts?.signal,
+      });
+    } catch (e) {
+      throw new ArcPayError({
+        type: "network_error",
+        message: e instanceof Error ? e.message : "Network request failed",
+        retryable: true,
+      });
+    }
+    if (!res.ok) throw await parseErrorResponse(res);
+    return parseSuccessResponse<T>(res);
+  };
+
   return {
+    postCardEntry,
     post: <T>(path: string, body: unknown, opts?: RequestOptions) =>
       send<T>("POST", path, body, opts),
     get: <T>(path: string, opts?: RequestOptions) => send<T>("GET", path, undefined, opts),

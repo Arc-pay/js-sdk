@@ -47,14 +47,26 @@ and API connections to `https://api.arcpay.space`. If your Content Security
 Policy also governs telemetry, allow connections to your configured Sentry ingest
 host or disable browser telemetry at your application layer.
 
+Card data never goes to the API host. When card data is posted straight from the
+page (for example the customer-transfer session client), the page must also
+allow the card-entry origin in `connect-src`. The host comes from the
+`card_entry_url` in the ticket response: `https://cards.arcpay.space` in
+production, `https://dev-cards.arcpay.space:30444` on dev and
+`https://debug-cards.arcpay.space:30444` on debug. Hosted Fields keep card data
+inside the `https://sdk.arcpay.space` iframe, so the merchant page needs only
+the `frame-src` and API `connect-src` entries above.
+
 Hosted Fields performs a browser settings check against Arc Pay API before
 mounting fields. That check is internal to the SDK; merchants should configure
 CSP for the public origins above, not call the settings endpoint directly.
-Tokenization requests are sent from `https://sdk.arcpay.space` to the public API
-with `Authorization: Bearer <pk_...>`, `Content-Type`, optional
-`Idempotency-Key`, `sentry-trace`, and `baggage` headers. Direct REST callers
-may use either `Authorization: Bearer <pk_...>` or `X-Api-Key: pk_...` for
-`/payments/{id}/tokenize`.
+Client-side validation can reject a card before any request with the local
+codes `invalid_card_number`, `invalid_cvv`, `invalid_expiry` and `card_expired`
+(expiry month already past); these are raised by the SDK, not returned by the API.
+Tokenization is two requests from `https://sdk.arcpay.space`: a ticket request to the
+public API (`POST /payments/{id}/card-entry-ticket`, no card data, authenticated
+with the publishable key), then the card itself straight to the card-entry
+endpoint named in the ticket response (`X-Card-Entry-Ticket` and `Content-Type`
+headers only). Card data never reaches the public API host or the merchant page.
 
 Hosted Fields formats buyer input inside the secure iframe: card numbers are
 grouped with spaces and expiry dates are displayed as `MM/YY`. The tokenization
@@ -126,11 +138,20 @@ cardCvv.mount("#card-cvv");
 const token = await elements.tokenize(paymentId, idempotencyKey);
 ```
 
+The caller owns `idempotencyKey`: generate one key for each payment and
+tokenization attempt, then pass that same key when replaying an unresolved
+request. If the outcome is unknown (for example, a timeout), reconcile the
+payment before deciding what to do next; a retryable error must replay with the
+same key and must not silently start a fresh authorization. Generate a new key
+only for an explicitly new payment attempt or a different `paymentId`.
+
 Do not mix `card` with split fields in one `Elements` instance. In split mode,
 PAN, expiry, and CVV are still kept inside Arc Pay iframes and synchronized only
 over the Arc Pay same-origin channel for tokenization; merchant JavaScript
 receives readiness, focus, validation, brand, and tokenization result events,
-not raw card data.
+not raw card data. Split fields require browser `BroadcastChannel` support.
+The channel is restricted to the Arc Pay iframe origin and the current top-level
+site partition; merchant-provided MessagePorts are never used for field values.
 
 `appearance.theme` defaults to `"none"` so Arc Pay branding is not imposed on
 merchant checkout pages. `theme: "arcpay"` is available for demos and quick
@@ -178,6 +199,11 @@ H2H card execution returns a standardized `next_action` when the buyer must do
 something in the browser. The shape is bank-agnostic: integrations branch only
 on `next_action.type`, `next_action.three_ds.phase`, and Arc Pay payment
 statuses. Do not branch on Sber, PSB, Alfa, Tinkoff, or any other adapter field.
+
+`browser_info` is optional on the wire: every field may be omitted and Arc Pay
+fills defaults and normalizes the values server-side (see the H2H guide).
+`collectBrowserInfo()` still gathers the real browser values, which gives the
+issuer the best frictionless decision.
 
 Run `executePayment` only on your backend with a secret key. For the browser
 handoff, prefer `confirmPayment()`: it collects `browser_info`, calls your
@@ -302,6 +328,10 @@ if (execution.wallet_action?.action === "qr") {
 }
 ```
 
+`currency` is any ISO 4217 alphabetic code, and `amount` is an integer in that
+currency's minor unit: `1234` is 12.34 RUB, 1234 JPY (no minor unit) or 1.234
+KWD. Which currencies a payment method processes is merchant configuration.
+
 For browser checkouts, use `confirmWalletPayment()` to call your backend execute
 proxy and receive a browser-friendly `walletAction` object. The helper keeps
 the public API request in snake_case and normalizes the returned action to
@@ -406,3 +436,55 @@ Leave `MaxNetworkRetries` unset to use the SDK default, or pass
 ## License
 
 MIT.
+
+## Customer transfers
+
+On the merchant backend, call `createCustomerTransferSession` with a secret key
+and a UUID idempotency key (versions 1–8 accepted; UUIDv7 recommended). Supply only bank-required payer fields in `payer`;
+PSB uses `payer_account`. The recipient never receives the merchant payer profile.
+Recipient contact and identity data can be bound at session creation when the
+selected bank requires it; these fields are optional and are never returned to
+the hosted recipient page as raw values:
+
+```ts
+await client.createCustomerTransferSession(
+  {
+    amount: 1000,
+    currency: "RUB",
+    external_reference: "order-123",
+    description: "Payout for order 123",
+    recipient_email: "recipient@example.test",
+    recipient_profile: { first_name: "Ada", last_name: "Lovelace" },
+    sender_profile: { first_name: "Merchant" },
+  },
+  { idempotencyKey },
+);
+```
+
+Omit fields that are not available; the hosted form asks only for recipient
+fields not already bound by the merchant.
+
+`purpose_code` is optional for sessions and direct transfers; it is not used by
+pricing, routing or banks, and the session response may return it as an empty
+string. `description` is the bank payment purpose text (PSB B2C: 1-150
+characters).
+The server SDK also exposes `listCustomerDisbursements`, `getCustomerDisbursement`
+and `refreshCustomerDisbursement`, including reconciliation and retry diagnostics.
+
+Use the returned hosted URL, or import `createCustomerTransferSessionClient`
+from the browser SDK for the recipient journey. `tokenizeCard` accepts PAN plus
+optional recipient/sender metadata; payout tokenization does not accept expiry
+or CVV. The PAN is sent only to the card-entry endpoint returned with a ticket
+(pages using it must allow that host in `connect-src`, see the CSP notes
+above); the API receives just the token id and the metadata. The card-entry host
+only accepts platform origins: the Arc Pay hosted page, the SDK iframe or
+Elements, and White Label hosts attested by the HPP ticket. Hosted Fields work
+from a merchant page because the card is entered inside the SDK iframe. The
+session client's `tokenizeCard` posts from the page itself, so it works only on
+a platform-origin page (the hosted session URL) and not from a merchant-owned
+origin; from a merchant origin, redirect the recipient to the hosted URL for
+card entry. The other session client calls go to the API host only. The session client supports retrieval, optional OTP, card or SBP
+attachment and submission. Bank capabilities determine available rails. The
+provided PSB B2C document supports CARD_OCT; other PSB rails require their bank
+contracts. Choose the deployment API URL separately from the key's sandbox/live
+business mode. An unknown outcome must be reconciled before a new attempt.

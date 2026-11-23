@@ -221,15 +221,16 @@ type Refund struct {
 	CreatedAt string   `json:"created_at"`
 }
 
+// CardBrowserInfo is optional: Arc Pay fills defaults and normalizes every field server-side.
 type CardBrowserInfo struct {
-	AcceptHeader          string `json:"accept_header"`
-	Language              string `json:"language"`
-	ScreenWidth           int    `json:"screen_width"`
-	ScreenHeight          int    `json:"screen_height"`
-	ColorDepth            int    `json:"color_depth"`
-	TimezoneOffsetMinutes int    `json:"timezone_offset_minutes"`
+	AcceptHeader          string `json:"accept_header,omitempty"`
+	Language              string `json:"language,omitempty"`
+	ScreenWidth           int    `json:"screen_width,omitempty"`
+	ScreenHeight          int    `json:"screen_height,omitempty"`
+	ColorDepth            int    `json:"color_depth,omitempty"`
+	TimezoneOffsetMinutes int    `json:"timezone_offset_minutes,omitempty"`
 	JavaEnabled           *bool  `json:"java_enabled,omitempty"`
-	UserAgent             string `json:"user_agent"`
+	UserAgent             string `json:"user_agent,omitempty"`
 	WindowSize            string `json:"window_size,omitempty"`
 }
 
@@ -252,6 +253,8 @@ type WalletAction struct {
 	QRContentType string        `json:"qr_content_type,omitempty"`
 	BankInvoiceID string        `json:"bank_invoice_id,omitempty"`
 	BackURL       string        `json:"back_url,omitempty"`
+	// Params is provider-specific render metadata; treat keys as opaque hints.
+	Params map[string]string `json:"params,omitempty"`
 }
 
 type ExecutePaymentRequest interface {
@@ -262,7 +265,8 @@ type CardExecutePaymentRequest struct {
 	PaymentMethod PaymentMethod   `json:"payment_method"`
 	CardTokenID   string          `json:"card_token_id"`
 	PaymentMode   PaymentFlowMode `json:"payment_mode"`
-	BrowserInfo   CardBrowserInfo `json:"browser_info"`
+	// BrowserInfo is optional; nil omits the field and Arc Pay uses its defaults.
+	BrowserInfo *CardBrowserInfo `json:"browser_info,omitempty"`
 }
 
 func (CardExecutePaymentRequest) executePaymentRequest() {}
@@ -324,7 +328,14 @@ type ChargeSavedCardRequest struct {
 	CustomerEmail string            `json:"customer_email,omitempty"`
 	CustomerPhone string            `json:"customer_phone,omitempty"`
 	MerchantINN   string            `json:"merchant_inn,omitempty"`
-	FiscalItems   []FiscalItem      `json:"fiscal_items,omitempty"`
+	// StoredCredentialReason is the merchant-initiated transaction reason:
+	// "unscheduled_cof" or "recurring". Omit for unscheduled COF.
+	StoredCredentialReason string `json:"stored_credential_reason,omitempty"`
+	// RecurringFrequencyDays is required (minimum 1) when StoredCredentialReason is "recurring".
+	RecurringFrequencyDays int `json:"recurring_frequency_days,omitempty"`
+	// RecurringExpiry is an optional recurring authorization expiry date, YYYYMMDD.
+	RecurringExpiry string       `json:"recurring_expiry,omitempty"`
+	FiscalItems     []FiscalItem `json:"fiscal_items,omitempty"`
 }
 
 type CompleteThreeDSMethodRequest struct {
@@ -452,16 +463,23 @@ type CheckoutSession struct {
 }
 
 type ListPaymentsQuery struct {
-	Cursor        string
-	PageSize      int
-	Status        PaymentStatus
-	PaymentMethod PaymentMethod
-	BankCode      string
-	DeclineCode   string
-	PaymentFlowID string
-	Search        string
-	DateFrom      string
-	DateTo        string
+	Cursor             string
+	PageSize           int
+	Statuses           []PaymentStatus
+	PaymentMethods     []PaymentMethod
+	BankCodes          []string
+	BankTerminalIDs    []string
+	PaymentFlowIDs     []string
+	PaymentIDs         []string
+	BankPaymentIDs     []string
+	Currencies         []string
+	DeclineCode        string
+	Search             string
+	DateFrom           string
+	DateTo             string
+	OrganizationID     string
+	AmountMinInclusive *int64
+	AmountMaxInclusive *int64
 }
 
 type ListAvailablePaymentMethodsQuery struct {

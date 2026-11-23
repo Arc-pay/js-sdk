@@ -1,4 +1,13 @@
-export type Currency = "RUB" | "KZT" | "UZS";
+/** Currencies with built-in autocomplete. Any ISO 4217 code is accepted, see {@link Currency}. */
+export type KnownCurrency = "RUB" | "KZT" | "UZS" | "USD" | "EUR" | "TRY";
+
+/**
+ * ISO 4217 alphabetic currency code, for example "RUB", "JPY" or "KWD". Every
+ * ISO 4217 currency is accepted; the amount is an integer in the currency's
+ * minor unit (JPY has none, RUB two decimals, KWD three). Whether a payment
+ * flow processes a currency is merchant configuration, not part of the type.
+ */
+export type Currency = KnownCurrency | (string & {});
 
 export type PaymentMethod =
   | "bank_card"
@@ -51,6 +60,17 @@ export interface PaymentOperationSummary {
   completed_at?: string;
 }
 
+export interface PaymentPreparationError {
+  code: string;
+  message: string;
+  stage: string;
+  retryable: boolean;
+  occurred_at: string;
+  min_amount?: number;
+  max_amount?: number;
+  currency: Currency;
+}
+
 export type TerminalPaymentStatus =
   | "authorized"
   | "captured"
@@ -87,6 +107,7 @@ export interface Payment {
   redirect_url?: string;
   payment_mode?: PaymentFlowMode;
   capture_mode?: CaptureMode;
+  preparation_error?: PaymentPreparationError;
   created_at: string;
   updated_at: string;
   metadata?: Record<string, string>;
@@ -190,15 +211,22 @@ export interface WalletAction {
   params?: Record<string, string>;
 }
 
+/**
+ * Browser data for EMV 3DS 2.x. Every field is optional: Arc Pay fills defaults
+ * and normalizes the values server-side (accept_header, language, screen size,
+ * color_depth, timezone_offset_minutes, user_agent from the request header,
+ * window_size). `collectBrowserInfo()` still gathers the real browser values,
+ * which gives the issuer the best frictionless decision.
+ */
 export interface CardBrowserInfo {
-  accept_header: string;
-  language: string;
-  screen_width: number;
-  screen_height: number;
-  color_depth: 1 | 4 | 8 | 15 | 16 | 24 | 32 | 48;
-  timezone_offset_minutes: number;
+  accept_header?: string;
+  language?: string;
+  screen_width?: number;
+  screen_height?: number;
+  color_depth?: 1 | 4 | 8 | 15 | 16 | 24 | 32 | 48;
+  timezone_offset_minutes?: number;
   java_enabled?: boolean;
-  user_agent: string;
+  user_agent?: string;
   window_size?: "01" | "02" | "03" | "04" | "05";
 }
 
@@ -206,7 +234,7 @@ export interface CardExecutePaymentRequest {
   payment_method: "bank_card";
   card_token_id: string;
   payment_mode: "h2h";
-  browser_info: CardBrowserInfo;
+  browser_info?: CardBrowserInfo;
 }
 
 export interface WalletExecutePaymentRequest {
@@ -257,6 +285,12 @@ export interface ChargeSavedCardRequest {
   customer_email?: string;
   customer_phone?: string;
   merchant_inn?: string;
+  /** Merchant-initiated stored-credential reason. Omit for unscheduled COF. */
+  stored_credential_reason?: "unscheduled_cof" | "recurring";
+  /** Required when `stored_credential_reason` is `recurring` (minimum 1). */
+  recurring_frequency_days?: number;
+  /** Optional recurring authorization expiry date, `YYYYMMDD`. */
+  recurring_expiry?: string;
   fiscal_items?: FiscalItem[];
 }
 
@@ -425,14 +459,21 @@ export interface CheckoutSession {
 export interface ListPaymentsQuery {
   cursor?: string;
   page_size?: number;
-  status?: PaymentStatus;
-  payment_method?: PaymentMethod;
-  bank_code?: string;
+  statuses?: PaymentStatus[];
+  payment_methods?: PaymentMethod[];
+  bank_codes?: string[];
+  bank_terminal_ids?: string[];
+  payment_flow_ids?: string[];
+  payment_ids?: string[];
+  bank_payment_ids?: string[];
+  currencies?: string[];
   decline_code?: string;
-  payment_flow_id?: string;
   search?: string;
   date_from?: string;
   date_to?: string;
+  organization_id?: string;
+  amount_min_inclusive?: number;
+  amount_max_inclusive?: number;
 }
 
 export interface ListAvailablePaymentMethodsQuery {

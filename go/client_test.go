@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -340,6 +341,26 @@ func TestExecutePaymentRequiresH2HMode(t *testing.T) {
 	}
 }
 
+func TestCardExecutePaymentRequestBrowserInfoIsOptional(t *testing.T) {
+	omitted, err := json.Marshal(CardExecutePaymentRequest{PaymentMethod: BankCard, CardTokenID: "tok_1", PaymentMode: H2H})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(omitted), "browser_info") {
+		t.Fatalf("nil BrowserInfo must be omitted, got %s", omitted)
+	}
+	set, err := json.Marshal(CardExecutePaymentRequest{
+		PaymentMethod: BankCard, CardTokenID: "tok_1", PaymentMode: H2H,
+		BrowserInfo: &CardBrowserInfo{Language: "ru-RU", ScreenWidth: 1920},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(set), `"browser_info":{"language":"ru-RU","screen_width":1920}`) {
+		t.Fatalf("BrowserInfo must be sent when set, got %s", set)
+	}
+}
+
 func TestExecutePaymentDecodesTypedWalletAction(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -530,5 +551,67 @@ func TestWaitForPaymentTerminalResultReturnsDiagnostics(t *testing.T) {
 	}
 	if result.Status != WaitStatusTerminal || result.PaymentStatus != PaymentCaptured || result.Attempts != 2 {
 		t.Fatalf("unexpected result: %#v", result)
+	}
+}
+
+func TestChargeSavedCardSendsStoredCredentialFields(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body["stored_credential_reason"] != "recurring" ||
+			body["recurring_frequency_days"] != float64(30) ||
+			body["recurring_expiry"] != "20271231" {
+			t.Fatalf("stored credential fields were not serialized: %#v", body)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"payment_id":"11111111-1111-1111-1111-111111111111","status":"pending"}`))
+	}))
+	defer server.Close()
+
+	client, err := NewClient(ClientOptions{SecretKey: "sk_test_123", APIBase: server.URL + "/v1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.ChargeSavedCard(context.Background(), ChargeSavedCardRequest{
+		Amount:                 10000,
+		Currency:               RUB,
+		CardTokenID:            "22222222-2222-2222-2222-222222222222",
+		CustomerID:             "customer-1",
+		StoredCredentialReason: "recurring",
+		RecurringFrequencyDays: 30,
+		RecurringExpiry:        "20271231",
+	}, IdempotencyOptions{IdempotencyKey: testIdempotencyKey})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestChargeSavedCardOmitsStoredCredentialFieldsByDefault(t *testing.T) {
+	raw, err := json.Marshal(ChargeSavedCardRequest{Amount: 1, Currency: RUB, CardTokenID: "t", CustomerID: "c"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"stored_credential_reason", "recurring_frequency_days", "recurring_expiry"} {
+		if strings.Contains(string(raw), key) {
+			t.Fatalf("%s must be omitted: %s", key, raw)
+		}
+	}
+}
+
+func TestConfigurationErrorTypeIsPublic(t *testing.T) {
+	if got := publicErrorType("configuration_error", http.StatusUnprocessableEntity); got != ConfigurationError {
+		t.Fatalf("publicErrorType = %q", got)
+	}
+}
+
+func TestWalletActionDecodesParams(t *testing.T) {
+	var action WalletAction
+	if err := json.Unmarshal([]byte(`{"provider":"sberpay","action":"sdk","params":{"k":"v"}}`), &action); err != nil {
+		t.Fatal(err)
+	}
+	if action.Params["k"] != "v" {
+		t.Fatalf("params = %#v", action.Params)
 	}
 }

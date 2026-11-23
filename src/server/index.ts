@@ -6,6 +6,7 @@ export type {
   RequestOptions,
   Payment,
   PaymentList,
+  PaymentPreparationError,
   PaymentMethod,
   PaymentStatus,
   PaymentFlowMode,
@@ -45,3 +46,18 @@ export type {
   ThreeDSAction,
   ThreeDSBrowserStep,
 } from "../three-ds";
+
+export type {
+  CustomerTransferRail,
+  CustomerTransferStatus,
+  CustomerTransferEnvironment,
+  CreateCustomerTransferSessionRequest,
+  CustomerTransferSession,
+  PayoutPartyProfile,
+  CreateCustomerDisbursementRequest,
+  TokenizeCustomerDisbursementCardRequest,
+  TokenizeCustomerDisbursementCardResponse,
+  CancelCustomerDisbursementRequest,
+  CustomerDisbursement,
+  CustomerDisbursementList,
+} from "./customer-transfers";
