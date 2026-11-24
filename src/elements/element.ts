@@ -9,10 +9,19 @@ import {
   parseIncoming,
 } from "./postmessage";
 import { buildStyleFromAppearance, type HostedFieldsAppearance } from "./style";
+import {
+  pickRuntimeOptions,
+  sanitizeRuntimeOptions,
+  type HostedFieldsRuntimeOptions,
+} from "./options";
 
-export interface ElementOptions {
+const MIN_HEIGHT = /^\d{1,4}(\.\d{1,2})?(px|rem|em|vh|svh|dvh)$/;
+
+export interface ElementOptions extends HostedFieldsRuntimeOptions {
   /** Iframe-safe input appearance. Container layout remains merchant-owned CSS. */
   appearance?: HostedFieldsAppearance;
+  /** Minimum iframe height, e.g. "48px" or "3rem". Default "44px". */
+  minHeight?: string;
   /** Accessible label for the merchant-owned field group and secure iframe. */
   label?: string;
   /** IDs for helper and error text owned by the merchant page. */
@@ -21,7 +30,10 @@ export interface ElementOptions {
 }
 
 export type ElementEvent =
+  | { type: "loading"; field: FieldType }
   | { type: "ready"; field: FieldType }
+  | { type: "submit"; field: FieldType }
+  | { type: "escape"; field: FieldType }
   | {
       type: "change";
       field: FieldType;
@@ -57,6 +69,20 @@ const FIELD_MIN_HEIGHT: Record<FieldType, string> = {
   cardCvv: "44px",
 };
 
+function assertMinHeight(value: string | undefined): void {
+  if (value === undefined || MIN_HEIGHT.test(value.trim())) return;
+  throw new ArcPayError({
+    type: "validation_error",
+    code: "invalid_hosted_fields_option",
+    message: "minHeight must be a number with px, rem, em, vh, svh or dvh",
+    retryable: false,
+  });
+}
+
+function runtimeOptionsOf(options: object): HostedFieldsRuntimeOptions {
+  return sanitizeRuntimeOptions(pickRuntimeOptions(options), { strict: true });
+}
+
 function accessibleLabel(field: FieldType, options: ElementOptions): string {
   return options.label?.trim() || FIELD_TITLES[field];
 }
@@ -70,6 +96,9 @@ export interface ElementContext {
 export class Element {
   private iframe: HTMLIFrameElement | null = null;
   private readonly listeners: Record<ElementEventName, Set<Listener>> = {
+    loading: new Set<Listener>(),
+    submit: new Set<Listener>(),
+    escape: new Set<Listener>(),
     ready: new Set<Listener>(),
     change: new Set<Listener>(),
     focus: new Set<Listener>(),
@@ -86,7 +115,15 @@ export class Element {
     public readonly field: FieldType,
     private options: ElementOptions,
     private readonly context: ElementContext,
-  ) {}
+  ) {
+    assertMinHeight(options.minHeight);
+    runtimeOptionsOf(options);
+  }
+
+  /** Internal: used by Elements for autoAdvance. */
+  get autoAdvance(): boolean {
+    return this.options.autoAdvance === true;
+  }
 
   mount(target: string | HTMLElement): void {
     if (this.iframe) {
@@ -112,7 +149,7 @@ export class Element {
     iframeURL.searchParams.set("parent_origin", window.location.origin);
     iframeURL.searchParams.set("publishable_key", this.context.publishableKey);
     iframe.src = iframeURL.toString();
-    iframe.style.cssText = `border:0;width:100%;height:100%;min-height:${FIELD_MIN_HEIGHT[this.field]};display:block;`;
+    iframe.style.cssText = `border:0;width:100%;height:100%;min-height:${this.options.minHeight?.trim() ?? FIELD_MIN_HEIGHT[this.field]};display:block;`;
     iframe.setAttribute("allow", "payment");
     iframe.setAttribute("data-arcpay-element", this.field);
     iframe.setAttribute("title", accessibleLabel(this.field, this.options));
@@ -129,6 +166,7 @@ export class Element {
     }
     container.appendChild(iframe);
     this.iframe = iframe;
+    this.emit({ type: "loading", field: this.field });
 
     const expectedOrigin = new URL(this.context.iframeBase).origin;
 
@@ -166,11 +204,13 @@ export class Element {
     if (data.type === "arcpay:ready") {
       if (this.status !== "pending") return;
       this.clearHelloTimer();
+      const runtime = runtimeOptionsOf(this.options);
       this.send({
         type: "arcpay:configure",
         field: this.field,
         payload: buildStyleFromAppearance(this.options.appearance),
         ...("placeholder" in this.options ? { placeholder: this.options.placeholder ?? "" } : {}),
+        ...(Object.keys(runtime).length > 0 ? { options: runtime } : {}),
       });
     } else if (data.type === "arcpay:configured") {
       if (this.status !== "pending") return;
@@ -191,6 +231,10 @@ export class Element {
       });
     } else if (data.type === "arcpay:focus" && data.field === this.field) {
       this.emit({ type: "focus", field: this.field, help: data.help });
+    } else if (data.type === "arcpay:submit" && data.field === this.field) {
+      this.emit({ type: "submit", field: this.field });
+    } else if (data.type === "arcpay:escape" && data.field === this.field) {
+      this.emit({ type: "escape", field: this.field });
     } else if (data.type === "arcpay:blur" && data.field === this.field) {
       this.emit({ type: "blur", field: this.field, issue: data.issue });
     } else if (data.type === "arcpay:change" && data.field === this.field) {
@@ -209,13 +253,16 @@ export class Element {
     // arcpay:tokenize-result / arcpay:tokenize-error handled by Elements factory (Task 9).
   }
 
-  update(options: {
-    appearance?: HostedFieldsAppearance;
-    label?: string;
-    describedBy?: string;
-    placeholder?: string;
-  }): void {
+  update(options: Partial<ElementOptions>): void {
+    assertMinHeight(options.minHeight);
+    const runtimeUpdate = runtimeOptionsOf(options);
     this.options = { ...this.options, ...options };
+    if (this.iframe && options.minHeight !== undefined) {
+      this.iframe.style.minHeight = options.minHeight.trim();
+    }
+    if (Object.keys(runtimeUpdate).length > 0) {
+      this.send({ type: "arcpay:options", options: runtimeUpdate });
+    }
     if (this.iframe && "label" in options) {
       this.iframe.setAttribute("title", accessibleLabel(this.field, this.options));
       this.iframe.setAttribute("aria-label", accessibleLabel(this.field, this.options));

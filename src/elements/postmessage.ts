@@ -1,4 +1,5 @@
 import { ArcPayError } from "../core/errors";
+import type { HostedFieldsRuntimeOptions } from "./options";
 
 export type FieldType = "card" | "cardNumber" | "cardExpiry" | "cardCvv";
 export type SplitFieldType = Exclude<FieldType, "card">;
@@ -24,7 +25,14 @@ export interface HostedFieldError {
 // Parent → iframe
 export type ParentToIframe =
   | { type: "arcpay:hello"; origin: string; publishableKey: string; channelId: string }
-  | { type: "arcpay:configure"; field: FieldType; payload: StyleSubset; placeholder?: string }
+  | {
+      type: "arcpay:configure";
+      field: FieldType;
+      payload: StyleSubset;
+      placeholder?: string;
+      options?: HostedFieldsRuntimeOptions;
+    }
+  | { type: "arcpay:options"; options: HostedFieldsRuntimeOptions }
   | { type: "arcpay:style"; payload: StyleSubset }
   | { type: "arcpay:placeholder"; field: FieldType; placeholder: string }
   | { type: "arcpay:focus" }
@@ -44,6 +52,8 @@ export type IframeToParent =
       channelId: string;
     }
   | { type: "arcpay:focus"; field: FieldType; help: HostedFieldHelp | null; channelId: string }
+  | { type: "arcpay:submit"; field: FieldType; channelId: string }
+  | { type: "arcpay:escape"; field: FieldType; channelId: string }
   | { type: "arcpay:blur"; field: FieldType; issue: HostedFieldIssue | null; channelId: string }
   | {
       type: "arcpay:change";
@@ -83,6 +93,9 @@ export interface StyleSubset {
   focus?: Record<string, string>;
   complete?: Record<string, string>;
   empty?: Record<string, string>;
+  disabled?: Record<string, string>;
+  hover?: Record<string, string>;
+  autofill?: Record<string, string>;
 }
 
 type TokenizeErrorType = "validation_error" | "configuration_error" | "network_error" | "api_error";
@@ -109,7 +122,10 @@ const isStyleSubset = (value: unknown): value is StyleSubset => {
     (value.invalid === undefined || isStringRecord(value.invalid)) &&
     (value.focus === undefined || isStringRecord(value.focus)) &&
     (value.complete === undefined || isStringRecord(value.complete)) &&
-    (value.empty === undefined || isStringRecord(value.empty))
+    (value.empty === undefined || isStringRecord(value.empty)) &&
+    (value.disabled === undefined || isStringRecord(value.disabled)) &&
+    (value.hover === undefined || isStringRecord(value.hover)) &&
+    (value.autofill === undefined || isStringRecord(value.autofill))
   );
 };
 
@@ -162,8 +178,11 @@ const isKnownArcpayMessage = (data: unknown): data is ParentToIframe | IframeToP
         "payload" in data &&
         isField(data.field) &&
         isStyleSubset(data.payload) &&
-        (!("placeholder" in data) || typeof data.placeholder === "string")
+        (!("placeholder" in data) || typeof data.placeholder === "string") &&
+        (!("options" in data) || data.options === undefined || isRecord(data.options))
       );
+    case "arcpay:options":
+      return "options" in data && isRecord(data.options);
     case "arcpay:style":
       return "payload" in data && isStyleSubset(data.payload);
     case "arcpay:placeholder":
@@ -188,6 +207,8 @@ const isKnownArcpayMessage = (data: unknown): data is ParentToIframe | IframeToP
       return true;
     case "arcpay:ready":
     case "arcpay:configured":
+    case "arcpay:submit":
+    case "arcpay:escape":
       return hasRequiredRouting(data);
     case "arcpay:tokenize":
       return (
