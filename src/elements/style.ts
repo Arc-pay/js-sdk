@@ -1,7 +1,7 @@
 import type { StyleSubset } from "./postmessage";
 import { ArcPayError } from "../core/errors";
 
-export type HostedFieldsTheme = "none" | "arcpay";
+export type HostedFieldsTheme = "none" | "arcpay" | "arcpay-dark";
 
 export interface HostedFieldsAppearanceVariables {
   fontFamily?: string;
@@ -30,7 +30,15 @@ export interface HostedFieldsAppearanceVariables {
   outline?: string;
 }
 
-export type HostedFieldsAppearanceRule = "base" | "focus" | "invalid" | "complete" | "empty";
+export type HostedFieldsAppearanceRule =
+  | "base"
+  | "focus"
+  | "invalid"
+  | "complete"
+  | "empty"
+  | "disabled"
+  | "hover"
+  | "autofill";
 
 export type HostedFieldsStyleProperty =
   | "--arcpay-placeholder-color"
@@ -46,6 +54,7 @@ export type HostedFieldsStyleProperty =
   | "box-sizing"
   | "caret-color"
   | "color"
+  | "color-scheme"
   | "font-family"
   | "font-feature-settings"
   | "font-size"
@@ -92,6 +101,7 @@ const ALLOWED_PROPERTIES = new Set<HostedFieldsStyleProperty>([
   "box-sizing",
   "caret-color",
   "color",
+  "color-scheme",
   "font-family",
   "font-feature-settings",
   "font-size",
@@ -128,8 +138,9 @@ const ARCPAY_THEME: StyleSubset = {
     "font-variant-numeric": "tabular-nums",
     "line-height": "24px",
     color: "#111827",
-    "--arcpay-placeholder-color": "#9ca3af",
+    "--arcpay-placeholder-color": "#6b7280",
     "caret-color": "#111827",
+    "color-scheme": "light",
   },
   focus: {
     color: "#111827",
@@ -143,6 +154,29 @@ const ARCPAY_THEME: StyleSubset = {
   empty: {
     color: "#111827",
   },
+  disabled: {
+    opacity: "0.6",
+  },
+};
+
+const ARCPAY_DARK_THEME: StyleSubset = {
+  base: {
+    ...ARCPAY_THEME.base,
+    color: "#f9fafb",
+    "--arcpay-placeholder-color": "#9ca3af",
+    "caret-color": "#f9fafb",
+    "color-scheme": "dark",
+  },
+  focus: { color: "#f9fafb" },
+  invalid: { color: "#f87171" },
+  complete: { color: "#f9fafb" },
+  empty: { color: "#f9fafb" },
+  disabled: { opacity: "0.6" },
+};
+
+const THEMES: Record<Exclude<HostedFieldsTheme, "none">, StyleSubset> = {
+  arcpay: ARCPAY_THEME,
+  "arcpay-dark": ARCPAY_DARK_THEME,
 };
 
 const mergeBlock = (
@@ -162,7 +196,9 @@ const setIfPresent = (
 };
 
 const assertKnownTheme = (theme: HostedFieldsTheme | undefined): void => {
-  if (theme === undefined || theme === "none" || theme === "arcpay") return;
+  if (theme === undefined || theme === "none" || theme === "arcpay" || theme === "arcpay-dark") {
+    return;
+  }
   throw new ArcPayError({
     type: "validation_error",
     code: "invalid_hosted_fields_theme",
@@ -174,7 +210,9 @@ const assertKnownTheme = (theme: HostedFieldsTheme | undefined): void => {
 const MAX_STYLE_VALUE_LENGTH = 512;
 // The iframe CSP already blocks external fetches; refusing resource-loading and
 // script-ish values here keeps a second layer in front of it.
-const FORBIDDEN_VALUE = /url\s*\(|image-set\s*\(|expression\s*\(|@import|javascript:|[<>{}]/i;
+// ";" is refused too: the iframe renders the autofill block as CSS text, so a value must never
+// be able to open a second declaration.
+const FORBIDDEN_VALUE = /url\s*\(|image-set\s*\(|expression\s*\(|@import|javascript:|[<>{};]/i;
 
 const isSafeValue = (value: string): boolean =>
   value.length <= MAX_STYLE_VALUE_LENGTH && !FORBIDDEN_VALUE.test(value);
@@ -197,12 +235,18 @@ export const sanitizeStyle = (style: StyleSubset): StyleSubset => {
   if (style.focus !== undefined) result.focus = sanitizeBlock(style.focus);
   if (style.complete !== undefined) result.complete = sanitizeBlock(style.complete);
   if (style.empty !== undefined) result.empty = sanitizeBlock(style.empty);
+  if (style.disabled !== undefined) result.disabled = sanitizeBlock(style.disabled);
+  if (style.hover !== undefined) result.hover = sanitizeBlock(style.hover);
+  if (style.autofill !== undefined) result.autofill = sanitizeBlock(style.autofill);
   return result;
 };
 
 export const buildStyleFromAppearance = (appearance?: HostedFieldsAppearance): StyleSubset => {
   assertKnownTheme(appearance?.theme);
-  const themeStyle: StyleSubset = appearance?.theme === "arcpay" ? ARCPAY_THEME : { base: {} };
+  const themeStyle: StyleSubset =
+    appearance?.theme === undefined || appearance.theme === "none"
+      ? { base: {} }
+      : THEMES[appearance.theme];
   const variableStyle: StyleSubset = { base: {} };
   const variables = appearance?.variables;
 
@@ -228,7 +272,7 @@ export const buildStyleFromAppearance = (appearance?: HostedFieldsAppearance): S
     setIfPresent(variableStyle.base, "padding", variables.padding);
     setIfPresent(variableStyle.base, "outline", variables.outline);
 
-    if (variables.colorText !== undefined && appearance?.theme === "arcpay") {
+    if (variables.colorText !== undefined && appearance?.theme !== undefined && appearance.theme !== "none") {
       variableStyle.focus = { color: variables.colorText };
       variableStyle.complete = { color: variables.colorText };
       variableStyle.empty = { color: variables.colorText };
@@ -258,6 +302,13 @@ export const buildStyleFromAppearance = (appearance?: HostedFieldsAppearance): S
   );
   const empty = mergeBlock(mergeBlock(themeStyle.empty, variableStyle.empty), rules?.empty);
 
+  const disabled = mergeBlock(themeStyle.disabled, rules?.disabled);
+  const hover = mergeBlock(themeStyle.hover, rules?.hover);
+  const autofill = mergeBlock(themeStyle.autofill, rules?.autofill);
+
+  if (disabled !== undefined) combined.disabled = disabled;
+  if (hover !== undefined) combined.hover = hover;
+  if (autofill !== undefined) combined.autofill = autofill;
   if (focus !== undefined) combined.focus = focus;
   if (invalid !== undefined) combined.invalid = invalid;
   if (complete !== undefined) combined.complete = complete;

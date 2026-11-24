@@ -160,8 +160,10 @@ rules and font URLs from the merchant page cannot reach them. Fonts are
 therefore served by Arc Pay: reference a bundled family by name in
 `fontFamily` / `font-family` and add a fallback stack.
 
-Bundled families: **Geologica** (Latin, Latin Extended, Cyrillic, Cyrillic
-Extended; variable weight 100-900).
+Bundled families: **Geologica** and **Inter** (Latin, Latin Extended, Cyrillic,
+Cyrillic Extended; variable weight 100-900). Both have tabular numerals. Only
+the subsets a field actually needs are downloaded, and the digit subset is
+fetched before `ready` so numbers are not first painted in a fallback font.
 
 ```ts
 const elements = arcpay.elements({
@@ -179,11 +181,62 @@ const elements = arcpay.elements({
 });
 ```
 
-`font-variant-numeric` and `font-feature-settings` are part of the allowlist
+`font-variant-numeric`, `font-feature-settings` and `color-scheme` are part of the allowlist
 (`HostedFieldsStyleProperty`). The `arcpay` theme enables `tabular-nums` by
 default; the default theme `"none"` leaves numerals untouched. Style values
 that load resources (`url(...)`, `image-set(...)`, `@import`) or exceed 512
 characters are dropped.
+
+### Hosted Fields options
+
+Every option below is optional, can be set for all fields in
+`arcpay.elements({...})` and overridden per field in `elements.create(field, {...})`,
+and can be changed later with `element.update({...})`. Invalid values throw an
+`ArcPayError` (`invalid_hosted_fields_option`) before anything is mounted.
+
+| Option | Default | Effect |
+| --- | --- | --- |
+| `locale` | `"auto"` | `"ru"`, `"en"` or the browser language for default texts, errors and help. |
+| `texts.placeholders` / `texts.labels` | localized | Per input: `cardNumber`, `cardExpiry`, `cardCvv`. |
+| `texts.errors` | localized | `issue.message` and the screen-reader error by issue code (`HOSTED_FIELD_ISSUE_CODES`). |
+| `layout` | `10px / 74px / 64px` | Composite `card` only: `gap`, `expiryWidth`, `cvvWidth` (`0` or px, rem, em, %). |
+| `minHeight` | `"44px"` | Minimum iframe height. |
+| `disabled`, `readOnly` | `false` | Standard input states; style them with `rules.disabled`. |
+| `autofocus` | `false` | Focus the field once it is ready. |
+| `autoAdvance` | `false` | Move to the next field once one is complete and valid (composite and split). |
+| `showBrandIcon` | `false` | Neutral brand badge inside the number input (Visa, Mastercard, Mir, Amex, Maestro, UnionPay, JCB, Discover, Diners). |
+| `maskCvv` | `true` | `false` shows the security code as digits. |
+| `expiryYearFormat` | `"YY"` | `"YYYY"` displays and accepts `MM/YYYY`. |
+
+```ts
+const elements = arcpay.elements({
+  locale: "ru",
+  showBrandIcon: true,
+  autoAdvance: true,
+  texts: { errors: { card_number_invalid: "Проверьте номер карты" } },
+});
+const card = elements.create("card", { layout: { gap: "8px", cvvWidth: "5rem" } });
+card.on("submit", () => pay()); // Enter pressed inside a field; no card data
+card.update({ disabled: true });
+```
+
+Appearance gains `rules.disabled`, `rules.hover` and `rules.autofill` (browser
+autofill no longer paints its own background over your style) and
+`theme: "arcpay-dark"`. `issue.message` and `help.message` follow `locale`; use
+`issue.code` for logic.
+
+New element events: `loading` (mounted, waiting for the handshake), `submit` and
+`escape` (Enter/Escape inside a field). The factory emits `tokenizing`,
+`tokenized` and `tokenizeerror` through `elements.on(...)`, and
+`elements.tokenize(paymentId, idempotencyKey, { timeoutMs })` accepts
+1000-120000 ms (default 30000).
+
+Behaviour that now applies to everyone: a lone month digit 2-9 becomes `0X/`,
+Backspace can delete past the `/` and spaces, the security code length follows
+the brand (Amex 4, other known brands 3; split mode checks it at `tokenize()`),
+Amex numbers must be 15 digits, expiry years more than 20 years ahead are
+rejected (`card_expiry_too_far`), and a `placeholder` given to a split
+`cardExpiry` / `cardCvv` element is now honored.
 
 `appearance.theme` defaults to `"none"` so Arc Pay branding is not imposed on
 merchant checkout pages. `theme: "arcpay"` is available for demos and quick
