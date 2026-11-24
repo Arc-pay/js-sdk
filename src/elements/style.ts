@@ -8,6 +8,10 @@ export interface HostedFieldsAppearanceVariables {
   fontSize?: string;
   fontWeight?: string;
   fontStyle?: string;
+  /** e.g. "tabular-nums" so card digits keep a constant width while typing. */
+  fontVariantNumeric?: string;
+  /** OpenType features, e.g. '"tnum" 1'. */
+  fontFeatureSettings?: string;
   lineHeight?: string;
   letterSpacing?: string;
   textAlign?: string;
@@ -43,8 +47,10 @@ export type HostedFieldsStyleProperty =
   | "caret-color"
   | "color"
   | "font-family"
+  | "font-feature-settings"
   | "font-size"
   | "font-style"
+  | "font-variant-numeric"
   | "font-weight"
   | "height"
   | "letter-spacing"
@@ -87,8 +93,10 @@ const ALLOWED_PROPERTIES = new Set<HostedFieldsStyleProperty>([
   "caret-color",
   "color",
   "font-family",
+  "font-feature-settings",
   "font-size",
   "font-style",
+  "font-variant-numeric",
   "font-weight",
   "height",
   "letter-spacing",
@@ -117,6 +125,7 @@ const ARCPAY_THEME: StyleSubset = {
     "font-family":
       'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
     "font-size": "16px",
+    "font-variant-numeric": "tabular-nums",
     "line-height": "24px",
     color: "#111827",
     "--arcpay-placeholder-color": "#9ca3af",
@@ -162,11 +171,19 @@ const assertKnownTheme = (theme: HostedFieldsTheme | undefined): void => {
   });
 };
 
+const MAX_STYLE_VALUE_LENGTH = 512;
+// The iframe CSP already blocks external fetches; refusing resource-loading and
+// script-ish values here keeps a second layer in front of it.
+const FORBIDDEN_VALUE = /url\s*\(|image-set\s*\(|expression\s*\(|@import|javascript:|[<>{}]/i;
+
+const isSafeValue = (value: string): boolean =>
+  value.length <= MAX_STYLE_VALUE_LENGTH && !FORBIDDEN_VALUE.test(value);
+
 const sanitizeBlock = (block: Record<string, string>): Record<string, string> => {
   const out: Record<string, string> = {};
   for (const [key, value] of Object.entries(block)) {
     const normalizedKey = key.toLowerCase();
-    if (!isAllowedProperty(normalizedKey)) {
+    if (!isAllowedProperty(normalizedKey) || !isSafeValue(value)) {
       continue;
     }
     out[normalizedKey] = value;
@@ -194,6 +211,8 @@ export const buildStyleFromAppearance = (appearance?: HostedFieldsAppearance): S
     setIfPresent(variableStyle.base, "font-size", variables.fontSize);
     setIfPresent(variableStyle.base, "font-weight", variables.fontWeight);
     setIfPresent(variableStyle.base, "font-style", variables.fontStyle);
+    setIfPresent(variableStyle.base, "font-variant-numeric", variables.fontVariantNumeric);
+    setIfPresent(variableStyle.base, "font-feature-settings", variables.fontFeatureSettings);
     setIfPresent(variableStyle.base, "line-height", variables.lineHeight);
     setIfPresent(variableStyle.base, "letter-spacing", variables.letterSpacing);
     setIfPresent(variableStyle.base, "text-align", variables.textAlign);

@@ -153,6 +153,38 @@ not raw card data. Split fields require browser `BroadcastChannel` support.
 The channel is restricted to the Arc Pay iframe origin and the current top-level
 site partition; merchant-provided MessagePorts are never used for field values.
 
+#### Fonts and numerals
+
+Hosted Fields run in their own origin with `font-src 'self'`, so `@font-face`
+rules and font URLs from the merchant page cannot reach them. Fonts are
+therefore served by Arc Pay: reference a bundled family by name in
+`fontFamily` / `font-family` and add a fallback stack.
+
+Bundled families: **Geologica** (Latin, Latin Extended, Cyrillic, Cyrillic
+Extended; variable weight 100-900).
+
+```ts
+const elements = arcpay.elements({
+  appearance: {
+    variables: {
+      fontFamily: "Geologica, system-ui, sans-serif",
+      fontWeight: "400",
+      fontVariantNumeric: "tabular-nums", // fixed-width digits while typing
+    },
+    rules: {
+      // any allowlisted property is also available per state
+      focus: { "font-feature-settings": '"tnum" 1' },
+    },
+  },
+});
+```
+
+`font-variant-numeric` and `font-feature-settings` are part of the allowlist
+(`HostedFieldsStyleProperty`). The `arcpay` theme enables `tabular-nums` by
+default; the default theme `"none"` leaves numerals untouched. Style values
+that load resources (`url(...)`, `image-set(...)`, `@import`) or exceed 512
+characters are dropped.
+
 `appearance.theme` defaults to `"none"` so Arc Pay branding is not imposed on
 merchant checkout pages. `theme: "arcpay"` is available for demos and quick
 starts. Supported iframe properties are limited to input-level text, color,

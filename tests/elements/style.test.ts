@@ -124,6 +124,54 @@ describe("sanitizeStyle", () => {
   });
 });
 
+describe("typography allowlist", () => {
+  it("keeps font-variant-numeric and font-feature-settings", () => {
+    expect(
+      sanitizeStyle({
+        base: { "font-variant-numeric": "tabular-nums", "font-feature-settings": '"tnum" 1' },
+      }).base,
+    ).toEqual({ "font-variant-numeric": "tabular-nums", "font-feature-settings": '"tnum" 1' });
+  });
+
+  it("drops resource-loading and oversized values", () => {
+    const out = sanitizeStyle({
+      base: {
+        color: "#111",
+        "background-color": "url(https://evil.example/x.png)",
+        "font-family": "a".repeat(600),
+        border: "1px solid red",
+      },
+    });
+    expect(out.base).toEqual({ color: "#111", border: "1px solid red" });
+  });
+
+  it("maps typography variables, including a bundled font family", () => {
+    expect(
+      buildStyleFromAppearance({
+        variables: {
+          fontFamily: "Geologica, system-ui, sans-serif",
+          fontVariantNumeric: "tabular-nums",
+          fontFeatureSettings: '"tnum" 1',
+        },
+      }).base,
+    ).toEqual({
+      "font-family": "Geologica, system-ui, sans-serif",
+      "font-variant-numeric": "tabular-nums",
+      "font-feature-settings": '"tnum" 1',
+    });
+  });
+
+  it("enables tabular numerals in the arcpay theme and lets variables override it", () => {
+    expect(buildStyleFromAppearance({ theme: "arcpay" }).base["font-variant-numeric"]).toBe(
+      "tabular-nums",
+    );
+    expect(
+      buildStyleFromAppearance({ theme: "arcpay", variables: { fontVariantNumeric: "normal" } })
+        .base["font-variant-numeric"],
+    ).toBe("normal");
+  });
+});
+
 describe("buildStyleFromAppearance", () => {
   it("defaults to a neutral, unbranded hosted-field input", () => {
     expect(buildStyleFromAppearance()).toEqual({ base: {} });

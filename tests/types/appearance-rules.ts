@@ -5,7 +5,9 @@ const typedAppearance: HostedFieldsAppearance = {
     base: {
       color: "#111827",
       "font-size": "16px",
-      "font-family": "Inter, system-ui, sans-serif",
+      "font-family": "Geologica, system-ui, sans-serif",
+      "font-variant-numeric": "tabular-nums",
+      "font-feature-settings": '"tnum" 1',
       "caret-color": "#111827",
       "--arcpay-placeholder-color": "#9ca3af",
       border: "0",
