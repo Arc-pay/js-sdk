@@ -14,3 +14,13 @@ paths = [
   '''^README\.md$''',
 ]
 regexes = ['''^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$''']
+
+[[allowlists]]
+description = "Short placeholder publishable keys (pk_test_abc123) used as fixtures in unit tests; real publishable keys are 64 hex characters and do not match"
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "secret"
+paths = [
+  '''(?:^|/)(?:tests|src)/.*\.test\.ts$''',
+]
+regexes = ['''^pk_test_[a-z0-9]{1,16}$''']
