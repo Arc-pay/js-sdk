@@ -1,4 +1,4 @@
-import { ArcPayError } from "../core/errors";
+import { validationError } from "../core/errors";
 import {
   type FieldType,
   type ParentToIframe,
@@ -76,14 +76,20 @@ const FIELD_MIN_HEIGHT: Record<FieldType, string> = {
   cardCvv: "44px",
 };
 
+// A throwing listener must not break SDK state.
+export function emitSafely<E>(listeners: Iterable<(event: E) => void>, event: E): void {
+  for (const listener of listeners) {
+    try {
+      listener(event);
+    } catch (error) {
+      (globalThis.reportError ?? console.error)(error);
+    }
+  }
+}
+
 function assertMinHeight(value: string | undefined): void {
   if (value === undefined || MIN_HEIGHT.test(value.trim())) return;
-  throw new ArcPayError({
-    type: "validation_error",
-    code: "invalid_hosted_fields_option",
-    message: "minHeight must be a number with px, rem, em, vh, svh or dvh",
-    retryable: false,
-  });
+  throw validationError("invalid_hosted_fields_option", "minHeight must be a number with px, rem, em, vh, svh or dvh");
 }
 
 function assertMountTimeout(value: number | undefined): void {
@@ -93,12 +99,7 @@ function assertMountTimeout(value: number | undefined): void {
   ) {
     return;
   }
-  throw new ArcPayError({
-    type: "validation_error",
-    code: "invalid_hosted_fields_option",
-    message: `mountTimeoutMs must be an integer between ${MIN_MOUNT_TIMEOUT_MS} and ${MAX_MOUNT_TIMEOUT_MS}`,
-    retryable: false,
-  });
+  throw validationError("invalid_hosted_fields_option", `mountTimeoutMs must be an integer between ${MIN_MOUNT_TIMEOUT_MS} and ${MAX_MOUNT_TIMEOUT_MS}`);
 }
 
 function runtimeOptionsOf(options: object): HostedFieldsRuntimeOptions {
@@ -153,21 +154,11 @@ export class Element {
 
   mount(target: string | HTMLElement): void {
     if (this.iframe) {
-      throw new ArcPayError({
-        type: "validation_error",
-        code: "already_mounted",
-        message: `Element ${this.field} is already mounted`,
-        retryable: false,
-      });
+      throw validationError("already_mounted", `Element ${this.field} is already mounted`);
     }
     const container = typeof target === "string" ? document.querySelector(target) : target;
     if (!(container instanceof HTMLElement)) {
-      throw new ArcPayError({
-        type: "validation_error",
-        code: "mount_target_not_found",
-        message: `mount target not found: ${String(target)}`,
-        retryable: false,
-      });
+      throw validationError("mount_target_not_found", `mount target not found: ${String(target)}`);
     }
 
     const iframe = document.createElement("iframe");
@@ -282,8 +273,11 @@ export class Element {
   update(options: Partial<ElementOptions>): void {
     assertMinHeight(options.minHeight);
     assertMountTimeout(options.mountTimeoutMs);
-    if ("appearance" in options) buildStyleFromAppearance(options.appearance);
+    const style = "appearance" in options ? buildStyleFromAppearance(options.appearance) : undefined;
     const runtimeUpdate = runtimeOptionsOf(options);
+    if (style || "placeholder" in options || Object.keys(runtimeUpdate).length) {
+      this.assertMounted();
+    }
     this.options = { ...this.options, ...options };
     if (this.iframe && options.minHeight !== undefined) {
       this.iframe.style.minHeight = options.minHeight.trim();
@@ -302,12 +296,7 @@ export class Element {
         this.iframe.removeAttribute("aria-describedby");
       }
     }
-    if ("appearance" in options) {
-      this.send({
-        type: "arcpay:style",
-        payload: buildStyleFromAppearance(options.appearance),
-      });
-    }
+    if (style) this.send({ type: "arcpay:style", payload: style });
     if ("placeholder" in options) {
       this.send({
         type: "arcpay:placeholder",
@@ -372,21 +361,18 @@ export class Element {
 
   /** Internal: used by Elements factory to send tokenize commands. */
   send(message: ParentToIframe, transfer?: Transferable[]): void {
+    this.assertMounted();
+    postToIframe(this.iframe!, message, new URL(this.context.iframeBase).origin, transfer);
+  }
+
+  private assertMounted(): void {
     if (!this.iframe) {
-      throw new ArcPayError({
-        type: "validation_error",
-        code: "not_mounted",
-        message: `Element ${this.field} is not mounted`,
-        retryable: false,
-      });
+      throw validationError("not_mounted", `Element ${this.field} is not mounted`);
     }
-    postToIframe(this.iframe, message, new URL(this.context.iframeBase).origin, transfer);
   }
 
   private emit(event: ElementEvent): void {
-    for (const listener of this.listeners[event.type]) {
-      listener(event);
-    }
+    emitSafely(this.listeners[event.type], event);
   }
 
   private startHelloHandshake(expectedOrigin: string): void {

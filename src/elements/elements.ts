@@ -1,5 +1,5 @@
-import { ArcPayError } from "../core/errors";
-import { Element, type ElementContext, type ElementOptions } from "./element";
+import { ArcPayError, validationError } from "../core/errors";
+import { Element, emitSafely, type ElementContext, type ElementOptions } from "./element";
 import type { FieldType, IframeToParent, SplitFieldType } from "./postmessage";
 import { parseIncoming } from "./postmessage";
 import type { TokenizeResult } from "../tokenize/tokenize";
@@ -18,7 +18,7 @@ export interface ElementsOptions extends HostedFieldsRuntimeOptions {
 }
 
 export interface TokenizeOptions {
-  /** Abort and reject after this many milliseconds. Default 30000, range 1000-120000. */
+  /** Reject after this many ms (default 30000, min 5000). Client side only. */
   timeoutMs?: number;
 }
 
@@ -31,7 +31,7 @@ type ElementsListener = (event: ElementsEvent) => void;
 type ElementsEventName = ElementsEvent["type"];
 
 const DEFAULT_TOKENIZE_TIMEOUT_MS = 30_000;
-const MIN_TOKENIZE_TIMEOUT_MS = 1_000;
+const MIN_TOKENIZE_TIMEOUT_MS = 5_000;
 const MAX_TOKENIZE_TIMEOUT_MS = 120_000;
 
 const DEFAULT_IFRAME_BASE = "https://sdk.arcpay.space";
@@ -43,12 +43,7 @@ const SPLIT_FIELDS = [
 
 const createChannelId = (): string => {
   if (!globalThis.crypto?.randomUUID) {
-    throw new ArcPayError({
-      type: "validation_error",
-      code: "crypto_unavailable",
-      message: "crypto.randomUUID is required for Hosted Fields",
-      retryable: false,
-    });
+    throw validationError("crypto_unavailable", "crypto.randomUUID is required for Hosted Fields");
   }
   return globalThis.crypto.randomUUID();
 };
@@ -58,12 +53,7 @@ const assertNonEmptyTokenizeInput = (
   value: unknown,
 ): void => {
   if (typeof value === "string" && value.trim().length > 0) return;
-  throw new ArcPayError({
-    type: "validation_error",
-    code: name === "paymentId" ? "missing_payment_id" : "missing_idempotency_key",
-    message: `${name} must be a non-empty string`,
-    retryable: false,
-  });
+  throw validationError(name === "paymentId" ? "missing_payment_id" : "missing_idempotency_key", `${name} must be a non-empty string`);
 };
 
 export class Elements {
@@ -102,35 +92,18 @@ export class Elements {
   }
 
   private emit(event: ElementsEvent): void {
-    for (const listener of this.listeners[event.type]) listener(event);
+    emitSafely(this.listeners[event.type], event);
   }
 
   create(field: FieldType, options: ElementOptions = {}): Element {
     if (field === "card" && SPLIT_FIELDS.some((splitField) => this.elementMap.has(splitField))) {
-      throw new ArcPayError({
-        type: "validation_error",
-        code: "mixed_hosted_fields_mode",
-        message:
-          "Use either the composite card Element or split cardNumber/cardExpiry/cardCvv Elements, not both.",
-        retryable: false,
-      });
+      throw validationError("mixed_hosted_fields_mode", "Use either the composite card Element or split cardNumber/cardExpiry/cardCvv Elements, not both.");
     }
     if (field !== "card" && this.elementMap.has("card")) {
-      throw new ArcPayError({
-        type: "validation_error",
-        code: "mixed_hosted_fields_mode",
-        message:
-          "Use either the composite card Element or split cardNumber/cardExpiry/cardCvv Elements, not both.",
-        retryable: false,
-      });
+      throw validationError("mixed_hosted_fields_mode", "Use either the composite card Element or split cardNumber/cardExpiry/cardCvv Elements, not both.");
     }
     if (this.elementMap.has(field)) {
-      throw new ArcPayError({
-        type: "validation_error",
-        code: "duplicate_element",
-        message: `Element for ${field} already created`,
-        retryable: false,
-      });
+      throw validationError("duplicate_element", `Element for ${field} already created`);
     }
     const ctx: ElementContext = {
       iframeBase: this.iframeBase,
@@ -150,18 +123,27 @@ export class Elements {
   private wireAutoAdvance(field: FieldType, element: Element): void {
     if (field === "card") return;
     let focused = false;
+    let wasDone = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const cancel = () => clearTimeout(timer);
     element.on("focus", () => {
       focused = true;
     });
     element.on("blur", () => {
       focused = false;
+      cancel();
     });
     element.on("change", (event) => {
-      if (event.type !== "change" || !element.autoAdvance || !focused) return;
-      if (!event.isComplete || !event.isValid) return;
-      const next = SPLIT_FIELDS[SPLIT_FIELDS.indexOf(field as SplitFieldType) + 1];
-      const nextElement = next ? this.elementMap.get(next) : undefined;
-      if (nextElement?.isReady()) nextElement.focus();
+      if (event.type !== "change") return;
+      cancel();
+      const was = wasDone;
+      wasDone = event.isComplete && event.isValid;
+      if (!wasDone || was || !element.autoAdvance || !focused) return;
+      timer = setTimeout(() => {
+        const next = SPLIT_FIELDS[SPLIT_FIELDS.indexOf(field as SplitFieldType) + 1];
+        const nextElement = next ? this.elementMap.get(next) : undefined;
+        if (nextElement?.isReady()) nextElement.focus();
+      }, 300);
     });
   }
 
@@ -178,73 +160,35 @@ export class Elements {
       timeoutMs < MIN_TOKENIZE_TIMEOUT_MS ||
       timeoutMs > MAX_TOKENIZE_TIMEOUT_MS
     ) {
-      throw new ArcPayError({
-        type: "validation_error",
-        code: "invalid_tokenize_timeout",
-        message: `timeoutMs must be an integer between ${MIN_TOKENIZE_TIMEOUT_MS} and ${MAX_TOKENIZE_TIMEOUT_MS}`,
-        retryable: false,
-      });
+      throw validationError("invalid_tokenize_timeout", `timeoutMs must be an integer between ${MIN_TOKENIZE_TIMEOUT_MS} and ${MAX_TOKENIZE_TIMEOUT_MS}`);
     }
 
     // C2: concurrent-call guard — only one tokenize() may be in-flight at a time.
     if (this.tokenizeInFlight) {
-      throw new ArcPayError({
-        type: "validation_error",
-        code: "tokenize_in_progress",
-        message: "A tokenize() call is already in progress for this Elements instance",
-        retryable: false,
-      });
+      throw validationError("tokenize_in_progress", "A tokenize() call is already in progress for this Elements instance");
     }
 
     const card = this.elementMap.get("card");
     const splitCardNumber = this.elementMap.get("cardNumber");
 
     if (!card && !splitCardNumber) {
-      throw new ArcPayError({
-        type: "validation_error",
-        code: "incomplete_elements",
-        message:
-          "Create either a secure card Element or split cardNumber/cardExpiry/cardCvv Elements before tokenize()",
-        retryable: false,
-      });
+      throw validationError("incomplete_elements", "Create either a secure card Element or split cardNumber/cardExpiry/cardCvv Elements before tokenize()");
     }
     const tokenizeElement = card ?? splitCardNumber;
     if (!tokenizeElement) {
-      throw new ArcPayError({
-        type: "validation_error",
-        code: "incomplete_elements",
-        message:
-          "Create either a secure card Element or split cardNumber/cardExpiry/cardCvv Elements before tokenize()",
-        retryable: false,
-      });
+      throw validationError("incomplete_elements", "Create either a secure card Element or split cardNumber/cardExpiry/cardCvv Elements before tokenize()");
     }
     if (card && !tokenizeElement.isReady()) {
-      throw new ArcPayError({
-        type: "validation_error",
-        code: "elements_not_ready",
-        message: "Wait for all secure card fields to fire 'ready' before tokenize()",
-        retryable: false,
-      });
+      throw validationError("elements_not_ready", "Wait for all secure card fields to fire 'ready' before tokenize()");
     }
     if (!card) {
       for (const splitField of SPLIT_FIELDS) {
         const element = this.elementMap.get(splitField);
         if (!element) {
-          throw new ArcPayError({
-            type: "validation_error",
-            code: "incomplete_elements",
-            message:
-              "Split Hosted Fields require cardNumber, cardExpiry, and cardCvv before tokenize()",
-            retryable: false,
-          });
+          throw validationError("incomplete_elements", "Split Hosted Fields require cardNumber, cardExpiry, and cardCvv before tokenize()");
         }
         if (!element.isReady()) {
-          throw new ArcPayError({
-            type: "validation_error",
-            code: "elements_not_ready",
-            message: "Wait for all secure card fields to fire 'ready' before tokenize()",
-            retryable: false,
-          });
+          throw validationError("elements_not_ready", "Wait for all secure card fields to fire 'ready' before tokenize()");
         }
       }
     }

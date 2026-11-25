@@ -27,7 +27,7 @@ configured for that iframe app.
 `dist/cdn/arcpay.global.js` is the full browser bundle (`window.ArcPay.ArcPay`, `confirmPayment`,
 3DS actions, customer transfers). If a page only mounts Hosted Fields, load
 `dist/cdn/arcpay.fields.global.js` instead: the same `ArcPay.ArcPay.load(...)` and
-`ArcPay.ArcPayError`, about 37% smaller gzipped (7.7 KB instead of 12.3 KB). Bundler users
+`ArcPay.ArcPayError`, about 38% smaller gzipped (7.5 KB instead of 12.1 KB). Bundler users
 need neither: the package is side-effect free and tree-shakes.
 
 ## React Bindings
@@ -204,7 +204,7 @@ and can be changed later with `element.update({...})`. Invalid values throw an
 
 | Option | Default | Effect |
 | --- | --- | --- |
-| `locale` | `"auto"` | `"ru"`, `"en"` or the browser language for default texts, errors and help. |
+| `locale` | `"auto"` | `"ru"`, `"en"` (region tags such as `ru-RU` are accepted) or the browser language for default texts, errors and help. |
 | `texts.placeholders` / `texts.labels` | localized | Per input: `cardNumber`, `cardExpiry`, `cardCvv`. |
 | `texts.errors` | localized | `issue.message` and the screen-reader error by issue code (`HOSTED_FIELD_ISSUE_CODES`). |
 | `layout` | `10px / 74px / 64px` | Composite `card` only: `gap`, `expiryWidth`, `cvvWidth` (`0` or px, rem, em, %). |

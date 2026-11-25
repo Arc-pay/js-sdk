@@ -2,7 +2,9 @@ import { gzipSync } from "node:zlib";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-const LIMIT_GZIP_BYTES = 12 * 1024; // 12 KB
+// Full bundle (payments + Hosted Fields). 12 KB until 0.1.57; raised by 0.5 KB for listener isolation,
+// atomic update() and debounced autoAdvance. Hosted Fields only pages use the 9 KB fields bundle.
+const LIMIT_GZIP_BYTES = 12.5 * 1024;
 const FIELDS_LIMIT_GZIP_BYTES = 9 * 1024; // Hosted Fields only bundle, currently about 7.7 KB
 const dist = resolve(process.cwd(), "dist");
 
