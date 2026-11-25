@@ -22,6 +22,14 @@ inferred from the key prefix (`pk_test_` or `pk_live_`). Hosted Fields are serve
 from `https://sdk.arcpay.space` and tokenize against the Arc Pay public API
 configured for that iframe app.
 
+### Script tag builds
+
+`dist/cdn/arcpay.global.js` is the full browser bundle (`window.ArcPay.ArcPay`, `confirmPayment`,
+3DS actions, customer transfers). If a page only mounts Hosted Fields, load
+`dist/cdn/arcpay.fields.global.js` instead: the same `ArcPay.ArcPay.load(...)` and
+`ArcPay.ArcPayError`, about 37% smaller gzipped (7.7 KB instead of 12.3 KB). Bundler users
+need neither: the package is side-effect free and tree-shakes.
+
 ## React Bindings
 
 ```ts
