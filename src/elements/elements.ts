@@ -4,13 +4,33 @@ import type { FieldType, IframeToParent, SplitFieldType } from "./postmessage";
 import { parseIncoming } from "./postmessage";
 import type { TokenizeResult } from "../tokenize/tokenize";
 import type { HostedFieldsAppearance } from "./style";
+import { pickRuntimeOptions, type HostedFieldsRuntimeOptions } from "./options";
 
 export type {};
 
-export interface ElementsOptions {
+export interface ElementsOptions extends HostedFieldsRuntimeOptions {
   /** Default iframe-safe input appearance applied to elements created by this factory. */
   appearance?: HostedFieldsAppearance;
+  /** Default minimum iframe height for every element. */
+  minHeight?: string;
 }
+
+export interface TokenizeOptions {
+  /** Abort and reject after this many milliseconds. Default 30000, range 1000-120000. */
+  timeoutMs?: number;
+}
+
+export type ElementsEvent =
+  | { type: "tokenizing"; paymentId: string }
+  | { type: "tokenized"; paymentId: string; result: TokenizeResult }
+  | { type: "tokenizeerror"; paymentId: string; error: ArcPayError };
+
+type ElementsListener = (event: ElementsEvent) => void;
+type ElementsEventName = ElementsEvent["type"];
+
+const DEFAULT_TOKENIZE_TIMEOUT_MS = 30_000;
+const MIN_TOKENIZE_TIMEOUT_MS = 1_000;
+const MAX_TOKENIZE_TIMEOUT_MS = 120_000;
 
 const DEFAULT_IFRAME_BASE = "https://sdk.arcpay.space";
 const SPLIT_FIELDS = [
@@ -50,17 +70,36 @@ export class Elements {
   private readonly publishableKey: string;
   private readonly channelId: string;
   private tokenizeInFlight = false;
-  private readonly appearance?: HostedFieldsAppearance;
+  private readonly defaults: ElementOptions;
+  private readonly listeners: Record<ElementsEventName, Set<ElementsListener>> = {
+    tokenizing: new Set<ElementsListener>(),
+    tokenized: new Set<ElementsListener>(),
+    tokenizeerror: new Set<ElementsListener>(),
+  };
 
-  constructor(opts: {
-    publishableKey: string;
-    iframeBase?: string;
-    appearance?: HostedFieldsAppearance;
-  }) {
+  constructor(
+    opts: {
+      publishableKey: string;
+      iframeBase?: string;
+    } & ElementsOptions,
+  ) {
     this.publishableKey = opts.publishableKey;
     this.iframeBase = opts.iframeBase ?? DEFAULT_IFRAME_BASE;
     this.channelId = createChannelId();
-    this.appearance = opts.appearance;
+    this.defaults = {
+      ...pickRuntimeOptions(opts),
+      ...(opts.appearance !== undefined ? { appearance: opts.appearance } : {}),
+      ...(opts.minHeight !== undefined ? { minHeight: opts.minHeight } : {}),
+    };
+  }
+
+  on(event: ElementsEventName, callback: ElementsListener): () => void {
+    this.listeners[event].add(callback);
+    return () => this.listeners[event].delete(callback);
+  }
+
+  private emit(event: ElementsEvent): void {
+    for (const listener of this.listeners[event.type]) listener(event);
   }
 
   create(field: FieldType, options: ElementOptions = {}): Element {
@@ -95,21 +134,54 @@ export class Elements {
       publishableKey: this.publishableKey,
       channelId: this.channelId,
     };
-    const element = new Element(
-      field,
-      {
-        ...options,
-        appearance: options.appearance ?? this.appearance,
-      },
-      ctx,
-    );
+    const merged: ElementOptions = { ...this.defaults };
+    for (const [key, value] of Object.entries(options)) {
+      if (value !== undefined) (merged as Record<string, unknown>)[key] = value;
+    }
+    const element = new Element(field, merged, ctx);
     this.elementMap.set(field, element);
+    this.wireAutoAdvance(field, element);
     return element;
   }
 
-  async tokenize(paymentId: string, idempotencyKey: string): Promise<TokenizeResult> {
+  private wireAutoAdvance(field: FieldType, element: Element): void {
+    if (field === "card") return;
+    let focused = false;
+    element.on("focus", () => {
+      focused = true;
+    });
+    element.on("blur", () => {
+      focused = false;
+    });
+    element.on("change", (event) => {
+      if (event.type !== "change" || !element.autoAdvance || !focused) return;
+      if (!event.isComplete || !event.isValid) return;
+      const next = SPLIT_FIELDS[SPLIT_FIELDS.indexOf(field as SplitFieldType) + 1];
+      const nextElement = next ? this.elementMap.get(next) : undefined;
+      if (nextElement?.isReady()) nextElement.focus();
+    });
+  }
+
+  async tokenize(
+    paymentId: string,
+    idempotencyKey: string,
+    options: TokenizeOptions = {},
+  ): Promise<TokenizeResult> {
     assertNonEmptyTokenizeInput("paymentId", paymentId);
     assertNonEmptyTokenizeInput("idempotencyKey", idempotencyKey);
+    const timeoutMs = options.timeoutMs ?? DEFAULT_TOKENIZE_TIMEOUT_MS;
+    if (
+      !Number.isInteger(timeoutMs) ||
+      timeoutMs < MIN_TOKENIZE_TIMEOUT_MS ||
+      timeoutMs > MAX_TOKENIZE_TIMEOUT_MS
+    ) {
+      throw new ArcPayError({
+        type: "validation_error",
+        code: "invalid_tokenize_timeout",
+        message: `timeoutMs must be an integer between ${MIN_TOKENIZE_TIMEOUT_MS} and ${MAX_TOKENIZE_TIMEOUT_MS}`,
+        retryable: false,
+      });
+    }
 
     // C2: concurrent-call guard — only one tokenize() may be in-flight at a time.
     if (this.tokenizeInFlight) {
@@ -175,8 +247,14 @@ export class Elements {
     }
 
     this.tokenizeInFlight = true;
+    this.emit({ type: "tokenizing", paymentId });
     try {
-      return await this.doTokenize(tokenizeElement, paymentId, idempotencyKey);
+      const result = await this.doTokenize(tokenizeElement, paymentId, idempotencyKey, timeoutMs);
+      this.emit({ type: "tokenized", paymentId, result });
+      return result;
+    } catch (error) {
+      if (error instanceof ArcPayError) this.emit({ type: "tokenizeerror", paymentId, error });
+      throw error;
     } finally {
       this.tokenizeInFlight = false;
     }
@@ -186,6 +264,7 @@ export class Elements {
     card: Element,
     paymentId: string,
     idempotencyKey: string,
+    timeoutMs: number,
   ): Promise<TokenizeResult> {
     const iframeOrigin = new URL(this.iframeBase).origin;
     // C1: obtain reference to the card iframe's contentWindow before
@@ -204,19 +283,19 @@ export class Elements {
     }
 
     return new Promise<TokenizeResult>((resolve, reject) => {
-      // C3: 30-second timeout — rejects and cleans up if no result arrives.
+      // C3: bounded timeout (default 30 s) — rejects and cleans up if no result arrives.
       const timer = window.setTimeout(() => {
         window.removeEventListener("message", onMessage);
         reject(
           new ArcPayError({
             type: "network_error",
             code: "tokenize_timeout",
-            message: "tokenize() timed out after 30 seconds",
+            message: `tokenize() timed out after ${timeoutMs / 1000} seconds`,
             retryable: true,
             paymentId,
           }),
         );
-      }, 30_000);
+      }, timeoutMs);
 
       const onMessage = (event: MessageEvent) => {
         // C4: use parseIncoming for origin + arcpay: prefix guard.

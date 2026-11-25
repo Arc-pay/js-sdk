@@ -51,12 +51,26 @@ export type {
   WaitForPaymentTerminalRequest,
   WalletNextAction,
 } from "./three-ds";
-export const SDK_VERSION = "0.1.54";
+export const SDK_VERSION = "0.1.55";
 
 export type { FieldType } from "./elements/postmessage";
 export type { ElementOptions, ElementEvent } from "./elements/element";
 export { Elements } from "./elements/elements";
-export type { ElementsOptions } from "./elements/elements";
+export type {
+  ElementsOptions,
+  ElementsEvent,
+  TokenizeOptions,
+} from "./elements/elements";
+export { HOSTED_FIELD_ISSUE_CODES } from "./elements/options";
+export type {
+  HostedFieldIssueCode,
+  HostedFieldsExpiryYearFormat,
+  HostedFieldsInputName,
+  HostedFieldsLayout,
+  HostedFieldsLocale,
+  HostedFieldsRuntimeOptions,
+  HostedFieldsTexts,
+} from "./elements/options";
 export type {
   HostedFieldsAppearance,
   HostedFieldsAppearanceRule,
