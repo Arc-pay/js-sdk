@@ -130,6 +130,42 @@ describe("Element runtime options", () => {
     expect(() => new Element("card", { minHeight: "tall" }, ctx)).toThrow(ArcPayError);
   });
 
+  it("rejects an unsupported theme at construction instead of hanging the handshake", () => {
+    expect(
+      () => new Element("card", { appearance: { theme: "neon" as never } }, ctx),
+    ).toThrow(expect.objectContaining({ code: "invalid_hosted_fields_theme" }));
+    expect(() => {
+      const els = new Elements({
+        publishableKey: "pk_test_x",
+        iframeBase: IFRAME_ORIGIN,
+        appearance: { theme: "neon" as never },
+      });
+      els.create("card");
+    }).toThrow(expect.objectContaining({ code: "invalid_hosted_fields_theme" }));
+    const live = new Element("card", {}, ctx);
+    live.mount(container);
+    mockWindow(document.querySelector("iframe")!);
+    expect(() => live.update({ appearance: { theme: "neon" as never } })).toThrow(ArcPayError);
+    live.destroy();
+  });
+
+  it("validates and honors mountTimeoutMs", () => {
+    for (const bad of [0, 2999, 120001, 5000.5, "5000" as never]) {
+      expect(() => new Element("card", { mountTimeoutMs: bad }, ctx)).toThrow(ArcPayError);
+    }
+    vi.useFakeTimers();
+    const el = new Element("card", { mountTimeoutMs: 20000 }, ctx);
+    const seen: string[] = [];
+    el.on("loaderror", (e) => seen.push(e.type === "loaderror" ? e.code : ""));
+    el.mount(container);
+    vi.advanceTimersByTime(19999);
+    expect(seen).toEqual([]);
+    vi.advanceTimersByTime(2);
+    expect(seen).toEqual(["iframe_ready_timeout"]);
+    el.destroy();
+    vi.useRealTimers();
+  });
+
   it("sends runtime options inside configure and omits the key when there are none", () => {
     const withOptions = new Element(
       "card",
@@ -244,6 +280,23 @@ describe("Elements factory options", () => {
       showBrandIcon: false,
     });
     els.destroy();
+  });
+
+  it("applies a factory-level mountTimeoutMs to every element", () => {
+    vi.useFakeTimers();
+    const els = new Elements({ publishableKey: "pk_test_x", iframeBase: IFRAME_ORIGIN, mountTimeoutMs: 15000 });
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const seen: string[] = [];
+    const card = els.create("card");
+    card.on("loaderror", (e) => seen.push(e.type));
+    card.mount(container);
+    vi.advanceTimersByTime(14999);
+    expect(seen).toEqual([]);
+    vi.advanceTimersByTime(2);
+    expect(seen).toEqual(["loaderror"]);
+    els.destroy();
+    vi.useRealTimers();
   });
 
   it("validates the tokenize timeout before doing any work", async () => {
