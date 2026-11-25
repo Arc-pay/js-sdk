@@ -1,4 +1,4 @@
-import { ArcPayError } from "../core/errors";
+import { validationError } from "../core/errors";
 import type { HostedFieldsRuntimeOptions } from "./options";
 
 export type FieldType = "card" | "cardNumber" | "cardExpiry" | "cardCvv";
@@ -293,20 +293,10 @@ export const postToIframe = (
   transfer?: Transferable[],
 ): void => {
   if (targetOrigin === "*") {
-    throw new ArcPayError({
-      type: "validation_error",
-      code: "wildcard_origin_forbidden",
-      message: "postToIframe: targetOrigin cannot be '*'",
-      retryable: false,
-    });
+    throw validationError("wildcard_origin_forbidden", "postToIframe: targetOrigin cannot be '*'");
   }
   if (!iframe.contentWindow) {
-    throw new ArcPayError({
-      type: "validation_error",
-      code: "iframe_not_loaded",
-      message: "postToIframe: iframe.contentWindow is null (iframe not mounted)",
-      retryable: false,
-    });
+    throw validationError("iframe_not_loaded", "postToIframe: iframe.contentWindow is null (iframe not mounted)");
   }
   if (transfer && transfer.length > 0) {
     iframe.contentWindow.postMessage(message, targetOrigin, transfer);
@@ -317,12 +307,7 @@ export const postToIframe = (
 
 export const postToParent = (message: IframeToParent, targetOrigin: string): void => {
   if (targetOrigin === "*") {
-    throw new ArcPayError({
-      type: "validation_error",
-      code: "wildcard_origin_forbidden",
-      message: "postToParent: targetOrigin cannot be '*'",
-      retryable: false,
-    });
+    throw validationError("wildcard_origin_forbidden", "postToParent: targetOrigin cannot be '*'");
   }
   window.parent.postMessage(message, targetOrigin);
 };

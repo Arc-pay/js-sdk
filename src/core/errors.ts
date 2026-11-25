@@ -61,3 +61,6 @@ export const isNetworkError = (e: unknown): e is ArcPayError =>
   e instanceof ArcPayError && e.type === "network_error";
 export const isChallengeAborted = (e: unknown): e is ArcPayError =>
   e instanceof ArcPayError && e.type === "challenge_aborted";
+
+export const validationError = (code: string, message: string): ArcPayError =>
+  new ArcPayError({ type: "validation_error", code, message, retryable: false });

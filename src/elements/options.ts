@@ -1,4 +1,4 @@
-import { ArcPayError } from "../core/errors";
+import { validationError } from "../core/errors";
 
 /**
  * Runtime options of a Hosted Field. They travel from the merchant page to the
@@ -87,7 +87,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 const fail = (code: string, message: string): never => {
-  throw new ArcPayError({ type: "validation_error", code, message, retryable: false });
+  throw validationError(code, message);
 };
 
 const sanitizeTextMap = <K extends string>(
@@ -165,7 +165,9 @@ export const sanitizeRuntimeOptions = (
 
   const { locale } = input;
   if (locale !== undefined) {
-    if (locale === "auto" || locale === "ru" || locale === "en") out.locale = locale;
+    const lower = String(locale).toLowerCase();
+    const base = lower === "auto" ? lower : /^(ru|en)(-[a-z\d]+)*$/.exec(lower)?.[1];
+    if (base) out.locale = base as HostedFieldsLocale;
     else if (strict) fail("invalid_hosted_fields_option", 'locale must be "auto", "ru" or "en"');
   }
 

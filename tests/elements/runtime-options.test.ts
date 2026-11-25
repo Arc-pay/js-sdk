@@ -79,6 +79,19 @@ describe("sanitizeRuntimeOptions", () => {
   });
 });
 
+describe("locale tags", () => {
+  it("accepts region tags and lower-cases them", () => {
+    expect(sanitizeRuntimeOptions({ locale: "ru-RU" }, { strict: true }).locale).toBe("ru");
+    expect(sanitizeRuntimeOptions({ locale: "EN-us" }, { strict: true }).locale).toBe("en");
+    expect(() => sanitizeRuntimeOptions({ locale: "auto-x" }, { strict: true })).toThrow(
+      ArcPayError,
+    );
+    expect(() => sanitizeRuntimeOptions({ locale: "de-DE" }, { strict: true })).toThrow(
+      ArcPayError,
+    );
+  });
+});
+
 describe("appearance states and themes", () => {
   it("supports disabled, hover and autofill blocks", () => {
     const out = buildStyleFromAppearance({
@@ -300,8 +313,11 @@ describe("Elements factory options", () => {
   });
 
   it("validates the tokenize timeout before doing any work", async () => {
-    const els = new Elements({ publishableKey: "pk_test_x", iframeBase: IFRAME_ORIGIN });
-    for (const timeoutMs of [0, 500, 130_000, 1500.5]) {
+    const els = new Elements({
+      publishableKey: "pk_test_x",
+      iframeBase: IFRAME_ORIGIN,
+    });
+    for (const timeoutMs of [0, 1000, 4999, 130_000, 6000.5]) {
       await expect(els.tokenize("pay_1", "idem_1", { timeoutMs })).rejects.toMatchObject({
         code: "invalid_tokenize_timeout",
       });
@@ -324,7 +340,7 @@ describe("Elements factory options", () => {
     els.on("tokenizeerror", (event) => {
       if (event.type === "tokenizeerror") seen.push(`${event.type}:${event.error.code}`);
     });
-    const attempt = els.tokenize("pay_1", "idem_1", { timeoutMs: 1000 });
+    const attempt = els.tokenize("pay_1", "idem_1", { timeoutMs: 5000 });
     fromIframe(
       {
         type: "arcpay:tokenize-error",
@@ -367,15 +383,108 @@ describe("Elements factory options", () => {
       fromIframe({ type: "arcpay:configured", field }, mock, channel);
     }
 
-    const complete = { isValid: true, isEmpty: false, isComplete: true, issue: null, help: null };
+    const complete = {
+      isValid: true,
+      isEmpty: false,
+      isComplete: true,
+      issue: null,
+      help: null,
+    };
+    const notDone = {
+      isValid: false,
+      isEmpty: false,
+      isComplete: false,
+      issue: null,
+      help: null,
+    };
+    vi.useFakeTimers();
     fromIframe({ type: "arcpay:focus", field: "cardNumber", help: null }, numberMock, channel);
     fromIframe({ type: "arcpay:change", field: "cardNumber", ...complete }, numberMock, channel);
+    // A longer number may still be coming: a further change inside the delay cancels the advance.
+    expect(sentOfType(expiryMock, "arcpay:focus")).toHaveLength(0);
+    vi.advanceTimersByTime(200);
+    fromIframe({ type: "arcpay:change", field: "cardNumber", ...notDone }, numberMock, channel);
+    vi.advanceTimersByTime(1000);
+    expect(sentOfType(expiryMock, "arcpay:focus")).toHaveLength(0);
+    fromIframe({ type: "arcpay:change", field: "cardNumber", ...complete }, numberMock, channel);
+    vi.advanceTimersByTime(400);
     expect(sentOfType(expiryMock, "arcpay:focus")).toHaveLength(1);
 
     // Not focused (e.g. autofill or programmatic clear) -> no focus steal.
     fromIframe({ type: "arcpay:blur", field: "cardNumber", issue: null }, numberMock, channel);
+    fromIframe({ type: "arcpay:change", field: "cardNumber", ...notDone }, numberMock, channel);
     fromIframe({ type: "arcpay:change", field: "cardNumber", ...complete }, numberMock, channel);
+    vi.advanceTimersByTime(1000);
     expect(sentOfType(expiryMock, "arcpay:focus")).toHaveLength(1);
+    els.destroy();
+    vi.useRealTimers();
+  });
+
+  it("keeps tokenize usable and reports success when a merchant listener throws", async () => {
+    const els = new Elements({
+      publishableKey: "pk_test_x",
+      iframeBase: IFRAME_ORIGIN,
+    });
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    els.create("card").mount(container);
+    const iframe = document.querySelector("iframe")!;
+    const mock = mockWindow(iframe);
+    const channel = (els as unknown as { channelId: string }).channelId;
+    fromIframe({ type: "arcpay:ready" }, mock, channel);
+    fromIframe({ type: "arcpay:configured" }, mock, channel);
+    const reported = vi.fn();
+    vi.stubGlobal("reportError", reported);
+    els.on("tokenizing", () => {
+      throw new Error("listener bug");
+    });
+    els.on("tokenized", () => {
+      throw new Error("listener bug 2");
+    });
+    const attempt = els.tokenize("pay_1", "idem_1");
+    fromIframe(
+      {
+        type: "arcpay:tokenize-result",
+        cardTokenId: "tok_1",
+        cardMask: "424242****4242",
+        cardScheme: "visa",
+        cardBin: "424242",
+        expiresIn: 300,
+        expiresAt: "2028-12-31T23:59:59Z",
+      },
+      mock,
+      channel,
+    );
+    await expect(attempt).resolves.toMatchObject({ cardTokenId: "tok_1" });
+    // The flag was released: a second attempt starts instead of failing with tokenize_in_progress.
+    const second = els.tokenize("pay_1", "idem_2");
+    fromIframe(
+      {
+        type: "arcpay:tokenize-result",
+        cardTokenId: "tok_2",
+        cardMask: "424242****4242",
+        cardScheme: "visa",
+        cardBin: "424242",
+        expiresIn: 300,
+        expiresAt: "2028-12-31T23:59:59Z",
+      },
+      mock,
+      channel,
+    );
+    await expect(second).resolves.toMatchObject({ cardTokenId: "tok_2" });
+    expect(reported).toHaveBeenCalledTimes(4);
+    vi.unstubAllGlobals();
+    els.destroy();
+  });
+
+  it("does not store an update that cannot reach an unmounted element", () => {
+    const els = new Elements({
+      publishableKey: "pk_test_x",
+      iframeBase: IFRAME_ORIGIN,
+    });
+    const el = els.create("card");
+    expect(() => el.update({ disabled: true })).toThrow(ArcPayError);
+    expect((el as unknown as { options: { disabled?: boolean } }).options.disabled).toBeUndefined();
     els.destroy();
   });
 });
