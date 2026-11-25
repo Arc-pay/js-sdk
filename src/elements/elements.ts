@@ -13,6 +13,8 @@ export interface ElementsOptions extends HostedFieldsRuntimeOptions {
   appearance?: HostedFieldsAppearance;
   /** Default minimum iframe height for every element. */
   minHeight?: string;
+  /** Default `mountTimeoutMs` for every element (see ElementOptions). */
+  mountTimeoutMs?: number;
 }
 
 export interface TokenizeOptions {
@@ -90,6 +92,7 @@ export class Elements {
       ...pickRuntimeOptions(opts),
       ...(opts.appearance !== undefined ? { appearance: opts.appearance } : {}),
       ...(opts.minHeight !== undefined ? { minHeight: opts.minHeight } : {}),
+      ...(opts.mountTimeoutMs !== undefined ? { mountTimeoutMs: opts.mountTimeoutMs } : {}),
     };
   }
 

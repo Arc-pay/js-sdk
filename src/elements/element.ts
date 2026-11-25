@@ -22,6 +22,11 @@ export interface ElementOptions extends HostedFieldsRuntimeOptions {
   appearance?: HostedFieldsAppearance;
   /** Minimum iframe height, e.g. "48px" or "3rem". Default "44px". */
   minHeight?: string;
+  /**
+   * How long to wait for the secure iframe handshake before emitting `loaderror`
+   * (`iframe_ready_timeout`). Default 10000, range 3000-120000. Raise it for slow networks.
+   */
+  mountTimeoutMs?: number;
   /** Accessible label for the merchant-owned field group and secure iframe. */
   label?: string;
   /** IDs for helper and error text owned by the merchant page. */
@@ -61,6 +66,8 @@ const FIELD_TITLES: Record<FieldType, string> = {
 };
 
 const MOUNT_TIMEOUT_MS = 10000;
+const MIN_MOUNT_TIMEOUT_MS = 3000;
+const MAX_MOUNT_TIMEOUT_MS = 120000;
 const HELLO_RETRY_INTERVAL_MS = 250;
 const FIELD_MIN_HEIGHT: Record<FieldType, string> = {
   card: "44px",
@@ -75,6 +82,21 @@ function assertMinHeight(value: string | undefined): void {
     type: "validation_error",
     code: "invalid_hosted_fields_option",
     message: "minHeight must be a number with px, rem, em, vh, svh or dvh",
+    retryable: false,
+  });
+}
+
+function assertMountTimeout(value: number | undefined): void {
+  if (
+    value === undefined ||
+    (Number.isInteger(value) && value >= MIN_MOUNT_TIMEOUT_MS && value <= MAX_MOUNT_TIMEOUT_MS)
+  ) {
+    return;
+  }
+  throw new ArcPayError({
+    type: "validation_error",
+    code: "invalid_hosted_fields_option",
+    message: `mountTimeoutMs must be an integer between ${MIN_MOUNT_TIMEOUT_MS} and ${MAX_MOUNT_TIMEOUT_MS}`,
     retryable: false,
   });
 }
@@ -117,7 +139,11 @@ export class Element {
     private readonly context: ElementContext,
   ) {
     assertMinHeight(options.minHeight);
+    assertMountTimeout(options.mountTimeoutMs);
     runtimeOptionsOf(options);
+    // Validate the appearance now: an unsupported theme used to surface only as an uncaught
+    // exception during the handshake and a silent 10 s wait for `loaderror`.
+    buildStyleFromAppearance(options.appearance);
   }
 
   /** Internal: used by Elements for autoAdvance. */
@@ -189,7 +215,7 @@ export class Element {
         reason: "Element iframe did not finish the Arc Pay handshake",
         retryable: true,
       });
-    }, MOUNT_TIMEOUT_MS);
+    }, this.options.mountTimeoutMs ?? MOUNT_TIMEOUT_MS);
 
     iframe.addEventListener(
       "load",
@@ -255,6 +281,8 @@ export class Element {
 
   update(options: Partial<ElementOptions>): void {
     assertMinHeight(options.minHeight);
+    assertMountTimeout(options.mountTimeoutMs);
+    if ("appearance" in options) buildStyleFromAppearance(options.appearance);
     const runtimeUpdate = runtimeOptionsOf(options);
     this.options = { ...this.options, ...options };
     if (this.iframe && options.minHeight !== undefined) {
