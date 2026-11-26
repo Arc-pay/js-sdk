@@ -22,6 +22,14 @@ inferred from the key prefix (`pk_test_` or `pk_live_`). Hosted Fields are serve
 from `https://sdk.arcpay.space` and tokenize against the Arc Pay public API
 configured for that iframe app.
 
+### Script tag builds
+
+`dist/cdn/arcpay.global.js` is the full browser bundle (`window.ArcPay.ArcPay`, `confirmPayment`,
+3DS actions, customer transfers). If a page only mounts Hosted Fields, load
+`dist/cdn/arcpay.fields.global.js` instead: the same `ArcPay.ArcPay.load(...)` and
+`ArcPay.ArcPayError`, about 38% smaller gzipped (7.5 KB instead of 12.1 KB). Bundler users
+need neither: the package is side-effect free and tree-shakes.
+
 ## React Bindings
 
 ```ts
@@ -196,11 +204,12 @@ and can be changed later with `element.update({...})`. Invalid values throw an
 
 | Option | Default | Effect |
 | --- | --- | --- |
-| `locale` | `"auto"` | `"ru"`, `"en"` or the browser language for default texts, errors and help. |
+| `locale` | `"auto"` | `"ru"`, `"en"` (region tags such as `ru-RU` are accepted) or the browser language for default texts, errors and help. |
 | `texts.placeholders` / `texts.labels` | localized | Per input: `cardNumber`, `cardExpiry`, `cardCvv`. |
 | `texts.errors` | localized | `issue.message` and the screen-reader error by issue code (`HOSTED_FIELD_ISSUE_CODES`). |
 | `layout` | `10px / 74px / 64px` | Composite `card` only: `gap`, `expiryWidth`, `cvvWidth` (`0` or px, rem, em, %). |
 | `minHeight` | `"44px"` | Minimum iframe height. |
+| `mountTimeoutMs` | `10000` | Wait for the iframe handshake before `loaderror` (`iframe_ready_timeout`); 3000-120000. Raise it for slow networks. |
 | `disabled`, `readOnly` | `false` | Standard input states; style them with `rules.disabled`. |
 | `autofocus` | `false` | Focus the field once it is ready. |
 | `autoAdvance` | `false` | Move to the next field once one is complete and valid (composite and split). |
@@ -237,6 +246,28 @@ the brand (Amex 4, other known brands 3; split mode checks it at `tokenize()`),
 Amex numbers must be 15 digits, expiry years more than 20 years ahead are
 rejected (`card_expiry_too_far`), and a `placeholder` given to a split
 `cardExpiry` / `cardCvv` element is now honored.
+
+#### Dark and tinted checkouts
+
+The secure iframe never paints a background of its own: `html` and `body` inside it
+are transparent, and only the input takes colors from `appearance`. For a dark
+checkout use `theme: "arcpay-dark"` (or set `colorText`, `colorPlaceholder` and
+`colorBackground` yourself) and declare the same scheme on your page
+(`html { color-scheme: dark }`) or pass `"color-scheme": "dark"` in `rules.base`:
+when the embedding page and the iframe disagree about the color scheme, browsers
+paint an opaque backdrop behind the iframe.
+
+#### Narrow containers and local development
+
+The composite `card` element shrinks its expiry and code columns below 340px so a
+16-digit number stays readable; explicit `layout` values are never overridden. For
+very small widths the split fields (separate iframes) give you full control.
+
+Hosted Fields are served with a strict `frame-ancestors` policy per merchant
+origin, and the edge refuses `http://localhost` and `http://127.0.0.1` as parent
+origins in every environment. Develop against an `https://` origin (for example a
+local TLS proxy or a staging host) and add it to the allowed origins of the test
+merchant.
 
 `appearance.theme` defaults to `"none"` so Arc Pay branding is not imposed on
 merchant checkout pages. `theme: "arcpay"` is available for demos and quick

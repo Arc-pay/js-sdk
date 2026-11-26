@@ -5,7 +5,7 @@ const cdn = process.env.BUILD === "cdn";
 export default defineConfig(
   cdn
     ? {
-        entry: { arcpay: "src/index.ts" },
+        entry: { arcpay: "src/index.ts", "arcpay.fields": "src/fields.ts" },
         format: ["iife"],
         globalName: "ArcPay",
         outDir: "dist/cdn",

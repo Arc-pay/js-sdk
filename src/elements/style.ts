@@ -1,5 +1,5 @@
 import type { StyleSubset } from "./postmessage";
-import { ArcPayError } from "../core/errors";
+import { validationError } from "../core/errors";
 
 export type HostedFieldsTheme = "none" | "arcpay" | "arcpay-dark";
 
@@ -199,12 +199,7 @@ const assertKnownTheme = (theme: HostedFieldsTheme | undefined): void => {
   if (theme === undefined || theme === "none" || theme === "arcpay" || theme === "arcpay-dark") {
     return;
   }
-  throw new ArcPayError({
-    type: "validation_error",
-    code: "invalid_hosted_fields_theme",
-    message: `Unsupported Hosted Fields appearance theme: ${String(theme)}`,
-    retryable: false,
-  });
+  throw validationError("invalid_hosted_fields_theme", `Unsupported Hosted Fields appearance theme: ${String(theme)}`);
 };
 
 const MAX_STYLE_VALUE_LENGTH = 512;

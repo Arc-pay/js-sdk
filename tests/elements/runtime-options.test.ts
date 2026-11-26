@@ -79,6 +79,19 @@ describe("sanitizeRuntimeOptions", () => {
   });
 });
 
+describe("locale tags", () => {
+  it("accepts region tags and lower-cases them", () => {
+    expect(sanitizeRuntimeOptions({ locale: "ru-RU" }, { strict: true }).locale).toBe("ru");
+    expect(sanitizeRuntimeOptions({ locale: "EN-us" }, { strict: true }).locale).toBe("en");
+    expect(() => sanitizeRuntimeOptions({ locale: "auto-x" }, { strict: true })).toThrow(
+      ArcPayError,
+    );
+    expect(() => sanitizeRuntimeOptions({ locale: "de-DE" }, { strict: true })).toThrow(
+      ArcPayError,
+    );
+  });
+});
+
 describe("appearance states and themes", () => {
   it("supports disabled, hover and autofill blocks", () => {
     const out = buildStyleFromAppearance({
@@ -128,6 +141,42 @@ describe("Element runtime options", () => {
   it("rejects invalid options at construction, before anything is mounted", () => {
     expect(() => new Element("card", { locale: "de" as never }, ctx)).toThrow(ArcPayError);
     expect(() => new Element("card", { minHeight: "tall" }, ctx)).toThrow(ArcPayError);
+  });
+
+  it("rejects an unsupported theme at construction instead of hanging the handshake", () => {
+    expect(
+      () => new Element("card", { appearance: { theme: "neon" as never } }, ctx),
+    ).toThrow(expect.objectContaining({ code: "invalid_hosted_fields_theme" }));
+    expect(() => {
+      const els = new Elements({
+        publishableKey: "pk_test_x",
+        iframeBase: IFRAME_ORIGIN,
+        appearance: { theme: "neon" as never },
+      });
+      els.create("card");
+    }).toThrow(expect.objectContaining({ code: "invalid_hosted_fields_theme" }));
+    const live = new Element("card", {}, ctx);
+    live.mount(container);
+    mockWindow(document.querySelector("iframe")!);
+    expect(() => live.update({ appearance: { theme: "neon" as never } })).toThrow(ArcPayError);
+    live.destroy();
+  });
+
+  it("validates and honors mountTimeoutMs", () => {
+    for (const bad of [0, 2999, 120001, 5000.5, "5000" as never]) {
+      expect(() => new Element("card", { mountTimeoutMs: bad }, ctx)).toThrow(ArcPayError);
+    }
+    vi.useFakeTimers();
+    const el = new Element("card", { mountTimeoutMs: 20000 }, ctx);
+    const seen: string[] = [];
+    el.on("loaderror", (e) => seen.push(e.type === "loaderror" ? e.code : ""));
+    el.mount(container);
+    vi.advanceTimersByTime(19999);
+    expect(seen).toEqual([]);
+    vi.advanceTimersByTime(2);
+    expect(seen).toEqual(["iframe_ready_timeout"]);
+    el.destroy();
+    vi.useRealTimers();
   });
 
   it("sends runtime options inside configure and omits the key when there are none", () => {
@@ -246,9 +295,29 @@ describe("Elements factory options", () => {
     els.destroy();
   });
 
+  it("applies a factory-level mountTimeoutMs to every element", () => {
+    vi.useFakeTimers();
+    const els = new Elements({ publishableKey: "pk_test_x", iframeBase: IFRAME_ORIGIN, mountTimeoutMs: 15000 });
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const seen: string[] = [];
+    const card = els.create("card");
+    card.on("loaderror", (e) => seen.push(e.type));
+    card.mount(container);
+    vi.advanceTimersByTime(14999);
+    expect(seen).toEqual([]);
+    vi.advanceTimersByTime(2);
+    expect(seen).toEqual(["loaderror"]);
+    els.destroy();
+    vi.useRealTimers();
+  });
+
   it("validates the tokenize timeout before doing any work", async () => {
-    const els = new Elements({ publishableKey: "pk_test_x", iframeBase: IFRAME_ORIGIN });
-    for (const timeoutMs of [0, 500, 130_000, 1500.5]) {
+    const els = new Elements({
+      publishableKey: "pk_test_x",
+      iframeBase: IFRAME_ORIGIN,
+    });
+    for (const timeoutMs of [0, 1000, 4999, 130_000, 6000.5]) {
       await expect(els.tokenize("pay_1", "idem_1", { timeoutMs })).rejects.toMatchObject({
         code: "invalid_tokenize_timeout",
       });
@@ -271,7 +340,7 @@ describe("Elements factory options", () => {
     els.on("tokenizeerror", (event) => {
       if (event.type === "tokenizeerror") seen.push(`${event.type}:${event.error.code}`);
     });
-    const attempt = els.tokenize("pay_1", "idem_1", { timeoutMs: 1000 });
+    const attempt = els.tokenize("pay_1", "idem_1", { timeoutMs: 5000 });
     fromIframe(
       {
         type: "arcpay:tokenize-error",
@@ -314,15 +383,108 @@ describe("Elements factory options", () => {
       fromIframe({ type: "arcpay:configured", field }, mock, channel);
     }
 
-    const complete = { isValid: true, isEmpty: false, isComplete: true, issue: null, help: null };
+    const complete = {
+      isValid: true,
+      isEmpty: false,
+      isComplete: true,
+      issue: null,
+      help: null,
+    };
+    const notDone = {
+      isValid: false,
+      isEmpty: false,
+      isComplete: false,
+      issue: null,
+      help: null,
+    };
+    vi.useFakeTimers();
     fromIframe({ type: "arcpay:focus", field: "cardNumber", help: null }, numberMock, channel);
     fromIframe({ type: "arcpay:change", field: "cardNumber", ...complete }, numberMock, channel);
+    // A longer number may still be coming: a further change inside the delay cancels the advance.
+    expect(sentOfType(expiryMock, "arcpay:focus")).toHaveLength(0);
+    vi.advanceTimersByTime(200);
+    fromIframe({ type: "arcpay:change", field: "cardNumber", ...notDone }, numberMock, channel);
+    vi.advanceTimersByTime(1000);
+    expect(sentOfType(expiryMock, "arcpay:focus")).toHaveLength(0);
+    fromIframe({ type: "arcpay:change", field: "cardNumber", ...complete }, numberMock, channel);
+    vi.advanceTimersByTime(400);
     expect(sentOfType(expiryMock, "arcpay:focus")).toHaveLength(1);
 
     // Not focused (e.g. autofill or programmatic clear) -> no focus steal.
     fromIframe({ type: "arcpay:blur", field: "cardNumber", issue: null }, numberMock, channel);
+    fromIframe({ type: "arcpay:change", field: "cardNumber", ...notDone }, numberMock, channel);
     fromIframe({ type: "arcpay:change", field: "cardNumber", ...complete }, numberMock, channel);
+    vi.advanceTimersByTime(1000);
     expect(sentOfType(expiryMock, "arcpay:focus")).toHaveLength(1);
+    els.destroy();
+    vi.useRealTimers();
+  });
+
+  it("keeps tokenize usable and reports success when a merchant listener throws", async () => {
+    const els = new Elements({
+      publishableKey: "pk_test_x",
+      iframeBase: IFRAME_ORIGIN,
+    });
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    els.create("card").mount(container);
+    const iframe = document.querySelector("iframe")!;
+    const mock = mockWindow(iframe);
+    const channel = (els as unknown as { channelId: string }).channelId;
+    fromIframe({ type: "arcpay:ready" }, mock, channel);
+    fromIframe({ type: "arcpay:configured" }, mock, channel);
+    const reported = vi.fn();
+    vi.stubGlobal("reportError", reported);
+    els.on("tokenizing", () => {
+      throw new Error("listener bug");
+    });
+    els.on("tokenized", () => {
+      throw new Error("listener bug 2");
+    });
+    const attempt = els.tokenize("pay_1", "idem_1");
+    fromIframe(
+      {
+        type: "arcpay:tokenize-result",
+        cardTokenId: "tok_1",
+        cardMask: "424242****4242",
+        cardScheme: "visa",
+        cardBin: "424242",
+        expiresIn: 300,
+        expiresAt: "2028-12-31T23:59:59Z",
+      },
+      mock,
+      channel,
+    );
+    await expect(attempt).resolves.toMatchObject({ cardTokenId: "tok_1" });
+    // The flag was released: a second attempt starts instead of failing with tokenize_in_progress.
+    const second = els.tokenize("pay_1", "idem_2");
+    fromIframe(
+      {
+        type: "arcpay:tokenize-result",
+        cardTokenId: "tok_2",
+        cardMask: "424242****4242",
+        cardScheme: "visa",
+        cardBin: "424242",
+        expiresIn: 300,
+        expiresAt: "2028-12-31T23:59:59Z",
+      },
+      mock,
+      channel,
+    );
+    await expect(second).resolves.toMatchObject({ cardTokenId: "tok_2" });
+    expect(reported).toHaveBeenCalledTimes(4);
+    vi.unstubAllGlobals();
+    els.destroy();
+  });
+
+  it("does not store an update that cannot reach an unmounted element", () => {
+    const els = new Elements({
+      publishableKey: "pk_test_x",
+      iframeBase: IFRAME_ORIGIN,
+    });
+    const el = els.create("card");
+    expect(() => el.update({ disabled: true })).toThrow(ArcPayError);
+    expect((el as unknown as { options: { disabled?: boolean } }).options.disabled).toBeUndefined();
     els.destroy();
   });
 });
