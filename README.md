@@ -481,6 +481,8 @@ const result = await confirmWalletPayment({
 
 if (result.status === "wallet_action" && result.walletAction.action === "qr") {
   // Render result.walletAction.qrUrl or result.walletAction.qrImageBase64.
+  // For SBP, result.walletAction.hostedUrl (when present) is our payment page
+  // with a bank list: offer it as a link or as a second QR for a phone camera.
 }
 ```
 

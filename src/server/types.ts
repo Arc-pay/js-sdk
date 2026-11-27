@@ -204,6 +204,8 @@ export interface WalletAction {
   sdk?: string;
   url?: string;
   qr_url?: string;
+  /** Arc Pay payment page for the same SBP payment, with a bank list. */
+  hosted_url?: string;
   qr_image_base64?: string;
   qr_content_type?: "image/png" | "image/svg+xml";
   bank_invoice_id?: string;
