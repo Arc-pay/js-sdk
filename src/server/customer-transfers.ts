@@ -194,8 +194,6 @@ export interface CustomerDisbursementList {
 export interface CustomerTransferCard {
   card_token_id: string;
   card_mask: string;
-  /** First digits of the card number; omitted when unknown. */
-  card_bin?: string;
   /** Empty string when the card network is unknown. */
   card_scheme: string;
   customer_reference: string;
