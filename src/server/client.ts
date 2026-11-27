@@ -391,6 +391,11 @@ const requireNonBlankFilter = (value: string | undefined, param: string): void =
   }
 };
 
+/** A card request is scoped to one owner: it is never sent without it. */
+const requireCardOwner = (value: string | undefined, param: string): void => {
+  requireNonBlankFilter(value ?? "", param);
+};
+
 const appendQuery = (path: string, query?: object): string => {
   if (!query) return path;
   const params = new URLSearchParams();
@@ -1048,6 +1053,7 @@ export class ArcPayClient {
   }
 
   async listSavedCards(query: SavedCardsQuery, opts: RequestOptions = {}): Promise<SavedCardList> {
+    requireCardOwner(query.customer_id, "customer_id");
     return this.request<SavedCardList>("GET", appendQuery("/cards", query), undefined, opts);
   }
 
@@ -1057,6 +1063,7 @@ export class ArcPayClient {
     query: SavedCardsQuery,
     opts: RequestOptions = {},
   ): Promise<void> {
+    requireCardOwner(query.customer_id, "customer_id");
     return this.request<void>(
       "DELETE",
       appendQuery(`/cards/${encodeURIComponent(cardTokenId)}`, query),
@@ -1069,6 +1076,7 @@ export class ArcPayClient {
     query: CustomerTransferCardsQuery,
     opts: RequestOptions = {},
   ): Promise<CustomerTransferCardList> {
+    requireCardOwner(query.customer_reference, "customer_reference");
     return this.request<CustomerTransferCardList>(
       "GET",
       appendQuery("/customer-transfer-cards", query),
@@ -1082,6 +1090,7 @@ export class ArcPayClient {
     query: CustomerTransferCardsQuery,
     opts: RequestOptions = {},
   ): Promise<CustomerTransferCard> {
+    requireCardOwner(query.customer_reference, "customer_reference");
     return this.request<CustomerTransferCard>(
       "GET",
       appendQuery(`/customer-transfer-cards/${encodeURIComponent(cardTokenId)}`, query),

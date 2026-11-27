@@ -166,6 +166,24 @@ describe("server ArcPayClient subscriptions and cards", () => {
     },
   );
 
+  it.each([undefined, "", "   "])(
+    "never sends a card request without its owner %j",
+    async (owner) => {
+      const saved = { customer_id: owner } as unknown as { customer_id: string };
+      const payout = { customer_reference: owner } as unknown as { customer_reference: string };
+      const calls: Array<[string, () => Promise<unknown>]> = [
+        ["customer_id", () => client.listSavedCards(saved)],
+        ["customer_id", () => client.deleteSavedCard("tok_1", saved)],
+        ["customer_reference", () => client.listCustomerTransferCards(payout)],
+        ["customer_reference", () => client.getCustomerTransferCard("tok_1", payout)],
+      ];
+      for (const [param, call] of calls) {
+        await expect(call()).rejects.toMatchObject({ type: "validation_error", param });
+      }
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
+
   it("cancels at once with an empty body by default", async () => {
     await client.cancelSubscription("sub_1");
 
