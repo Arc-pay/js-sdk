@@ -108,6 +108,13 @@ export interface Payment {
   payment_mode?: PaymentFlowMode;
   capture_mode?: CaptureMode;
   preparation_error?: PaymentPreparationError;
+  /** Present on the cancel response and single-payment reads, not on lists. */
+  cancellation?: PaymentCancellation;
+  /**
+   * Present together with `cancellation`. Create another payment for the same
+   * order only when this is `true`.
+   */
+  new_attempt_allowed?: boolean;
   created_at: string;
   updated_at: string;
   metadata?: Record<string, string>;
@@ -165,6 +172,30 @@ export interface CreateCardSetupRequest {
 
 export interface CaptureRequest {
   amount?: number;
+}
+
+export type PaymentCancellationReason =
+  | "requested_by_customer"
+  | "abandoned"
+  | "switch_payment_method"
+  | "duplicate"
+  | "other";
+
+export interface CancelPaymentRequest {
+  reason?: PaymentCancellationReason;
+}
+
+/** The merchant cancellation of a payment. */
+export interface PaymentCancellation {
+  /** `pending`: the payer may still be charged. */
+  state: "pending" | "succeeded" | "failed";
+  reason?: PaymentCancellationReason;
+  /** How a succeeded cancellation was proven. */
+  mechanism?: "local" | "void" | "bank_decline" | "bank_final";
+  /** Why a cancellation failed, e.g. `already_paid`. Tolerate unknown codes. */
+  outcome_code?: string;
+  requested_at: string;
+  resolved_at: string | null;
 }
 
 export interface VoidRequest {
