@@ -479,3 +479,164 @@ export interface ListPaymentsQuery {
 export interface ListAvailablePaymentMethodsQuery {
   environment: "live" | "sandbox";
 }
+
+export type SubscriptionStatus =
+  "trial" | "active" | "past_due" | "paused" | "canceled" | "expired";
+export type SubscriptionPaymentMethod = Extract<PaymentMethod, "bank_card" | "sbp">;
+export type BillingIntervalType = "day" | "week" | "month" | "year";
+
+/** Receipt line of a subscription created without `link_id`. The bank decides what it needs. */
+export interface SubscriptionReceiptItem {
+  name?: string;
+  quantity?: string;
+  unit_price?: number;
+  /** VAT rate in percent. Absent means 0. */
+  vat_rate?: number;
+  payment_object?: string;
+  payment_method?: string;
+  measure?: string;
+  item_code?: string;
+}
+
+export interface CreateSubscriptionRequest {
+  /** Recurring payment link template. Omit for a direct subscription. */
+  link_id?: string;
+  customer_id: string;
+  customer_email?: string;
+  /** Required when `link_id` is omitted, as are `currency` and `billing_interval_*`. */
+  amount?: number;
+  currency?: Currency;
+  billing_interval_type?: BillingIntervalType;
+  billing_interval_count?: number;
+  billing_trial_days?: number;
+  billing_trial_price?: number;
+  payment_method: SubscriptionPaymentMethod;
+  /** Reusable saved-card token, required for `bank_card`. */
+  card_token_id?: string;
+  sbp_subscription_id?: string;
+  sbp_member_id?: string;
+  sbp_bank_code?: string;
+  sbp_bank_terminal_id?: string;
+  external_id?: string;
+  metadata?: Record<string, string>;
+  /** Days between consecutive charge attempts of a failed cycle, for example `[2, 3]`. */
+  retry_schedule?: number[];
+  /** Receipt lines of the full-amount charges. Only without `link_id`. */
+  items?: SubscriptionReceiptItem[];
+  /** Receipt lines of the paid trial. Only without `link_id`. */
+  trial_items?: SubscriptionReceiptItem[];
+}
+
+export interface Subscription {
+  id: string;
+  link_id?: string;
+  tenant_id: string;
+  organization_id: string;
+  status: SubscriptionStatus;
+  environment: "live" | "sandbox";
+  customer_id: string;
+  /** Empty string when the subscription has no buyer email. */
+  customer_email: string;
+  amount: number;
+  currency: Currency;
+  interval_type: BillingIntervalType;
+  interval_count: number;
+  billing_day: number;
+  created_at: string;
+  current_period_start?: string;
+  current_period_end?: string;
+  /** Omitted while a cancellation is scheduled. */
+  next_billing_date?: string;
+  trial_days?: number;
+  trial_price?: number;
+  trial_end_date?: string;
+  retry_count?: number;
+  max_retries?: number;
+  next_retry_at?: string;
+  paused_at?: string;
+  pause_until?: string;
+  canceled_at?: string;
+  cancel_reason?: string;
+  canceled_by?: string;
+  external_id?: string;
+  metadata?: Record<string, string>;
+  payment_method: SubscriptionPaymentMethod;
+  card_token_id?: string;
+  retry_schedule?: number[];
+  cancel_at_period_end?: boolean;
+  /** Grows with every change; apply a webhook or a read only when it is greater than yours. */
+  version?: number;
+}
+
+export interface SubscriptionList {
+  subscriptions: Subscription[];
+  total_count: number;
+  next_cursor?: string;
+}
+
+export interface ListSubscriptionsQuery {
+  link_id?: string;
+  status?: SubscriptionStatus;
+  /** Exact merchant reference. It is not unique. */
+  external_id?: string;
+  limit?: number;
+  cursor?: string;
+}
+
+export interface CancelSubscriptionRequest {
+  cancel_reason?: string;
+  /** `true` cancels at the end of the paid period; the default cancels at once. */
+  cancel_at_period_end?: boolean;
+}
+
+export interface PauseSubscriptionRequest {
+  /** Automatic resume time, RFC 3339. */
+  pause_until?: string;
+}
+
+export interface BillingCycle {
+  id: string;
+  subscription_id: string;
+  status: "pending" | "paid" | "failed" | "waived";
+  amount: number;
+  currency: Currency;
+  period_start: string;
+  period_end: string;
+  created_at: string;
+  payment_id?: string;
+  attempts: number;
+  last_decline_code?: string;
+}
+
+export interface BillingCycleList {
+  cycles: BillingCycle[];
+  total_count: number;
+  next_cursor?: string;
+}
+
+export interface ListBillingCyclesQuery {
+  limit?: number;
+  cursor?: string;
+}
+
+export interface SavedCard {
+  card_token_id: string;
+  card_mask: string;
+  card_scheme: string;
+  expiry_month?: number;
+  expiry_year?: number;
+  bank_code: string;
+  /** An inactive card stays listed, but a charge with it is refused. */
+  is_active: boolean;
+  created_at: string;
+  last_used_at?: string;
+}
+
+export interface SavedCardList {
+  cards: SavedCard[];
+}
+
+export interface SavedCardsQuery {
+  /** Customer identifier the card was saved for. */
+  customer_id: string;
+}

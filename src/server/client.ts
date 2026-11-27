@@ -8,6 +8,9 @@ import type {
   TokenizeCustomerDisbursementCardRequest,
   TokenizeCustomerDisbursementCardResponse,
   CancelCustomerDisbursementRequest,
+  CustomerTransferCard,
+  CustomerTransferCardList,
+  CustomerTransferCardsQuery,
 } from "./customer-transfers";
 export type {
   CreateCustomerTransferSessionRequest,
@@ -20,6 +23,9 @@ export type {
   TokenizeCustomerDisbursementCardRequest,
   TokenizeCustomerDisbursementCardResponse,
   CancelCustomerDisbursementRequest,
+  CustomerTransferCard,
+  CustomerTransferCardList,
+  CustomerTransferCardsQuery,
 } from "./customer-transfers";
 import { ArcPayError, type ArcPayErrorType } from "../core/errors";
 import { isIdempotencyKey } from "../core/idempotency";
@@ -46,6 +52,17 @@ import type {
   VoidRequest,
   WaitForPaymentOptions,
   WaitForPaymentTerminalResult,
+  BillingCycle,
+  BillingCycleList,
+  CancelSubscriptionRequest,
+  CreateSubscriptionRequest,
+  ListBillingCyclesQuery,
+  ListSubscriptionsQuery,
+  PauseSubscriptionRequest,
+  SavedCardList,
+  SavedCardsQuery,
+  Subscription,
+  SubscriptionList,
 } from "./types";
 
 export type {
@@ -75,6 +92,22 @@ export type {
   VoidRequest,
   WaitForPaymentOptions,
   WaitForPaymentTerminalResult,
+  BillingCycle,
+  BillingCycleList,
+  BillingIntervalType,
+  CancelSubscriptionRequest,
+  CreateSubscriptionRequest,
+  ListBillingCyclesQuery,
+  ListSubscriptionsQuery,
+  PauseSubscriptionRequest,
+  SavedCard,
+  SavedCardList,
+  SavedCardsQuery,
+  Subscription,
+  SubscriptionList,
+  SubscriptionPaymentMethod,
+  SubscriptionReceiptItem,
+  SubscriptionStatus,
 } from "./types";
 
 export interface ArcPayClientOptions {
@@ -320,6 +353,42 @@ const normalizeCreateCheckoutSessionRequest = (
     unit_price: requirePositiveMinorUnits(item.unit_price, `fiscal_items.${index}.unit_price`),
   }));
   return { ...body, amount, ...(fiscalItems ? { fiscal_items: fiscalItems } : {}) };
+};
+
+const requireReceiptItemPrices = (
+  items: CreateSubscriptionRequest["items"],
+  field: string,
+): void => {
+  items?.forEach((item, index) => {
+    if (item.unit_price !== undefined) {
+      requireNonNegativeMinorUnits(item.unit_price, `${field}.${index}.unit_price`);
+    }
+  });
+};
+
+const normalizeCreateSubscriptionRequest = (
+  body: CreateSubscriptionRequest,
+): CreateSubscriptionRequest => {
+  if (body.amount !== undefined) requirePositiveMinorUnits(body.amount, "amount");
+  if (body.billing_trial_price !== undefined) {
+    requireNonNegativeMinorUnits(body.billing_trial_price, "billing_trial_price");
+  }
+  requireReceiptItemPrices(body.items, "items");
+  requireReceiptItemPrices(body.trial_items, "trial_items");
+  return body;
+};
+
+/** appendQuery drops empty values, which would turn a blank filter into "list everything". */
+const requireNonBlankFilter = (value: string | undefined, param: string): void => {
+  if (value !== undefined && value.trim() === "") {
+    throw new ArcPayError({
+      type: "validation_error",
+      code: "invalid_request",
+      message: `${param} filter must not be blank`,
+      param,
+      retryable: false,
+    });
+  }
 };
 
 const appendQuery = (path: string, query?: object): string => {
@@ -851,6 +920,171 @@ export class ArcPayClient {
     return this.request(
       "GET",
       `/customer-disbursements${params.size ? `?${params}` : ""}`,
+      undefined,
+      opts,
+    );
+  }
+
+  async createSubscription(
+    body: CreateSubscriptionRequest,
+    opts: IdempotencyOptions,
+  ): Promise<Subscription>;
+  async createSubscription(
+    body: CreateSubscriptionRequest,
+    opts: RequestOptionsInput,
+  ): Promise<Subscription> {
+    return this.request<Subscription>(
+      "POST",
+      "/subscriptions-v2",
+      normalizeCreateSubscriptionRequest(body),
+      opts,
+      true,
+    );
+  }
+
+  async getSubscription(subscriptionId: string, opts: RequestOptions = {}): Promise<Subscription> {
+    return this.request<Subscription>(
+      "GET",
+      `/subscriptions-v2/${encodeURIComponent(subscriptionId)}`,
+      undefined,
+      opts,
+    );
+  }
+
+  async listSubscriptions(
+    query: ListSubscriptionsQuery = {},
+    opts: RequestOptions = {},
+  ): Promise<SubscriptionList> {
+    requireNonBlankFilter(query.external_id, "external_id");
+    return this.request<SubscriptionList>(
+      "GET",
+      appendQuery("/subscriptions-v2", query),
+      undefined,
+      opts,
+    );
+  }
+
+  /** Cancels at once, or at the end of the paid period with `cancel_at_period_end: true`. */
+  async cancelSubscription(
+    subscriptionId: string,
+    body: CancelSubscriptionRequest = {},
+    opts: RequestOptions = {},
+  ): Promise<Subscription> {
+    return this.request<Subscription>(
+      "POST",
+      `/subscriptions-v2/${encodeURIComponent(subscriptionId)}/cancel`,
+      body,
+      opts,
+    );
+  }
+
+  /** Removes a cancellation scheduled for the end of the period. */
+  async uncancelSubscription(
+    subscriptionId: string,
+    opts: RequestOptions = {},
+  ): Promise<Subscription> {
+    return this.request<Subscription>(
+      "POST",
+      `/subscriptions-v2/${encodeURIComponent(subscriptionId)}/uncancel`,
+      undefined,
+      opts,
+    );
+  }
+
+  async pauseSubscription(
+    subscriptionId: string,
+    body: PauseSubscriptionRequest = {},
+    opts: RequestOptions = {},
+  ): Promise<Subscription> {
+    return this.request<Subscription>(
+      "POST",
+      `/subscriptions-v2/${encodeURIComponent(subscriptionId)}/pause`,
+      body,
+      opts,
+    );
+  }
+
+  async resumeSubscription(
+    subscriptionId: string,
+    opts: RequestOptions = {},
+  ): Promise<Subscription> {
+    return this.request<Subscription>(
+      "POST",
+      `/subscriptions-v2/${encodeURIComponent(subscriptionId)}/resume`,
+      undefined,
+      opts,
+    );
+  }
+
+  /** Charges the customer, so the SDK requires the key that the API leaves optional. */
+  async retrySubscriptionBilling(
+    subscriptionId: string,
+    opts: IdempotencyOptions,
+  ): Promise<BillingCycle>;
+  async retrySubscriptionBilling(
+    subscriptionId: string,
+    opts: RequestOptionsInput,
+  ): Promise<BillingCycle> {
+    return this.request<BillingCycle>(
+      "POST",
+      `/subscriptions-v2/${encodeURIComponent(subscriptionId)}/retry`,
+      undefined,
+      opts,
+      true,
+    );
+  }
+
+  async listSubscriptionBillingCycles(
+    subscriptionId: string,
+    query: ListBillingCyclesQuery = {},
+    opts: RequestOptions = {},
+  ): Promise<BillingCycleList> {
+    return this.request<BillingCycleList>(
+      "GET",
+      appendQuery(`/subscriptions-v2/${encodeURIComponent(subscriptionId)}/billing-cycles`, query),
+      undefined,
+      opts,
+    );
+  }
+
+  async listSavedCards(query: SavedCardsQuery, opts: RequestOptions = {}): Promise<SavedCardList> {
+    return this.request<SavedCardList>("GET", appendQuery("/cards", query), undefined, opts);
+  }
+
+  /** Revokes a saved-card or payout token bound to this customer. */
+  async deleteSavedCard(
+    cardTokenId: string,
+    query: SavedCardsQuery,
+    opts: RequestOptions = {},
+  ): Promise<void> {
+    return this.request<void>(
+      "DELETE",
+      appendQuery(`/cards/${encodeURIComponent(cardTokenId)}`, query),
+      undefined,
+      opts,
+    );
+  }
+
+  async listCustomerTransferCards(
+    query: CustomerTransferCardsQuery,
+    opts: RequestOptions = {},
+  ): Promise<CustomerTransferCardList> {
+    return this.request<CustomerTransferCardList>(
+      "GET",
+      appendQuery("/customer-transfer-cards", query),
+      undefined,
+      opts,
+    );
+  }
+
+  async getCustomerTransferCard(
+    cardTokenId: string,
+    query: CustomerTransferCardsQuery,
+    opts: RequestOptions = {},
+  ): Promise<CustomerTransferCard> {
+    return this.request<CustomerTransferCard>(
+      "GET",
+      appendQuery(`/customer-transfer-cards/${encodeURIComponent(cardTokenId)}`, query),
       undefined,
       opts,
     );
