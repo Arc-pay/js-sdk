@@ -190,3 +190,21 @@ export interface CustomerDisbursementList {
   disbursements: CustomerDisbursement[];
   next_cursor?: string;
 }
+/** Stored payout recipient card. The PAN and the card expiry are never returned. */
+export interface CustomerTransferCard {
+  card_token_id: string;
+  card_mask: string;
+  /** Empty string when the card network is unknown. */
+  card_scheme: string;
+  customer_reference: string;
+  created_at: string;
+  /** End of the token storage period, not the card expiry. Omitted when none is configured. */
+  expires_at?: string;
+}
+export interface CustomerTransferCardList {
+  cards: CustomerTransferCard[];
+}
+export interface CustomerTransferCardsQuery {
+  /** Customer reference the cards were tokenized for; matched exactly. */
+  customer_reference: string;
+}

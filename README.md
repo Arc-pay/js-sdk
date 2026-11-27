@@ -292,7 +292,8 @@ and checkout sessions.
 Mutating server-client methods require an explicit `{ idempotencyKey }`:
 `createPayment`, `createCardSetup`, `executePayment`, `capturePayment`, `voidPayment`,
 `createRefund`, `chargeSavedCard`, `completeThreeDSMethod`, `createLink`,
-`cancelLink`, and `createCheckoutSession`. Missing idempotency raises
+`cancelLink`, `createCheckoutSession`, `createSubscription`, and
+`retrySubscriptionBilling`. Missing idempotency raises
 `ArcPayError` with `code="missing_idempotency_key"` before any HTTP request is
 sent.
 
@@ -399,6 +400,51 @@ For saved cards and subscriptions, create a setup intent with
 complete any returned 3DS browser step, and wait for a terminal payment that
 contains `card_token_id`. Later merchant-initiated charges use
 `chargeSavedCard()`.
+
+## Subscriptions and stored cards
+
+```ts
+const subscription = await client.createSubscription(
+  {
+    customer_id: "customer-1",
+    amount: 100000,
+    currency: "RUB",
+    billing_interval_type: "month",
+    billing_interval_count: 1,
+    payment_method: "bank_card",
+    card_token_id: savedCardTokenId,
+    external_id: "plan-42",
+    retry_schedule: [2, 3],
+  },
+  { idempotencyKey },
+);
+
+// Find it again by your own reference. The reference is not unique.
+const { subscriptions } = await client.listSubscriptions({ external_id: "plan-42" });
+
+// Cancel at the end of the paid period, or change your mind before it ends.
+await client.cancelSubscription(subscription.id, { cancel_at_period_end: true });
+await client.uncancelSubscription(subscription.id);
+```
+
+Persist the create key with your order: it never creates a second subscription,
+and reusing it with other parameters answers `409`. A direct subscription without
+a trial is not charged for its first period. `items` and `trial_items` carry
+receipt data only when `link_id` is omitted.
+
+Also available: `getSubscription`, `pauseSubscription`, `resumeSubscription`,
+`retrySubscriptionBilling` and `listSubscriptionBillingCycles`. A manual retry
+charges the customer, so reuse its key after a network failure or an unknown
+outcome. `cancelSubscription`, `uncancelSubscription`, `pauseSubscription` and
+`resumeSubscription` take no idempotency key and are not retried automatically;
+after a failure, read the subscription before calling again. Webhook delivery
+order is not guaranteed: apply a webhook or a read only when its `version` is
+greater than the one you stored.
+
+`listSavedCards({ customer_id })` and
+`deleteSavedCard(cardTokenId, { customer_id })` manage cards saved for payments.
+Deletion also revokes a payout token; pass the `customer_reference` it was
+tokenized with as `customer_id`.
 
 ## SBP QR with the server SDK
 
@@ -588,6 +634,14 @@ string. `description` is the bank payment purpose text (PSB B2C: 1-150
 characters).
 The server SDK also exposes `listCustomerDisbursements`, `getCustomerDisbursement`
 and `refreshCustomerDisbursement`, including reconciliation and retry diagnostics.
+
+Stored payout recipient cards are read with
+`listCustomerTransferCards({ customer_reference })` and
+`getCustomerTransferCard(cardTokenId, { customer_reference })`. Always pass
+`customer_reference` when tokenizing a recipient card: cards without it are never
+listed. `expires_at` is the end of the token storage period, not the card expiry.
+The error code `card_token_unavailable` means the token was revoked or erased:
+tokenize the card again.
 
 Use the returned hosted URL, or import `createCustomerTransferSessionClient`
 from the browser SDK for the recipient journey. `tokenizeCard` accepts PAN plus
