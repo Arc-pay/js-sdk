@@ -205,6 +205,54 @@ describe("parseIncoming", () => {
     expect(parseIncoming(event, EXPECTED_ORIGIN)).toBeNull();
   });
 
+  it("accepts a tokenize-recipient command only with a non-empty setupId", () => {
+    const data = { type: "arcpay:tokenize-recipient" as const, setupId: "setup-1" };
+    expect(parseIncoming(makeMessageEvent(data, EXPECTED_ORIGIN), EXPECTED_ORIGIN)).toBe(data);
+    for (const setupId of ["", 42, undefined]) {
+      const event = makeMessageEvent({ type: "arcpay:tokenize-recipient", setupId }, EXPECTED_ORIGIN);
+      expect(parseIncoming(event, EXPECTED_ORIGIN)).toBeNull();
+    }
+  });
+
+  it("accepts a recipient-result with routing, card fields and an optional expiresAt", () => {
+    const data = {
+      type: "arcpay:recipient-result" as const,
+      field: "cardNumber" as const,
+      channelId: "channel-1",
+      setupId: "setup-1",
+      cardTokenId: "tok_1",
+      cardMask: "411111******1111",
+      cardScheme: "visa",
+    };
+    expect(parseIncoming(makeMessageEvent(data, EXPECTED_ORIGIN), EXPECTED_ORIGIN)).toBe(data);
+    const withExpiry = { ...data, expiresAt: "2027-11-27T10:00:00Z" };
+    expect(parseIncoming(makeMessageEvent(withExpiry, EXPECTED_ORIGIN), EXPECTED_ORIGIN)).toBe(
+      withExpiry,
+    );
+  });
+
+  it("rejects structurally invalid recipient-result messages", () => {
+    const base = {
+      type: "arcpay:recipient-result",
+      field: "cardNumber",
+      channelId: "channel-1",
+      setupId: "setup-1",
+      cardTokenId: "tok_1",
+      cardMask: "411111******1111",
+      cardScheme: "visa",
+    };
+    for (const broken of [
+      { ...base, setupId: undefined },
+      { ...base, cardTokenId: 1 },
+      { ...base, cardMask: undefined },
+      { ...base, expiresAt: 0 },
+      { ...base, channelId: undefined },
+      { ...base, field: "notAField" },
+    ]) {
+      expect(parseIncoming(makeMessageEvent(broken, EXPECTED_ORIGIN), EXPECTED_ORIGIN)).toBeNull();
+    }
+  });
+
   it("rejects structurally invalid change messages", () => {
     const event = makeMessageEvent(
       {

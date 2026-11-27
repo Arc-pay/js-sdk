@@ -22,6 +22,16 @@ export interface TokenizeOptions {
   timeoutMs?: number;
 }
 
+export interface RecipientCardResult {
+  setupId: string;
+  cardTokenId: string;
+  cardMask: string;
+  /** Empty string when the card network is unknown. */
+  cardScheme: string;
+  /** End of the token storage period (not the card expiry); omitted when none is configured. */
+  expiresAt?: string;
+}
+
 export type ElementsEvent =
   | { type: "tokenizing"; paymentId: string }
   | { type: "tokenized"; paymentId: string; result: TokenizeResult }
@@ -55,6 +65,45 @@ const assertNonEmptyTokenizeInput = (
   if (typeof value === "string" && value.trim().length > 0) return;
   throw validationError(name === "paymentId" ? "missing_payment_id" : "missing_idempotency_key", `${name} must be a non-empty string`);
 };
+
+const resolveTokenizeTimeout = (options: TokenizeOptions): number => {
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TOKENIZE_TIMEOUT_MS;
+  if (
+    !Number.isInteger(timeoutMs) ||
+    timeoutMs < MIN_TOKENIZE_TIMEOUT_MS ||
+    timeoutMs > MAX_TOKENIZE_TIMEOUT_MS
+  ) {
+    throw validationError("invalid_tokenize_timeout", `timeoutMs must be an integer between ${MIN_TOKENIZE_TIMEOUT_MS} and ${MAX_TOKENIZE_TIMEOUT_MS}`);
+  }
+  return timeoutMs;
+};
+
+const bridgeError = (
+  data: Extract<IframeToParent, { type: "arcpay:tokenize-error" }>,
+  paymentId?: string,
+): ArcPayError =>
+  new ArcPayError({
+    type:
+      data.errorType === "validation_error" ||
+      data.errorType === "configuration_error" ||
+      data.errorType === "network_error" ||
+      data.errorType === "api_error"
+        ? data.errorType
+        : "api_error",
+    code: data.code,
+    message: data.message,
+    retryable: false,
+    paymentId,
+  });
+
+const tokenizeTimeoutError = (method: string, timeoutMs: number, paymentId?: string): ArcPayError =>
+  new ArcPayError({
+    type: "network_error",
+    code: "tokenize_timeout",
+    message: `${method} timed out after ${timeoutMs / 1000} seconds`,
+    retryable: true,
+    paymentId,
+  });
 
 export class Elements {
   private readonly elementMap = new Map<FieldType, Element>();
@@ -154,14 +203,7 @@ export class Elements {
   ): Promise<TokenizeResult> {
     assertNonEmptyTokenizeInput("paymentId", paymentId);
     assertNonEmptyTokenizeInput("idempotencyKey", idempotencyKey);
-    const timeoutMs = options.timeoutMs ?? DEFAULT_TOKENIZE_TIMEOUT_MS;
-    if (
-      !Number.isInteger(timeoutMs) ||
-      timeoutMs < MIN_TOKENIZE_TIMEOUT_MS ||
-      timeoutMs > MAX_TOKENIZE_TIMEOUT_MS
-    ) {
-      throw validationError("invalid_tokenize_timeout", `timeoutMs must be an integer between ${MIN_TOKENIZE_TIMEOUT_MS} and ${MAX_TOKENIZE_TIMEOUT_MS}`);
-    }
+    const timeoutMs = resolveTokenizeTimeout(options);
 
     // C2: concurrent-call guard — only one tokenize() may be in-flight at a time.
     if (this.tokenizeInFlight) {
@@ -233,15 +275,7 @@ export class Elements {
       // C3: bounded timeout (default 30 s) — rejects and cleans up if no result arrives.
       const timer = window.setTimeout(() => {
         window.removeEventListener("message", onMessage);
-        reject(
-          new ArcPayError({
-            type: "network_error",
-            code: "tokenize_timeout",
-            message: `tokenize() timed out after ${timeoutMs / 1000} seconds`,
-            retryable: true,
-            paymentId,
-          }),
-        );
+        reject(tokenizeTimeoutError("tokenize()", timeoutMs, paymentId));
       }, timeoutMs);
 
       const onMessage = (event: MessageEvent) => {
@@ -266,26 +300,104 @@ export class Elements {
         } else if (data.type === "arcpay:tokenize-error") {
           clearTimeout(timer);
           window.removeEventListener("message", onMessage);
-          reject(
-            new ArcPayError({
-              type:
-                data.errorType === "validation_error" ||
-                data.errorType === "configuration_error" ||
-                data.errorType === "network_error" ||
-                data.errorType === "api_error"
-                  ? data.errorType
-                  : "api_error",
-              code: data.code,
-              message: data.message,
-              retryable: false,
-              paymentId,
-            }),
-          );
+          reject(bridgeError(data, paymentId));
         }
       };
 
       window.addEventListener("message", onMessage);
       card.send({ type: "arcpay:tokenize", paymentId, idempotencyKey });
+    });
+  }
+
+  /**
+   * Tokenizes a payout recipient card entered in the `cardNumber` Element and attaches it to
+   * the card setup `setupId` created by the merchant backend. Only the card number is used
+   * (no expiry or CVC); the PAN stays inside the Elements iframe and goes only to card-entry.
+   * Confirm the returned `cardTokenId` on the backend (webhook
+   * `customer_transfer_card_setup.completed` or GET of the setup) before paying out to it.
+   */
+  async tokenizeRecipientCard(
+    setupId: string,
+    options: TokenizeOptions = {},
+  ): Promise<RecipientCardResult> {
+    if (typeof setupId !== "string" || setupId.trim().length === 0) {
+      throw validationError("missing_setup_id", "setupId must be a non-empty string");
+    }
+    const timeoutMs = resolveTokenizeTimeout(options);
+    if (this.tokenizeInFlight) {
+      throw validationError("tokenize_in_progress", "A tokenize() call is already in progress for this Elements instance");
+    }
+    if (this.elementMap.has("card") || this.elementMap.has("cardExpiry") || this.elementMap.has("cardCvv")) {
+      throw validationError("mixed_hosted_fields_mode", "tokenizeRecipientCard() uses only the cardNumber Element; do not create card, cardExpiry or cardCvv Elements on this instance.");
+    }
+    const cardNumber = this.elementMap.get("cardNumber");
+    if (!cardNumber) {
+      throw validationError("incomplete_elements", "Create a cardNumber Element before tokenizeRecipientCard()");
+    }
+    if (!cardNumber.isReady()) {
+      throw validationError("elements_not_ready", "Wait for the cardNumber Element to fire 'ready' before tokenizeRecipientCard()");
+    }
+
+    this.tokenizeInFlight = true;
+    try {
+      return await this.doTokenizeRecipient(cardNumber, setupId, timeoutMs);
+    } finally {
+      this.tokenizeInFlight = false;
+    }
+  }
+
+  private doTokenizeRecipient(
+    cardNumber: Element,
+    setupId: string,
+    timeoutMs: number,
+  ): Promise<RecipientCardResult> {
+    const iframeOrigin = new URL(this.iframeBase).origin;
+    const iframeWindow = cardNumber.getIframeContentWindow();
+    if (!iframeWindow) {
+      return Promise.reject(
+        validationError("iframe_not_loaded", "tokenizeRecipientCard() cannot start because the cardNumber iframe is not loaded"),
+      );
+    }
+
+    return new Promise<RecipientCardResult>((resolve, reject) => {
+      const timer = window.setTimeout(() => {
+        window.removeEventListener("message", onMessage);
+        reject(tokenizeTimeoutError("tokenizeRecipientCard()", timeoutMs));
+      }, timeoutMs);
+
+      const onMessage = (event: MessageEvent) => {
+        const data = parseIncoming<IframeToParent>(event, iframeOrigin);
+        if (!data) return;
+        const channelId = "channelId" in data ? data.channelId : undefined;
+        if (typeof channelId !== "string" || channelId !== this.channelId) return;
+        if (event.source !== iframeWindow) return;
+
+        if (data.type === "arcpay:recipient-result") {
+          if (data.setupId !== setupId) return;
+          clearTimeout(timer);
+          window.removeEventListener("message", onMessage);
+          resolve({
+            setupId: data.setupId,
+            cardTokenId: data.cardTokenId,
+            cardMask: data.cardMask,
+            cardScheme: data.cardScheme,
+            ...(data.expiresAt !== undefined ? { expiresAt: data.expiresAt } : {}),
+          });
+        } else if (data.type === "arcpay:tokenize-error") {
+          clearTimeout(timer);
+          window.removeEventListener("message", onMessage);
+          reject(bridgeError(data));
+        }
+      };
+
+      window.addEventListener("message", onMessage);
+      try {
+        cardNumber.send({ type: "arcpay:tokenize-recipient", setupId });
+      } catch (error) {
+        clearTimeout(timer);
+        window.removeEventListener("message", onMessage);
+        reject(error);
+      }
     });
   }
 

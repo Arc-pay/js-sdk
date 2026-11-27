@@ -481,3 +481,217 @@ describe("Elements.destroy", () => {
     expect(document.querySelectorAll("iframe")).toHaveLength(0);
   });
 });
+
+function mountCardNumberOnly(els: Elements): HTMLElement {
+  const container = document.createElement("div");
+  document.body.replaceChildren(container);
+  els.create("cardNumber").mount(container);
+  return container;
+}
+
+function readyCardNumber(els: Elements): { postMessage: ReturnType<typeof vi.fn> } {
+  mountCardNumberOnly(els);
+  const mock = mockIframeContentWindow('[data-arcpay-element="cardNumber"]');
+  simulateReady(els, mock, "cardNumber");
+  return mock;
+}
+
+const RECIPIENT_RESULT = {
+  type: "arcpay:recipient-result",
+  field: "cardNumber",
+  setupId: "setup_1",
+  cardTokenId: "tok_recipient",
+  cardMask: "411111******1111",
+  cardScheme: "visa",
+  expiresAt: "2027-11-27T10:00:00Z",
+};
+
+describe("Elements.tokenizeRecipientCard", () => {
+  beforeEach(() => {
+    document.body.replaceChildren();
+  });
+
+  afterEach(() => {
+    document.body.replaceChildren();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("sends the setup id only to the cardNumber iframe and resolves with the attach result", async () => {
+    const els = makeElements();
+    const numberMock = readyCardNumber(els);
+
+    const promise = els.tokenizeRecipientCard("setup_1");
+
+    expect(numberMock.postMessage).toHaveBeenCalledWith(
+      { type: "arcpay:tokenize-recipient", setupId: "setup_1" },
+      IFRAME_ORIGIN,
+    );
+    for (const call of numberMock.postMessage.mock.calls) {
+      expect(call[1]).toBe(IFRAME_ORIGIN);
+    }
+    dispatchFromIframe(RECIPIENT_RESULT, numberMock);
+
+    await expect(promise).resolves.toEqual({
+      setupId: "setup_1",
+      cardTokenId: "tok_recipient",
+      cardMask: "411111******1111",
+      cardScheme: "visa",
+      expiresAt: "2027-11-27T10:00:00Z",
+    });
+    els.destroy();
+  });
+
+  it("omits expiresAt when the token has no storage period", async () => {
+    const els = makeElements();
+    const numberMock = readyCardNumber(els);
+    const promise = els.tokenizeRecipientCard("setup_1");
+    const withoutExpiry: Record<string, unknown> = { ...RECIPIENT_RESULT };
+    delete withoutExpiry.expiresAt;
+    dispatchFromIframe(withoutExpiry, numberMock);
+
+    const result = await promise;
+    expect(result).not.toHaveProperty("expiresAt");
+    expect(result).not.toHaveProperty("cardBin");
+    els.destroy();
+  });
+
+  it("rejects mixed_hosted_fields_mode when card, cardExpiry or cardCvv exist", async () => {
+    const composite = makeElements();
+    composite.create("card");
+    await expect(composite.tokenizeRecipientCard("setup_1")).rejects.toMatchObject({
+      code: "mixed_hosted_fields_mode",
+    });
+    composite.destroy();
+
+    for (const extra of ["cardExpiry", "cardCvv"] as const) {
+      const split = makeElements();
+      split.create("cardNumber");
+      split.create(extra);
+      await expect(split.tokenizeRecipientCard("setup_1")).rejects.toMatchObject({
+        code: "mixed_hosted_fields_mode",
+      });
+      split.destroy();
+    }
+  });
+
+  it("rejects incomplete_elements without a cardNumber Element", async () => {
+    const els = makeElements();
+    await expect(els.tokenizeRecipientCard("setup_1")).rejects.toMatchObject({
+      type: "validation_error",
+      code: "incomplete_elements",
+    });
+  });
+
+  it("rejects elements_not_ready before the cardNumber iframe is ready", async () => {
+    const els = makeElements();
+    mountCardNumberOnly(els);
+    mockIframeContentWindow('[data-arcpay-element="cardNumber"]');
+    await expect(els.tokenizeRecipientCard("setup_1")).rejects.toMatchObject({
+      code: "elements_not_ready",
+    });
+    els.destroy();
+  });
+
+  it("rejects a blank setup id and an out-of-range timeout before messaging the iframe", async () => {
+    const els = makeElements();
+    const numberMock = readyCardNumber(els);
+    numberMock.postMessage.mockClear();
+    await expect(els.tokenizeRecipientCard(" ")).rejects.toMatchObject({ code: "missing_setup_id" });
+    await expect(
+      els.tokenizeRecipientCard("setup_1", { timeoutMs: 10 }),
+    ).rejects.toMatchObject({ code: "invalid_tokenize_timeout" });
+    expect(numberMock.postMessage).not.toHaveBeenCalled();
+    els.destroy();
+  });
+
+  it("shares the single in-flight guard with tokenize()", async () => {
+    const els = makeElements();
+    const numberMock = readyCardNumber(els);
+
+    const first = els.tokenizeRecipientCard("setup_1");
+    await expect(els.tokenizeRecipientCard("setup_1")).rejects.toMatchObject({
+      code: "tokenize_in_progress",
+    });
+    await expect(els.tokenize("pay_1", "idem_1")).rejects.toMatchObject({
+      code: "tokenize_in_progress",
+    });
+    dispatchFromIframe(RECIPIENT_RESULT, numberMock);
+    await first;
+    els.destroy();
+  });
+
+  it("ignores replies from a foreign origin, source, channel, setup or message type", async () => {
+    const els = makeElements();
+    const numberMock = readyCardNumber(els);
+    const promise = els.tokenizeRecipientCard("setup_1");
+
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: { ...RECIPIENT_RESULT, channelId: channelIdFromElements(els), cardTokenId: "tok_evil" },
+        origin: "https://evil.example.com",
+      }),
+    );
+    dispatchFromIframe({ ...RECIPIENT_RESULT, cardTokenId: "tok_source" }, { postMessage: vi.fn() }, channelIdFromElements(els));
+    dispatchFromIframe({ ...RECIPIENT_RESULT, cardTokenId: "tok_channel", channelId: "other" }, numberMock);
+    dispatchFromIframe({ ...RECIPIENT_RESULT, cardTokenId: "tok_setup", setupId: "setup_2" }, numberMock);
+    dispatchFromIframe(
+      {
+        type: "arcpay:tokenize-result",
+        field: "cardNumber",
+        cardTokenId: "tok_payment",
+        cardMask: "x",
+        cardScheme: "visa",
+        cardBin: "411111",
+        expiresIn: 300,
+        expiresAt: "2030-01-01T00:00:00Z",
+      },
+      numberMock,
+    );
+    dispatchFromIframe(RECIPIENT_RESULT, numberMock);
+
+    await expect(promise).resolves.toMatchObject({ cardTokenId: "tok_recipient" });
+    els.destroy();
+  });
+
+  it("rejects with the API code from arcpay:tokenize-error and allows a retry", async () => {
+    const els = makeElements();
+    const numberMock = readyCardNumber(els);
+    const promise = els.tokenizeRecipientCard("setup_1");
+    dispatchFromIframe(
+      {
+        type: "arcpay:tokenize-error",
+        field: "cardNumber",
+        errorType: "api_error",
+        code: "card_setup_expired",
+        message: "Could not save the card.",
+      },
+      numberMock,
+    );
+
+    const err = (await promise.catch((e: unknown) => e)) as ArcPayError;
+    expect(err).toBeInstanceOf(ArcPayError);
+    expect(err.type).toBe("api_error");
+    expect(err.code).toBe("card_setup_expired");
+    expect(err.paymentId).toBeUndefined();
+
+    const retry = els.tokenizeRecipientCard("setup_1");
+    dispatchFromIframe(RECIPIENT_RESULT, numberMock);
+    await expect(retry).resolves.toMatchObject({ cardTokenId: "tok_recipient" });
+    els.destroy();
+  });
+
+  it("rejects tokenize_timeout when the iframe never answers", async () => {
+    vi.useFakeTimers();
+    const els = makeElements();
+    readyCardNumber(els);
+    const promise = els.tokenizeRecipientCard("setup_1", { timeoutMs: 5_000 });
+    vi.advanceTimersByTime(5_001);
+
+    const err = (await promise.catch((e: unknown) => e)) as ArcPayError;
+    expect(err.code).toBe("tokenize_timeout");
+    expect(err.type).toBe("network_error");
+    expect(err.retryable).toBe(true);
+    els.destroy();
+  });
+});

@@ -60,6 +60,7 @@ export type {
   ElementsOptions,
   ElementsEvent,
   TokenizeOptions,
+  RecipientCardResult,
 } from "./elements/elements";
 export { HOSTED_FIELD_ISSUE_CODES } from "./elements/options";
 export type {

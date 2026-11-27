@@ -643,6 +643,53 @@ listed. `expires_at` is the end of the token storage period, not the card expiry
 The error code `card_token_unavailable` means the token was revoked or erased:
 tokenize the card again.
 
+### Payout recipient card from a merchant page
+
+To save a recipient card in your own UI without the PAN touching your servers or
+page script, create a card setup on the backend and finish it with Hosted
+Fields. The card number is entered inside the Elements iframe and sent only to
+the Arc Pay card-entry host; your page receives the token id and the mask.
+
+```ts
+// Backend (secret key). allowed_origin must be registered for your account.
+const setup = await client.createCustomerTransferCardSetup(
+  { customer_reference: "expert-42", allowed_origin: "https://app.example.com" },
+  { idempotencyKey },
+);
+// Give setup.card_setup_id only to the authenticated recipient's page.
+```
+
+```ts
+// Merchant page (publishable key), served from allowed_origin.
+const elements = arcpay.elements();
+const cardNumber = elements.create("cardNumber");
+cardNumber.mount("#recipient-card");
+cardNumber.on("ready", () => (button.disabled = false));
+
+const result = await elements.tokenizeRecipientCard(cardSetupId);
+// { setupId, cardTokenId, cardMask, cardScheme, expiresAt? }
+```
+
+- Only the `cardNumber` Element is used: no expiry or CVC. Creating `card`,
+  `cardExpiry` or `cardCvv` on the same `Elements` instance fails with
+  `mixed_hosted_fields_mode`.
+- A setup lives 30 minutes and completes once. Calling the method again after a
+  network break is safe: the same card yields the same token, and attaching the
+  same token again returns the same result.
+- Do not pay out to `cardTokenId` from the browser alone. Confirm it on the
+  backend with the `customer_transfer_card_setup.completed` webhook or
+  `getCustomerTransferCardSetup(card_setup_id)` (status `completed`, `card`).
+- Errors arrive as `ArcPayError` with the API code, for example
+  `card_setup_expired`, `card_setup_completed`, `origin_not_allowed`,
+  `card_token_unavailable` or `rate_limited`; `tokenize_timeout` when the iframe
+  does not answer.
+- Your CSP needs only `frame-src` for the Elements origin.
+
+For the server PAN path, `createCustomerDisbursementCardEntryTicket({
+customer_reference })` returns `{ticket, card_entry_url, expires_at,
+customer_reference}`: POST `{pan}` to `card_entry_url` from your backend with the
+`X-Card-Entry-Ticket` header.
+
 Use the returned hosted URL, or import `createCustomerTransferSessionClient`
 from the browser SDK for the recipient journey. `tokenizeCard` accepts PAN plus
 optional recipient/sender metadata; payout tokenization does not accept expiry

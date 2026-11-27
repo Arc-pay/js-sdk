@@ -37,7 +37,9 @@ export type ParentToIframe =
   | { type: "arcpay:placeholder"; field: FieldType; placeholder: string }
   | { type: "arcpay:focus" }
   | { type: "arcpay:clear" }
-  | { type: "arcpay:tokenize"; paymentId: string; idempotencyKey: string };
+  | { type: "arcpay:tokenize"; paymentId: string; idempotencyKey: string }
+  /** Tokenizes a payout recipient PAN (cardNumber only) and attaches it to a card setup. */
+  | { type: "arcpay:tokenize-recipient"; setupId: string };
 
 // iframe → parent
 export type IframeToParent =
@@ -77,6 +79,18 @@ export type IframeToParent =
       expiresIn: number;
       expiresAt: string;
       channelId: string;
+    }
+  | {
+      /** Card setup attach result. No BIN: payout recipient cards never expose it. */
+      type: "arcpay:recipient-result";
+      field: FieldType;
+      channelId: string;
+      setupId: string;
+      cardTokenId: string;
+      cardMask: string;
+      cardScheme: string;
+      /** End of the token storage period, from the attach response; omitted when none. */
+      expiresAt?: string;
     }
   | {
       type: "arcpay:tokenize-error";
@@ -216,6 +230,23 @@ const isKnownArcpayMessage = (data: unknown): data is ParentToIframe | IframeToP
         "idempotencyKey" in data &&
         typeof data.paymentId === "string" &&
         typeof data.idempotencyKey === "string"
+      );
+    case "arcpay:tokenize-recipient":
+      return "setupId" in data && typeof data.setupId === "string" && data.setupId.length > 0;
+    case "arcpay:recipient-result":
+      return (
+        "setupId" in data &&
+        "cardTokenId" in data &&
+        "cardMask" in data &&
+        "cardScheme" in data &&
+        typeof data.setupId === "string" &&
+        typeof data.cardTokenId === "string" &&
+        typeof data.cardMask === "string" &&
+        typeof data.cardScheme === "string" &&
+        (!("expiresAt" in data) ||
+          data.expiresAt === undefined ||
+          typeof data.expiresAt === "string") &&
+        hasRequiredRouting(data)
       );
     case "arcpay:rejected":
       return (

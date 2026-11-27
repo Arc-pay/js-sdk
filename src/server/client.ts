@@ -11,6 +11,10 @@ import type {
   CustomerTransferCard,
   CustomerTransferCardList,
   CustomerTransferCardsQuery,
+  CreateCustomerTransferCardSetupRequest,
+  CustomerTransferCardSetup,
+  CreateCustomerDisbursementCardEntryTicketRequest,
+  CustomerDisbursementCardEntryTicket,
 } from "./customer-transfers";
 export type {
   CreateCustomerTransferSessionRequest,
@@ -26,6 +30,12 @@ export type {
   CustomerTransferCard,
   CustomerTransferCardList,
   CustomerTransferCardsQuery,
+  CreateCustomerTransferCardSetupRequest,
+  CustomerTransferCardSetup,
+  CustomerTransferCardSetupCard,
+  CustomerTransferCardSetupStatus,
+  CreateCustomerDisbursementCardEntryTicketRequest,
+  CustomerDisbursementCardEntryTicket,
 } from "./customer-transfers";
 import { ArcPayError, type ArcPayErrorType } from "../core/errors";
 import { isIdempotencyKey } from "../core/idempotency";
@@ -1095,6 +1105,61 @@ export class ArcPayClient {
       "GET",
       appendQuery(`/customer-transfer-cards/${encodeURIComponent(cardTokenId)}`, query),
       undefined,
+      opts,
+    );
+  }
+
+  /**
+   * Creates a 30-minute browser card setup for a payout recipient. The merchant page then calls
+   * `elements.tokenizeRecipientCard(card_setup_id)`; confirm the card through the
+   * `customer_transfer_card_setup.completed` webhook or {@link getCustomerTransferCardSetup}.
+   */
+  async createCustomerTransferCardSetup(
+    body: CreateCustomerTransferCardSetupRequest,
+    opts: IdempotencyOptions,
+  ): Promise<CustomerTransferCardSetup> {
+    return this.request(
+      "POST",
+      "/customer-transfer-card-setups",
+      { customer_reference: body.customer_reference, allowed_origin: body.allowed_origin },
+      opts,
+      true,
+    );
+  }
+
+  async getCustomerTransferCardSetup(
+    cardSetupId: string,
+    opts: RequestOptions = {},
+  ): Promise<CustomerTransferCardSetup> {
+    if (typeof cardSetupId !== "string" || cardSetupId.trim() === "") {
+      throw new ArcPayError({
+        type: "validation_error",
+        code: "invalid_request",
+        message: "card_setup_id must be a non-empty string",
+        param: "card_setup_id",
+        retryable: false,
+      });
+    }
+    return this.request(
+      "GET",
+      `/customer-transfer-card-setups/${encodeURIComponent(cardSetupId)}`,
+      undefined,
+      opts,
+    );
+  }
+
+  /**
+   * Issues a ticket for the server PAN path: POST `{pan}` to `card_entry_url` from the merchant
+   * backend with the `X-Card-Entry-Ticket` header. No card data passes through this call.
+   */
+  async createCustomerDisbursementCardEntryTicket(
+    body: CreateCustomerDisbursementCardEntryTicketRequest = {},
+    opts: RequestOptions = {},
+  ): Promise<CustomerDisbursementCardEntryTicket> {
+    return this.request(
+      "POST",
+      "/customer-disbursements/card-entry-ticket",
+      body.customer_reference === undefined ? {} : { customer_reference: body.customer_reference },
       opts,
     );
   }

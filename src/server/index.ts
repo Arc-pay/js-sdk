@@ -79,4 +79,10 @@ export type {
   CustomerTransferCard,
   CustomerTransferCardList,
   CustomerTransferCardsQuery,
+  CreateCustomerTransferCardSetupRequest,
+  CustomerTransferCardSetup,
+  CustomerTransferCardSetupCard,
+  CustomerTransferCardSetupStatus,
+  CreateCustomerDisbursementCardEntryTicketRequest,
+  CustomerDisbursementCardEntryTicket,
 } from "./customer-transfers";
