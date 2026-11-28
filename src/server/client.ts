@@ -41,6 +41,8 @@ import { ArcPayError, type ArcPayErrorType } from "../core/errors";
 import { isIdempotencyKey } from "../core/idempotency";
 import type {
   AvailablePaymentMethod,
+  CardExecutePaymentRequest,
+  WalletExecutePaymentRequest,
   CaptureRequest,
   ChargeSavedCardRequest,
   CheckoutSession,
@@ -251,7 +253,9 @@ const normalizeExecutePaymentRequest = (body: ExecutePaymentRequest): ExecutePay
       retryable: false,
     });
   }
-  if (body.payment_method === "bank_card" && !body.card_token_id) {
+  // PaymentMethod is an open string, so the request union does not narrow on it.
+  const isCard = body.payment_method === "bank_card";
+  if (isCard && !(body as CardExecutePaymentRequest).card_token_id) {
     throw new ArcPayError({
       type: "validation_error",
       code: "missing_card_token_id",
@@ -267,8 +271,9 @@ const normalizeExecutePaymentRequest = (body: ExecutePaymentRequest): ExecutePay
       retryable: false,
     });
   }
-  if (body.payment_method !== "bank_card") {
-    if (!body.wallet_interaction) {
+  if (!isCard) {
+    const wallet = body as WalletExecutePaymentRequest;
+    if (!wallet.wallet_interaction) {
       throw new ArcPayError({
         type: "validation_error",
         code: "invalid_request",
@@ -276,7 +281,7 @@ const normalizeExecutePaymentRequest = (body: ExecutePaymentRequest): ExecutePay
         retryable: false,
       });
     }
-    if (body.wallet_interaction.provider !== body.payment_method) {
+    if (wallet.wallet_interaction.provider !== wallet.payment_method) {
       throw new ArcPayError({
         type: "validation_error",
         code: "invalid_request",

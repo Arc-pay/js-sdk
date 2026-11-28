@@ -452,6 +452,8 @@ SBP is a wallet/APM H2H flow. Keep the secret key on your backend, create the
 payment, then execute it with `wallet_interaction`. Render the returned
 `wallet_action` exactly as provided by Arc Pay.
 
+`PaymentMethod` is an open string: `KnownPaymentMethod` lists the nine built-in codes for autocomplete, and provider-catalog codes such as `pix` or `airtel_gh` are accepted too. New codes can appear without an API version change, so tolerate unknown values in responses and webhooks, and send only a method returned by `listAvailablePaymentMethods()`.
+
 ```ts
 import { createArcPayClient, newIdempotencyKey } from "@thavguard/arc-pay/server";
 

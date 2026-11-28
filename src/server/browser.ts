@@ -23,6 +23,7 @@ export const createArcPayClient = (options: ArcPayClientOptions): ArcPayClient =
 export type {
   Currency,
   KnownCurrency,
+  KnownPaymentMethod,
   PaymentMethod,
   CaptureMode,
   PaymentFlowMode,
