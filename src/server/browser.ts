@@ -23,6 +23,7 @@ export const createArcPayClient = (options: ArcPayClientOptions): ArcPayClient =
 export type {
   Currency,
   KnownCurrency,
+  KnownPaymentMethod,
   PaymentMethod,
   CaptureMode,
   PaymentFlowMode,
@@ -39,7 +40,10 @@ export type {
   FiscalItem,
   CreatePaymentRequest,
   CreateCardSetupRequest,
+  CancelPaymentRequest,
   CaptureRequest,
+  PaymentCancellation,
+  PaymentCancellationReason,
   VoidRequest,
   CreateRefundRequest,
   Refund,

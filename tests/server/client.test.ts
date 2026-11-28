@@ -49,6 +49,52 @@ describe("server ArcPayClient", () => {
     }
   });
 
+  it("cancels a payment and waits long enough for the bank", async () => {
+    vi.useFakeTimers();
+    let aborted = false;
+    fetchMock.mockImplementation(
+      (_url: string, init: RequestInit) =>
+        new Promise((resolve) => {
+          init.signal?.addEventListener("abort", () => (aborted = true));
+          setTimeout(
+            () =>
+              resolve(
+                ok({
+                  id: "pay_1",
+                  status: "pending_3ds",
+                  cancellation: {
+                    state: "pending",
+                    requested_at: "2026-11-27T00:00:00Z",
+                    resolved_at: null,
+                  },
+                  new_attempt_allowed: false,
+                }),
+              ),
+            45_000,
+          );
+        }),
+    );
+    const client = new ArcPayClient({ secretKey: "sk_test_x", fetch: fetchMock });
+    const idempotencyKey = "018fe7e2-90c8-789c-9b17-4c861d4b5366";
+
+    const pending = client.cancelPayment(
+      "pay 1",
+      { reason: "switch_payment_method" },
+      { idempotencyKey },
+    );
+    await vi.advanceTimersByTimeAsync(45_000);
+    const payment = await pending;
+
+    expect(aborted).toBe(false);
+    expect(payment.cancellation?.state).toBe("pending");
+    expect(payment.new_attempt_allowed).toBe(false);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.arcpay.space/v1/payments/pay%201/cancel");
+    expect(init.method).toBe("POST");
+    expect(init.body).toBe(JSON.stringify({ reason: "switch_payment_method" }));
+    expect((init.headers as Record<string, string>)["Idempotency-Key"]).toBe(idempotencyKey);
+  });
+
   it("forwards stored-credential recurring fields on saved-card charges", async () => {
     fetchMock.mockResolvedValue(ok({ payment_id: "pay_1", status: "pending" }));
     const client = new ArcPayClient({
@@ -669,6 +715,10 @@ describe("server ArcPayClient", () => {
           idempotentClient.capturePayment("pay_1", { amount: 5000 }, opts as never),
       },
       {
+        name: "cancelPayment",
+        invoke: (opts: unknown) => idempotentClient.cancelPayment("pay_1", {}, opts as never),
+      },
+      {
         name: "voidPayment",
         invoke: (opts: unknown) => idempotentClient.voidPayment("pay_1", {}, opts as never),
       },
@@ -1206,6 +1256,59 @@ describe("server ArcPayClient", () => {
         back_url: "https://merchant.example/return",
       },
     });
+  });
+
+  it("executes a provider-catalog method such as airtel_gh like any wallet method", async () => {
+    fetchMock.mockResolvedValue(
+      ok({
+        payment_id: "pay_gh_1",
+        status: "pending",
+        wallet_action: { provider: "airtel_gh", action: "phone_push" },
+      }),
+    );
+    const client = new ArcPayClient({
+      secretKey: "sk_test_x",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+
+    const result = await client.executePayment(
+      "pay_gh_1",
+      {
+        payment_method: "airtel_gh",
+        payment_mode: "h2h",
+        wallet_interaction: {
+          provider: "airtel_gh",
+          surface: "merchant_web",
+          action: "phone_push",
+          phone: "+233200000000",
+        },
+      },
+      { idempotencyKey: EXECUTE_IDEMPOTENCY_KEY },
+    );
+
+    expect(result.wallet_action?.provider).toBe("airtel_gh");
+    const [, init] = fetchMock.mock.calls[0]!;
+    expect(JSON.parse(init.body as string)).toMatchObject({ payment_method: "airtel_gh" });
+  });
+
+  it("still requires wallet_interaction.provider to match an unknown payment_method", async () => {
+    const client = new ArcPayClient({
+      secretKey: "sk_test_x",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+
+    await expect(
+      client.executePayment(
+        "pay_gh_1",
+        {
+          payment_method: "airtel_gh",
+          payment_mode: "h2h",
+          wallet_interaction: { provider: "pix", surface: "merchant_web", action: "redirect" },
+        },
+        { idempotencyKey: EXECUTE_IDEMPOTENCY_KEY },
+      ),
+    ).rejects.toMatchObject({ code: "invalid_request" });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("rejects executePayment requests without explicit h2h payment_mode", async () => {

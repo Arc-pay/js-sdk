@@ -41,6 +41,9 @@ import { ArcPayError, type ArcPayErrorType } from "../core/errors";
 import { isIdempotencyKey } from "../core/idempotency";
 import type {
   AvailablePaymentMethod,
+  CancelPaymentRequest,
+  CardExecutePaymentRequest,
+  WalletExecutePaymentRequest,
   CaptureRequest,
   ChargeSavedCardRequest,
   CheckoutSession,
@@ -81,6 +84,7 @@ import type {
 
 export type {
   AvailablePaymentMethod,
+  CancelPaymentRequest,
   CaptureRequest,
   ChargeSavedCardRequest,
   CheckoutSession,
@@ -99,8 +103,11 @@ export type {
   PaymentFlowMode,
   PaymentList,
   PaymentMethod,
+  KnownPaymentMethod,
   PaymentStatus,
   PaymentPreparationError,
+  PaymentCancellation,
+  PaymentCancellationReason,
   Refund,
   TerminalPaymentStatus,
   VoidRequest,
@@ -158,6 +165,8 @@ const DEFAULT_API_BASE = "https://api.arcpay.space/v1";
 const API_VERSION = "2026-05-06";
 const SERVER_SDK_VERSION = "0.1.59";
 const DEFAULT_TIMEOUT_MS = 30_000;
+// Cancel waits for the bank before answering.
+const CANCEL_MIN_TIMEOUT_MS = 60_000;
 const DEFAULT_MAX_NETWORK_RETRIES = 1;
 const DEFAULT_POLL_INTERVAL_MS = 1500;
 const DEFAULT_POLL_TIMEOUT_MS = 60_000;
@@ -251,7 +260,9 @@ const normalizeExecutePaymentRequest = (body: ExecutePaymentRequest): ExecutePay
       retryable: false,
     });
   }
-  if (body.payment_method === "bank_card" && !body.card_token_id) {
+  // PaymentMethod is an open string, so the request union does not narrow on it.
+  const isCard = body.payment_method === "bank_card";
+  if (isCard && !(body as CardExecutePaymentRequest).card_token_id) {
     throw new ArcPayError({
       type: "validation_error",
       code: "missing_card_token_id",
@@ -267,8 +278,9 @@ const normalizeExecutePaymentRequest = (body: ExecutePaymentRequest): ExecutePay
       retryable: false,
     });
   }
-  if (body.payment_method !== "bank_card") {
-    if (!body.wallet_interaction) {
+  if (!isCard) {
+    const wallet = body as WalletExecutePaymentRequest;
+    if (!wallet.wallet_interaction) {
       throw new ArcPayError({
         type: "validation_error",
         code: "invalid_request",
@@ -276,7 +288,7 @@ const normalizeExecutePaymentRequest = (body: ExecutePaymentRequest): ExecutePay
         retryable: false,
       });
     }
-    if (body.wallet_interaction.provider !== body.payment_method) {
+    if (wallet.wallet_interaction.provider !== wallet.payment_method) {
       throw new ArcPayError({
         type: "validation_error",
         code: "invalid_request",
@@ -729,6 +741,33 @@ export class ArcPayClient {
       `/payments/${encodeURIComponent(paymentId)}/capture`,
       normalizeCaptureRequest(body),
       opts,
+      true,
+    );
+  }
+
+  /**
+   * Cancels a payment that has not been captured. The returned payment carries
+   * `cancellation`: while its state is `pending` the payer may still be charged,
+   * so start another payment only when `new_attempt_allowed` is `true`. A
+   * captured payment is rejected with `payment_already_captured`; refund it.
+   * Waits at least 60 s unless `opts.timeoutMs` says otherwise.
+   */
+  async cancelPayment(
+    paymentId: string,
+    body: CancelPaymentRequest,
+    opts: IdempotencyOptions,
+  ): Promise<Payment>;
+  async cancelPayment(
+    paymentId: string,
+    body: CancelPaymentRequest,
+    opts: RequestOptionsInput,
+  ): Promise<Payment> {
+    const requestOpts = normalizeRequestOptions(opts);
+    return this.request<Payment>(
+      "POST",
+      `/payments/${encodeURIComponent(paymentId)}/cancel`,
+      body,
+      { ...requestOpts, timeoutMs: requestOpts.timeoutMs ?? Math.max(this.timeoutMs, CANCEL_MIN_TIMEOUT_MS) },
       true,
     );
   }

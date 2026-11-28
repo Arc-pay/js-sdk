@@ -9,7 +9,8 @@ export type KnownCurrency = "RUB" | "KZT" | "UZS" | "USD" | "EUR" | "TRY";
  */
 export type Currency = KnownCurrency | (string & {});
 
-export type PaymentMethod =
+/** Built-in payment methods with autocomplete. The set is open, see {@link PaymentMethod}. */
+export type KnownPaymentMethod =
   | "bank_card"
   | "sbp"
   | "sberpay"
@@ -19,6 +20,16 @@ export type PaymentMethod =
   | "mirpay"
   | "applepay"
   | "googlepay";
+
+/**
+ * Payment method code: 2-64 lowercase letters, digits and `_`, starting with a
+ * letter. The nine built-in methods are listed in {@link KnownPaymentMethod};
+ * provider catalogs add more (for example "pix" or "airtel_gh") and new codes
+ * can appear without an API version change, so code that reads a method from a
+ * response or webhook must tolerate unknown values. Send only a method returned
+ * by `listAvailablePaymentMethods()` for the same key environment.
+ */
+export type PaymentMethod = KnownPaymentMethod | (string & {});
 
 export type CaptureMode = "one_stage" | "two_stage";
 export type PaymentFlowMode = "h2h" | "redirect";
@@ -108,6 +119,13 @@ export interface Payment {
   payment_mode?: PaymentFlowMode;
   capture_mode?: CaptureMode;
   preparation_error?: PaymentPreparationError;
+  /** Present on the cancel response and single-payment reads, not on lists. */
+  cancellation?: PaymentCancellation;
+  /**
+   * Present together with `cancellation`. Create another payment for the same
+   * order only when this is `true`.
+   */
+  new_attempt_allowed?: boolean;
   created_at: string;
   updated_at: string;
   metadata?: Record<string, string>;
@@ -167,6 +185,30 @@ export interface CreateCardSetupRequest {
 
 export interface CaptureRequest {
   amount?: number;
+}
+
+export type PaymentCancellationReason =
+  | "requested_by_customer"
+  | "abandoned"
+  | "switch_payment_method"
+  | "duplicate"
+  | "other";
+
+export interface CancelPaymentRequest {
+  reason?: PaymentCancellationReason;
+}
+
+/** The merchant cancellation of a payment. */
+export interface PaymentCancellation {
+  /** `pending`: the payer may still be charged. */
+  state: "pending" | "succeeded" | "failed";
+  reason?: PaymentCancellationReason;
+  /** How a succeeded cancellation was proven. */
+  mechanism?: "local" | "void" | "bank_decline" | "bank_final";
+  /** Why a cancellation failed, e.g. `already_paid`. Tolerate unknown codes. */
+  outcome_code?: string;
+  requested_at: string;
+  resolved_at: string | null;
 }
 
 export interface VoidRequest {

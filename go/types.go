@@ -10,6 +10,11 @@ const (
 	UZS Currency = "UZS"
 )
 
+// PaymentMethod is an open payment method code: 2-64 lowercase letters, digits
+// and "_", starting with a letter. The constants below are the built-in methods;
+// provider catalogs add more (for example "pix" or "airtel_gh") and new codes can
+// appear without an API version change, so any string is a valid PaymentMethod
+// and responses may carry values without a constant.
 type PaymentMethod string
 
 const (
