@@ -163,7 +163,7 @@ export interface RequestOptions {
 
 const DEFAULT_API_BASE = "https://api.arcpay.space/v1";
 const API_VERSION = "2026-05-06";
-const SERVER_SDK_VERSION = "0.1.59";
+const SERVER_SDK_VERSION = "0.1.60";
 const DEFAULT_TIMEOUT_MS = 30_000;
 // Cancel waits for the bank before answering.
 const CANCEL_MIN_TIMEOUT_MS = 60_000;
