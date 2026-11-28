@@ -9,7 +9,8 @@ export type KnownCurrency = "RUB" | "KZT" | "UZS" | "USD" | "EUR" | "TRY";
  */
 export type Currency = KnownCurrency | (string & {});
 
-export type PaymentMethod =
+/** Built-in payment methods with autocomplete. The set is open, see {@link PaymentMethod}. */
+export type KnownPaymentMethod =
   | "bank_card"
   | "sbp"
   | "sberpay"
@@ -19,6 +20,16 @@ export type PaymentMethod =
   | "mirpay"
   | "applepay"
   | "googlepay";
+
+/**
+ * Payment method code: 2-64 lowercase letters, digits and `_`, starting with a
+ * letter. The nine built-in methods are listed in {@link KnownPaymentMethod};
+ * provider catalogs add more (for example "pix" or "airtel_gh") and new codes
+ * can appear without an API version change, so code that reads a method from a
+ * response or webhook must tolerate unknown values. Send only a method returned
+ * by `listAvailablePaymentMethods()` for the same key environment.
+ */
+export type PaymentMethod = KnownPaymentMethod | (string & {});
 
 export type CaptureMode = "one_stage" | "two_stage";
 export type PaymentFlowMode = "h2h" | "redirect";

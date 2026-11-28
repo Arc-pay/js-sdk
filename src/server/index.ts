@@ -8,6 +8,7 @@ export type {
   PaymentList,
   PaymentPreparationError,
   PaymentMethod,
+  KnownPaymentMethod,
   PaymentStatus,
   PaymentFlowMode,
   TerminalPaymentStatus,
