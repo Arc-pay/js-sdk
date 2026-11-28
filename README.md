@@ -292,7 +292,8 @@ and checkout sessions.
 Mutating server-client methods require an explicit `{ idempotencyKey }`:
 `createPayment`, `createCardSetup`, `executePayment`, `capturePayment`, `voidPayment`,
 `createRefund`, `chargeSavedCard`, `completeThreeDSMethod`, `createLink`,
-`cancelLink`, and `createCheckoutSession`. Missing idempotency raises
+`cancelLink`, `createCheckoutSession`, `createSubscription`, and
+`retrySubscriptionBilling`. Missing idempotency raises
 `ArcPayError` with `code="missing_idempotency_key"` before any HTTP request is
 sent.
 
@@ -400,6 +401,51 @@ complete any returned 3DS browser step, and wait for a terminal payment that
 contains `card_token_id`. Later merchant-initiated charges use
 `chargeSavedCard()`.
 
+## Subscriptions and stored cards
+
+```ts
+const subscription = await client.createSubscription(
+  {
+    customer_id: "customer-1",
+    amount: 100000,
+    currency: "RUB",
+    billing_interval_type: "month",
+    billing_interval_count: 1,
+    payment_method: "bank_card",
+    card_token_id: savedCardTokenId,
+    external_id: "plan-42",
+    retry_schedule: [2, 3],
+  },
+  { idempotencyKey },
+);
+
+// Find it again by your own reference. The reference is not unique.
+const { subscriptions } = await client.listSubscriptions({ external_id: "plan-42" });
+
+// Cancel at the end of the paid period, or change your mind before it ends.
+await client.cancelSubscription(subscription.id, { cancel_at_period_end: true });
+await client.uncancelSubscription(subscription.id);
+```
+
+Persist the create key with your order: it never creates a second subscription,
+and reusing it with other parameters answers `409`. A direct subscription without
+a trial is not charged for its first period. `items` and `trial_items` carry
+receipt data only when `link_id` is omitted.
+
+Also available: `getSubscription`, `pauseSubscription`, `resumeSubscription`,
+`retrySubscriptionBilling` and `listSubscriptionBillingCycles`. A manual retry
+charges the customer, so reuse its key after a network failure or an unknown
+outcome. `cancelSubscription`, `uncancelSubscription`, `pauseSubscription` and
+`resumeSubscription` take no idempotency key and are not retried automatically;
+after a failure, read the subscription before calling again. Webhook delivery
+order is not guaranteed: apply a webhook or a read only when its `version` is
+greater than the one you stored.
+
+`listSavedCards({ customer_id })` and
+`deleteSavedCard(cardTokenId, { customer_id })` manage cards saved for payments.
+Deletion also revokes a payout token; pass the `customer_reference` it was
+tokenized with as `customer_id`.
+
 ## SBP QR with the server SDK
 
 SBP is a wallet/APM H2H flow. Keep the secret key on your backend, create the
@@ -481,6 +527,8 @@ const result = await confirmWalletPayment({
 
 if (result.status === "wallet_action" && result.walletAction.action === "qr") {
   // Render result.walletAction.qrUrl or result.walletAction.qrImageBase64.
+  // For SBP, result.walletAction.hostedUrl (when present) is our payment page
+  // with a bank list: offer it as a link or as a second QR for a phone camera.
 }
 ```
 
@@ -586,6 +634,61 @@ string. `description` is the bank payment purpose text (PSB B2C: 1-150
 characters).
 The server SDK also exposes `listCustomerDisbursements`, `getCustomerDisbursement`
 and `refreshCustomerDisbursement`, including reconciliation and retry diagnostics.
+
+Stored payout recipient cards are read with
+`listCustomerTransferCards({ customer_reference })` and
+`getCustomerTransferCard(cardTokenId, { customer_reference })`. Always pass
+`customer_reference` when tokenizing a recipient card: cards without it are never
+listed. `expires_at` is the end of the token storage period, not the card expiry.
+The error code `card_token_unavailable` means the token was revoked or erased:
+tokenize the card again.
+
+### Payout recipient card from a merchant page
+
+To save a recipient card in your own UI without the PAN touching your servers or
+page script, create a card setup on the backend and finish it with Hosted
+Fields. The card number is entered inside the Elements iframe and sent only to
+the Arc Pay card-entry host; your page receives the token id and the mask.
+
+```ts
+// Backend (secret key). allowed_origin must be registered for your account.
+const setup = await client.createCustomerTransferCardSetup(
+  { customer_reference: "expert-42", allowed_origin: "https://app.example.com" },
+  { idempotencyKey },
+);
+// Give setup.card_setup_id only to the authenticated recipient's page.
+```
+
+```ts
+// Merchant page (publishable key), served from allowed_origin.
+const elements = arcpay.elements();
+const cardNumber = elements.create("cardNumber");
+cardNumber.mount("#recipient-card");
+cardNumber.on("ready", () => (button.disabled = false));
+
+const result = await elements.tokenizeRecipientCard(cardSetupId);
+// { setupId, cardTokenId, cardMask, cardScheme, expiresAt? }
+```
+
+- Only the `cardNumber` Element is used: no expiry or CVC. Creating `card`,
+  `cardExpiry` or `cardCvv` on the same `Elements` instance fails with
+  `mixed_hosted_fields_mode`.
+- A setup lives 30 minutes and completes once. Calling the method again after a
+  network break is safe: the same card yields the same token, and attaching the
+  same token again returns the same result.
+- Do not pay out to `cardTokenId` from the browser alone. Confirm it on the
+  backend with the `customer_transfer_card_setup.completed` webhook or
+  `getCustomerTransferCardSetup(card_setup_id)` (status `completed`, `card`).
+- Errors arrive as `ArcPayError` with the API code, for example
+  `card_setup_expired`, `card_setup_completed`, `origin_not_allowed`,
+  `card_token_unavailable` or `rate_limited`; `tokenize_timeout` when the iframe
+  does not answer.
+- Your CSP needs only `frame-src` for the Elements origin.
+
+For the server PAN path, `createCustomerDisbursementCardEntryTicket({
+customer_reference })` returns `{ticket, card_entry_url, expires_at,
+customer_reference}`: POST `{pan}` to `card_entry_url` from your backend with the
+`X-Card-Entry-Ticket` header.
 
 Use the returned hosted URL, or import `createCustomerTransferSessionClient`
 from the browser SDK for the recipient journey. `tokenizeCard` accepts PAN plus

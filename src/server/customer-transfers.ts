@@ -190,3 +190,62 @@ export interface CustomerDisbursementList {
   disbursements: CustomerDisbursement[];
   next_cursor?: string;
 }
+/** Stored payout recipient card. The PAN and the card expiry are never returned. */
+export interface CustomerTransferCard {
+  card_token_id: string;
+  card_mask: string;
+  /** Empty string when the card network is unknown. */
+  card_scheme: string;
+  customer_reference: string;
+  created_at: string;
+  /** End of the token storage period, not the card expiry. Omitted when none is configured. */
+  expires_at?: string;
+}
+export interface CustomerTransferCardList {
+  cards: CustomerTransferCard[];
+}
+export interface CustomerTransferCardsQuery {
+  /** Customer reference the cards were tokenized for; matched exactly. */
+  customer_reference: string;
+}
+
+/** Browser card setup for a payout recipient; the merchant page finishes it with Elements. */
+export interface CreateCustomerTransferCardSetupRequest {
+  /** Merchant recipient id; no surrounding spaces, must not start with `anon-`. */
+  customer_reference: string;
+  /** Exact https origin (no path) of the page that mounts Elements; registered for the tenant. */
+  allowed_origin: string;
+}
+export type CustomerTransferCardSetupStatus = "created" | "completed" | "expired" | (string & {});
+/** Card attached to a setup. Snapshot at completion; later revocation shows in customer transfer cards. */
+export interface CustomerTransferCardSetupCard {
+  card_token_id: string;
+  card_mask: string;
+  /** Empty string when the card network is unknown. */
+  card_scheme: string;
+  /** End of the token storage period, not the card expiry. Omitted when none is configured. */
+  expires_at?: string;
+}
+export interface CustomerTransferCardSetup {
+  card_setup_id: string;
+  status: CustomerTransferCardSetupStatus;
+  customer_reference: string;
+  allowed_origin: string;
+  created_at: string;
+  /** Setup expiry (30 minutes after creation). */
+  expires_at: string;
+  completed_at?: string;
+  card?: CustomerTransferCardSetupCard;
+}
+export interface CreateCustomerDisbursementCardEntryTicketRequest {
+  /** Recipient the card belongs to; the API generates an anonymous one when omitted. */
+  customer_reference?: string;
+}
+/** Signed ticket for sending one recipient PAN from the merchant server straight to card-entry. */
+export interface CustomerDisbursementCardEntryTicket {
+  ticket: string;
+  /** Card-entry URL to POST `{pan}` to with the `X-Card-Entry-Ticket` header. */
+  card_entry_url: string;
+  expires_at: string;
+  customer_reference: string;
+}

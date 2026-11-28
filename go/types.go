@@ -244,15 +244,17 @@ type WalletInteraction struct {
 }
 
 type WalletAction struct {
-	Provider      PaymentMethod `json:"provider"`
-	Action        string        `json:"action"`
-	SDK           string        `json:"sdk,omitempty"`
-	URL           string        `json:"url,omitempty"`
-	QRURL         string        `json:"qr_url,omitempty"`
-	QRImageBase64 string        `json:"qr_image_base64,omitempty"`
-	QRContentType string        `json:"qr_content_type,omitempty"`
-	BankInvoiceID string        `json:"bank_invoice_id,omitempty"`
-	BackURL       string        `json:"back_url,omitempty"`
+	Provider PaymentMethod `json:"provider"`
+	Action   string        `json:"action"`
+	SDK      string        `json:"sdk,omitempty"`
+	URL      string        `json:"url,omitempty"`
+	QRURL    string        `json:"qr_url,omitempty"`
+	// HostedURL is the Arc Pay page for the same SBP payment, with a bank list.
+	HostedURL     string `json:"hosted_url,omitempty"`
+	QRImageBase64 string `json:"qr_image_base64,omitempty"`
+	QRContentType string `json:"qr_content_type,omitempty"`
+	BankInvoiceID string `json:"bank_invoice_id,omitempty"`
+	BackURL       string `json:"back_url,omitempty"`
 	// Params is provider-specific render metadata; treat keys as opaque hints.
 	Params map[string]string `json:"params,omitempty"`
 }

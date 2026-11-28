@@ -8,6 +8,13 @@ import type {
   TokenizeCustomerDisbursementCardRequest,
   TokenizeCustomerDisbursementCardResponse,
   CancelCustomerDisbursementRequest,
+  CustomerTransferCard,
+  CustomerTransferCardList,
+  CustomerTransferCardsQuery,
+  CreateCustomerTransferCardSetupRequest,
+  CustomerTransferCardSetup,
+  CreateCustomerDisbursementCardEntryTicketRequest,
+  CustomerDisbursementCardEntryTicket,
 } from "./customer-transfers";
 export type {
   CreateCustomerTransferSessionRequest,
@@ -20,6 +27,15 @@ export type {
   TokenizeCustomerDisbursementCardRequest,
   TokenizeCustomerDisbursementCardResponse,
   CancelCustomerDisbursementRequest,
+  CustomerTransferCard,
+  CustomerTransferCardList,
+  CustomerTransferCardsQuery,
+  CreateCustomerTransferCardSetupRequest,
+  CustomerTransferCardSetup,
+  CustomerTransferCardSetupCard,
+  CustomerTransferCardSetupStatus,
+  CreateCustomerDisbursementCardEntryTicketRequest,
+  CustomerDisbursementCardEntryTicket,
 } from "./customer-transfers";
 import { ArcPayError, type ArcPayErrorType } from "../core/errors";
 import { isIdempotencyKey } from "../core/idempotency";
@@ -46,6 +62,21 @@ import type {
   VoidRequest,
   WaitForPaymentOptions,
   WaitForPaymentTerminalResult,
+  BillingCycle,
+  BillingCycleList,
+  CancelSubscriptionRequest,
+  CreateSubscriptionRequest,
+  ListBillingCyclesQuery,
+  ListSubscriptionsQuery,
+  PauseSubscriptionRequest,
+  SavedCardList,
+  SavedCardsQuery,
+  Subscription,
+  SubscriptionList,
+  BindBillingHoldPaymentRequest,
+  CreateBillingHoldRequest,
+  PaySubscriptionRequest,
+  UpdateSubscriptionTermsRequest,
 } from "./types";
 
 export type {
@@ -75,6 +106,30 @@ export type {
   VoidRequest,
   WaitForPaymentOptions,
   WaitForPaymentTerminalResult,
+  BillingCycle,
+  BillingCycleList,
+  BillingIntervalType,
+  CancelSubscriptionRequest,
+  CreateSubscriptionRequest,
+  ListBillingCyclesQuery,
+  ListSubscriptionsQuery,
+  PauseSubscriptionRequest,
+  SavedCard,
+  SavedCardList,
+  SavedCardsQuery,
+  Subscription,
+  SubscriptionList,
+  SubscriptionPaymentMethod,
+  SubscriptionReceiptItem,
+  SubscriptionStatus,
+  BindBillingHoldPaymentRequest,
+  BillingHold,
+  CreateBillingHoldRequest,
+  PaySubscriptionRequest,
+  PendingSubscriptionUpdate,
+  SubscriptionUpdateChange,
+  SubscriptionUpdatedEventData,
+  UpdateSubscriptionTermsRequest,
 } from "./types";
 
 export interface ArcPayClientOptions {
@@ -320,6 +375,47 @@ const normalizeCreateCheckoutSessionRequest = (
     unit_price: requirePositiveMinorUnits(item.unit_price, `fiscal_items.${index}.unit_price`),
   }));
   return { ...body, amount, ...(fiscalItems ? { fiscal_items: fiscalItems } : {}) };
+};
+
+const requireReceiptItemPrices = (
+  items: CreateSubscriptionRequest["items"],
+  field: string,
+): void => {
+  items?.forEach((item, index) => {
+    if (item.unit_price !== undefined) {
+      requireNonNegativeMinorUnits(item.unit_price, `${field}.${index}.unit_price`);
+    }
+  });
+};
+
+const normalizeCreateSubscriptionRequest = (
+  body: CreateSubscriptionRequest,
+): CreateSubscriptionRequest => {
+  if (body.amount !== undefined) requirePositiveMinorUnits(body.amount, "amount");
+  if (body.billing_trial_price !== undefined) {
+    requireNonNegativeMinorUnits(body.billing_trial_price, "billing_trial_price");
+  }
+  requireReceiptItemPrices(body.items, "items");
+  requireReceiptItemPrices(body.trial_items, "trial_items");
+  return body;
+};
+
+/** appendQuery drops empty values, which would turn a blank filter into "list everything". */
+const requireNonBlankFilter = (value: string | undefined, param: string): void => {
+  if (value !== undefined && value.trim() === "") {
+    throw new ArcPayError({
+      type: "validation_error",
+      code: "invalid_request",
+      message: `${param} filter must not be blank`,
+      param,
+      retryable: false,
+    });
+  }
+};
+
+/** A card request is scoped to one owner: it is never sent without it. */
+const requireCardOwner = (value: string | undefined, param: string): void => {
+  requireNonBlankFilter(value ?? "", param);
 };
 
 const appendQuery = (path: string, query?: object): string => {
@@ -852,6 +948,351 @@ export class ArcPayClient {
       "GET",
       `/customer-disbursements${params.size ? `?${params}` : ""}`,
       undefined,
+      opts,
+    );
+  }
+
+  async createSubscription(
+    body: CreateSubscriptionRequest,
+    opts: IdempotencyOptions,
+  ): Promise<Subscription>;
+  async createSubscription(
+    body: CreateSubscriptionRequest,
+    opts: RequestOptionsInput,
+  ): Promise<Subscription> {
+    return this.request<Subscription>(
+      "POST",
+      "/subscriptions-v2",
+      normalizeCreateSubscriptionRequest(body),
+      opts,
+      true,
+    );
+  }
+
+  async getSubscription(subscriptionId: string, opts: RequestOptions = {}): Promise<Subscription> {
+    return this.request<Subscription>(
+      "GET",
+      `/subscriptions-v2/${encodeURIComponent(subscriptionId)}`,
+      undefined,
+      opts,
+    );
+  }
+
+  async listSubscriptions(
+    query: ListSubscriptionsQuery = {},
+    opts: RequestOptions = {},
+  ): Promise<SubscriptionList> {
+    requireNonBlankFilter(query.external_id, "external_id");
+    return this.request<SubscriptionList>(
+      "GET",
+      appendQuery("/subscriptions-v2", query),
+      undefined,
+      opts,
+    );
+  }
+
+  /** Cancels at once, or at the end of the paid period with `cancel_at_period_end: true`. */
+  async cancelSubscription(
+    subscriptionId: string,
+    body: CancelSubscriptionRequest = {},
+    opts: RequestOptions = {},
+  ): Promise<Subscription> {
+    return this.request<Subscription>(
+      "POST",
+      `/subscriptions-v2/${encodeURIComponent(subscriptionId)}/cancel`,
+      body,
+      opts,
+    );
+  }
+
+  /** Removes a cancellation scheduled for the end of the period. */
+  async uncancelSubscription(
+    subscriptionId: string,
+    opts: RequestOptions = {},
+  ): Promise<Subscription> {
+    return this.request<Subscription>(
+      "POST",
+      `/subscriptions-v2/${encodeURIComponent(subscriptionId)}/uncancel`,
+      undefined,
+      opts,
+    );
+  }
+
+  async pauseSubscription(
+    subscriptionId: string,
+    body: PauseSubscriptionRequest = {},
+    opts: RequestOptions = {},
+  ): Promise<Subscription> {
+    return this.request<Subscription>(
+      "POST",
+      `/subscriptions-v2/${encodeURIComponent(subscriptionId)}/pause`,
+      body,
+      opts,
+    );
+  }
+
+  async resumeSubscription(
+    subscriptionId: string,
+    opts: RequestOptions = {},
+  ): Promise<Subscription> {
+    return this.request<Subscription>(
+      "POST",
+      `/subscriptions-v2/${encodeURIComponent(subscriptionId)}/resume`,
+      undefined,
+      opts,
+    );
+  }
+
+  /** Charges the customer, so the SDK requires the key that the API leaves optional. */
+  async retrySubscriptionBilling(
+    subscriptionId: string,
+    opts: IdempotencyOptions,
+  ): Promise<BillingCycle>;
+  async retrySubscriptionBilling(
+    subscriptionId: string,
+    opts: RequestOptionsInput,
+  ): Promise<BillingCycle> {
+    return this.request<BillingCycle>(
+      "POST",
+      `/subscriptions-v2/${encodeURIComponent(subscriptionId)}/retry`,
+      undefined,
+      opts,
+      true,
+    );
+  }
+
+  /** Stops automatic charges of the subscription while you collect a payment for it. */
+  async createBillingHold(
+    subscriptionId: string,
+    body: CreateBillingHoldRequest,
+    opts: IdempotencyOptions,
+  ): Promise<Subscription>;
+  async createBillingHold(
+    subscriptionId: string,
+    body: CreateBillingHoldRequest,
+    opts: RequestOptionsInput,
+  ): Promise<Subscription> {
+    return this.request<Subscription>(
+      "POST",
+      `/subscriptions-v2/${encodeURIComponent(subscriptionId)}/billing-hold`,
+      body,
+      opts,
+      true,
+    );
+  }
+
+  /** Binds a created, not yet executed payment to the hold. */
+  async bindBillingHoldPayment(
+    subscriptionId: string,
+    body: BindBillingHoldPaymentRequest,
+    opts: IdempotencyOptions,
+  ): Promise<Subscription>;
+  async bindBillingHoldPayment(
+    subscriptionId: string,
+    body: BindBillingHoldPaymentRequest,
+    opts: RequestOptionsInput,
+  ): Promise<Subscription> {
+    return this.request<Subscription>(
+      "POST",
+      `/subscriptions-v2/${encodeURIComponent(subscriptionId)}/billing-hold/payment`,
+      body,
+      opts,
+      true,
+    );
+  }
+
+  async releaseBillingHold(
+    subscriptionId: string,
+    holdId: string,
+    opts: IdempotencyOptions,
+  ): Promise<Subscription>;
+  async releaseBillingHold(
+    subscriptionId: string,
+    holdId: string,
+    opts: RequestOptionsInput,
+  ): Promise<Subscription> {
+    return this.request<Subscription>(
+      "DELETE",
+      appendQuery(
+        `/subscriptions-v2/${encodeURIComponent(subscriptionId)}/billing-hold`,
+        {
+          hold_id: holdId,
+        },
+      ),
+      undefined,
+      opts,
+      true,
+    );
+  }
+
+  /** Pays the unpaid period of the subscription with a captured payment. */
+  async paySubscription(
+    subscriptionId: string,
+    body: PaySubscriptionRequest,
+    opts: IdempotencyOptions,
+  ): Promise<Subscription>;
+  async paySubscription(
+    subscriptionId: string,
+    body: PaySubscriptionRequest,
+    opts: RequestOptionsInput,
+  ): Promise<Subscription> {
+    return this.request<Subscription>(
+      "POST",
+      `/subscriptions-v2/${encodeURIComponent(subscriptionId)}/pay`,
+      body,
+      opts,
+      true,
+    );
+  }
+
+  /** Changes the price and/or payment instrument now or from the next period. */
+  async updateSubscriptionTerms(
+    subscriptionId: string,
+    body: UpdateSubscriptionTermsRequest,
+    opts: IdempotencyOptions,
+  ): Promise<Subscription>;
+  async updateSubscriptionTerms(
+    subscriptionId: string,
+    body: UpdateSubscriptionTermsRequest,
+    opts: RequestOptionsInput,
+  ): Promise<Subscription> {
+    return this.request<Subscription>(
+      "POST",
+      `/subscriptions-v2/${encodeURIComponent(subscriptionId)}/update`,
+      body,
+      opts,
+      true,
+    );
+  }
+
+  async cancelPendingSubscriptionUpdate(
+    subscriptionId: string,
+    opts: IdempotencyOptions,
+  ): Promise<Subscription>;
+  async cancelPendingSubscriptionUpdate(
+    subscriptionId: string,
+    opts: RequestOptionsInput,
+  ): Promise<Subscription> {
+    return this.request<Subscription>(
+      "DELETE",
+      `/subscriptions-v2/${encodeURIComponent(subscriptionId)}/pending-update`,
+      undefined,
+      opts,
+      true,
+    );
+  }
+
+  async listSubscriptionBillingCycles(
+    subscriptionId: string,
+    query: ListBillingCyclesQuery = {},
+    opts: RequestOptions = {},
+  ): Promise<BillingCycleList> {
+    return this.request<BillingCycleList>(
+      "GET",
+      appendQuery(`/subscriptions-v2/${encodeURIComponent(subscriptionId)}/billing-cycles`, query),
+      undefined,
+      opts,
+    );
+  }
+
+  async listSavedCards(query: SavedCardsQuery, opts: RequestOptions = {}): Promise<SavedCardList> {
+    requireCardOwner(query.customer_id, "customer_id");
+    return this.request<SavedCardList>("GET", appendQuery("/cards", query), undefined, opts);
+  }
+
+  /** Revokes a saved-card or payout token bound to this customer. */
+  async deleteSavedCard(
+    cardTokenId: string,
+    query: SavedCardsQuery,
+    opts: RequestOptions = {},
+  ): Promise<void> {
+    requireCardOwner(query.customer_id, "customer_id");
+    return this.request<void>(
+      "DELETE",
+      appendQuery(`/cards/${encodeURIComponent(cardTokenId)}`, query),
+      undefined,
+      opts,
+    );
+  }
+
+  async listCustomerTransferCards(
+    query: CustomerTransferCardsQuery,
+    opts: RequestOptions = {},
+  ): Promise<CustomerTransferCardList> {
+    requireCardOwner(query.customer_reference, "customer_reference");
+    return this.request<CustomerTransferCardList>(
+      "GET",
+      appendQuery("/customer-transfer-cards", query),
+      undefined,
+      opts,
+    );
+  }
+
+  async getCustomerTransferCard(
+    cardTokenId: string,
+    query: CustomerTransferCardsQuery,
+    opts: RequestOptions = {},
+  ): Promise<CustomerTransferCard> {
+    requireCardOwner(query.customer_reference, "customer_reference");
+    return this.request<CustomerTransferCard>(
+      "GET",
+      appendQuery(`/customer-transfer-cards/${encodeURIComponent(cardTokenId)}`, query),
+      undefined,
+      opts,
+    );
+  }
+
+  /**
+   * Creates a 30-minute browser card setup for a payout recipient. The merchant page then calls
+   * `elements.tokenizeRecipientCard(card_setup_id)`; confirm the card through the
+   * `customer_transfer_card_setup.completed` webhook or {@link getCustomerTransferCardSetup}.
+   */
+  async createCustomerTransferCardSetup(
+    body: CreateCustomerTransferCardSetupRequest,
+    opts: IdempotencyOptions,
+  ): Promise<CustomerTransferCardSetup> {
+    return this.request(
+      "POST",
+      "/customer-transfer-card-setups",
+      { customer_reference: body.customer_reference, allowed_origin: body.allowed_origin },
+      opts,
+      true,
+    );
+  }
+
+  async getCustomerTransferCardSetup(
+    cardSetupId: string,
+    opts: RequestOptions = {},
+  ): Promise<CustomerTransferCardSetup> {
+    if (typeof cardSetupId !== "string" || cardSetupId.trim() === "") {
+      throw new ArcPayError({
+        type: "validation_error",
+        code: "invalid_request",
+        message: "card_setup_id must be a non-empty string",
+        param: "card_setup_id",
+        retryable: false,
+      });
+    }
+    return this.request(
+      "GET",
+      `/customer-transfer-card-setups/${encodeURIComponent(cardSetupId)}`,
+      undefined,
+      opts,
+    );
+  }
+
+  /**
+   * Issues a ticket for the server PAN path: POST `{pan}` to `card_entry_url` from the merchant
+   * backend with the `X-Card-Entry-Ticket` header. No card data passes through this call.
+   */
+  async createCustomerDisbursementCardEntryTicket(
+    body: CreateCustomerDisbursementCardEntryTicketRequest = {},
+    opts: RequestOptions = {},
+  ): Promise<CustomerDisbursementCardEntryTicket> {
+    return this.request(
+      "POST",
+      "/customer-disbursements/card-entry-ticket",
+      body.customer_reference === undefined ? {} : { customer_reference: body.customer_reference },
       opts,
     );
   }

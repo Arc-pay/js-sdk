@@ -141,6 +141,8 @@ export interface CreatePaymentRequest {
   external_id: string;
   capture_mode: CaptureMode;
   customer_id?: string;
+  /** Saves the buyer's card or SBP mandate with this payment. Requires `customer_id` and `bank_card` or `sbp`. */
+  save_card?: boolean;
   description?: string;
   success_url?: string;
   fail_url?: string;
@@ -204,6 +206,8 @@ export interface WalletAction {
   sdk?: string;
   url?: string;
   qr_url?: string;
+  /** Arc Pay payment page for the same SBP payment, with a bank list. */
+  hosted_url?: string;
   qr_image_base64?: string;
   qr_content_type?: "image/png" | "image/svg+xml";
   bank_invoice_id?: string;
@@ -478,4 +482,239 @@ export interface ListPaymentsQuery {
 
 export interface ListAvailablePaymentMethodsQuery {
   environment: "live" | "sandbox";
+}
+
+export type SubscriptionStatus =
+  "trial" | "active" | "past_due" | "paused" | "canceled" | "expired";
+export type SubscriptionPaymentMethod = Extract<PaymentMethod, "bank_card" | "sbp">;
+export type BillingIntervalType = "day" | "week" | "month" | "year";
+
+/** Receipt line of a subscription created without `link_id`. The bank decides what it needs. */
+export interface SubscriptionReceiptItem {
+  name?: string;
+  quantity?: string;
+  unit_price?: number;
+  /** VAT rate in percent. Absent means 0. */
+  vat_rate?: number;
+  payment_object?: string;
+  payment_method?: string;
+  measure?: string;
+  item_code?: string;
+}
+
+export interface CreateSubscriptionRequest {
+  /** Recurring payment link template. Omit for a direct subscription. */
+  link_id?: string;
+  customer_id: string;
+  customer_email?: string;
+  /** Required when `link_id` is omitted, as are `currency` and `billing_interval_*`. */
+  amount?: number;
+  currency?: Currency;
+  billing_interval_type?: BillingIntervalType;
+  billing_interval_count?: number;
+  billing_trial_days?: number;
+  billing_trial_price?: number;
+  payment_method: SubscriptionPaymentMethod;
+  /**
+   * Captured payment (created with `save_card: true`) that pays the first period. Direct subscriptions
+   * only. Without it the first period is not charged.
+   */
+  initial_payment_id?: string;
+  /** Reusable saved-card token, required for `bank_card` unless `initial_payment_id` is given. */
+  card_token_id?: string;
+  sbp_subscription_id?: string;
+  sbp_member_id?: string;
+  sbp_bank_code?: string;
+  sbp_bank_terminal_id?: string;
+  external_id?: string;
+  metadata?: Record<string, string>;
+  /** Days between consecutive charge attempts of a failed cycle, for example `[2, 3]`. */
+  retry_schedule?: number[];
+  /** Receipt lines of the full-amount charges. Only without `link_id`. */
+  items?: SubscriptionReceiptItem[];
+  /** Receipt lines of the paid trial. Only without `link_id`. */
+  trial_items?: SubscriptionReceiptItem[];
+}
+
+export interface Subscription {
+  id: string;
+  link_id?: string;
+  tenant_id: string;
+  organization_id: string;
+  status: SubscriptionStatus;
+  environment: "live" | "sandbox";
+  customer_id: string;
+  /** Empty string when the subscription has no buyer email. */
+  customer_email: string;
+  amount: number;
+  currency: Currency;
+  interval_type: BillingIntervalType;
+  interval_count: number;
+  billing_day: number;
+  created_at: string;
+  current_period_start?: string;
+  current_period_end?: string;
+  /** Omitted while a cancellation is scheduled. */
+  next_billing_date?: string;
+  trial_days?: number;
+  trial_price?: number;
+  trial_end_date?: string;
+  retry_count?: number;
+  max_retries?: number;
+  next_retry_at?: string;
+  paused_at?: string;
+  pause_until?: string;
+  canceled_at?: string;
+  cancel_reason?: string;
+  canceled_by?: string;
+  external_id?: string;
+  metadata?: Record<string, string>;
+  payment_method: SubscriptionPaymentMethod;
+  card_token_id?: string;
+  retry_schedule?: number[];
+  cancel_at_period_end?: boolean;
+  /** Grows with every change; apply a webhook or a read only when it is greater than yours. */
+  version?: number;
+  billing_hold?: BillingHold;
+  pending_update?: PendingSubscriptionUpdate;
+}
+
+/** Stops automatic charges of a subscription while you collect a payment for it. */
+export interface BillingHold {
+  id: string;
+  created_at: string;
+  /** Ignored while a payment is bound. */
+  expires_at: string;
+  payment_id?: string;
+}
+
+/** Change of price and/or payment method that waits for the next period. Only changed fields are present. */
+export interface PendingSubscriptionUpdate {
+  amount?: number;
+  payment_method?: SubscriptionPaymentMethod;
+  card_mask?: string;
+  effective_at: string;
+  created_at: string;
+}
+
+export interface CreateBillingHoldRequest {
+  /** Seconds an unbound hold stops charges, 60 to 10800. Default 1800. */
+  expires_in?: number;
+}
+
+export interface BindBillingHoldPaymentRequest {
+  hold_id: string;
+  payment_id: string;
+}
+
+export interface PaySubscriptionRequest {
+  payment_id: string;
+}
+
+export interface UpdateSubscriptionTermsRequest {
+  apply: "now" | "next_period";
+  amount?: number;
+  payment_method?: SubscriptionPaymentMethod;
+  /** A saved card of the customer. Send either this or `mandate_payment_id`. */
+  card_token_id?: string;
+  /** Captured `sbp` payment made with `save_card: true`; its mandate becomes the instrument. */
+  mandate_payment_id?: string;
+  /** Captured top-up payment for a price increase with `apply: "now"`. Send with `top_up_amount` and `expected_current_period_end`. */
+  payment_id?: string;
+  top_up_amount?: number;
+  expected_current_period_end?: string;
+}
+
+export type SubscriptionUpdateChange = "accepted" | "applied" | "canceled";
+
+/** `data` of the `subscription.updated` webhook event. */
+export interface SubscriptionUpdatedEventData {
+  subscription_id: string;
+  organization_id?: string;
+  change: SubscriptionUpdateChange;
+  apply: "now" | "next_period";
+  amount?: number;
+  currency?: Currency;
+  payment_method?: SubscriptionPaymentMethod;
+  card_mask?: string;
+  effective_at?: string;
+  payment_id?: string;
+  top_up_amount?: number;
+  external_id?: string;
+  metadata?: Record<string, string>;
+  occurred_at?: string;
+  version?: number;
+}
+
+export interface SubscriptionList {
+  subscriptions: Subscription[];
+  total_count: number;
+  next_cursor?: string;
+}
+
+export interface ListSubscriptionsQuery {
+  link_id?: string;
+  status?: SubscriptionStatus;
+  /** Exact merchant reference. It is not unique. */
+  external_id?: string;
+  limit?: number;
+  cursor?: string;
+}
+
+export interface CancelSubscriptionRequest {
+  cancel_reason?: string;
+  /** `true` cancels at the end of the paid period; the default cancels at once. */
+  cancel_at_period_end?: boolean;
+}
+
+export interface PauseSubscriptionRequest {
+  /** Automatic resume time, RFC 3339. */
+  pause_until?: string;
+}
+
+export interface BillingCycle {
+  id: string;
+  subscription_id: string;
+  status: "pending" | "paid" | "failed" | "waived";
+  amount: number;
+  currency: Currency;
+  period_start: string;
+  period_end: string;
+  created_at: string;
+  payment_id?: string;
+  attempts: number;
+  last_decline_code?: string;
+}
+
+export interface BillingCycleList {
+  cycles: BillingCycle[];
+  total_count: number;
+  next_cursor?: string;
+}
+
+export interface ListBillingCyclesQuery {
+  limit?: number;
+  cursor?: string;
+}
+
+export interface SavedCard {
+  card_token_id: string;
+  card_mask: string;
+  card_scheme: string;
+  expiry_month?: number;
+  expiry_year?: number;
+  bank_code: string;
+  /** An inactive card stays listed, but a charge with it is refused. */
+  is_active: boolean;
+  created_at: string;
+  last_used_at?: string;
+}
+
+export interface SavedCardList {
+  cards: SavedCard[];
+}
+
+export interface SavedCardsQuery {
+  /** Customer identifier the card was saved for. */
+  customer_id: string;
 }

@@ -121,6 +121,7 @@ export interface WalletNextAction {
   sdk?: string;
   url?: string;
   qrUrl?: string;
+  hostedUrl?: string;
   qrImageBase64?: string;
   qrContentType?: "image/png" | "image/svg+xml";
   bankInvoiceId?: string;
@@ -273,6 +274,7 @@ const normalizeWalletAction = (walletAction?: WalletAction): WalletNextAction | 
     sdk: walletAction.sdk,
     url: walletAction.url,
     qrUrl: walletAction.qr_url,
+    hostedUrl: walletAction.hosted_url,
     qrImageBase64: walletAction.qr_image_base64,
     qrContentType: walletAction.qr_content_type,
     bankInvoiceId: walletAction.bank_invoice_id,
