@@ -8,6 +8,7 @@ export type {
   PaymentList,
   PaymentPreparationError,
   PaymentMethod,
+  KnownPaymentMethod,
   PaymentStatus,
   PaymentFlowMode,
   TerminalPaymentStatus,
@@ -49,6 +50,14 @@ export type {
   SubscriptionPaymentMethod,
   SubscriptionReceiptItem,
   SubscriptionStatus,
+  BindBillingHoldPaymentRequest,
+  BillingHold,
+  CreateBillingHoldRequest,
+  PaySubscriptionRequest,
+  PendingSubscriptionUpdate,
+  SubscriptionUpdateChange,
+  SubscriptionUpdatedEventData,
+  UpdateSubscriptionTermsRequest,
 } from "./client";
 export {
   buildThreeDSAutoSubmitHtml,

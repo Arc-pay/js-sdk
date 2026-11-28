@@ -1258,6 +1258,59 @@ describe("server ArcPayClient", () => {
     });
   });
 
+  it("executes a provider-catalog method such as airtel_gh like any wallet method", async () => {
+    fetchMock.mockResolvedValue(
+      ok({
+        payment_id: "pay_gh_1",
+        status: "pending",
+        wallet_action: { provider: "airtel_gh", action: "phone_push" },
+      }),
+    );
+    const client = new ArcPayClient({
+      secretKey: "sk_test_x",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+
+    const result = await client.executePayment(
+      "pay_gh_1",
+      {
+        payment_method: "airtel_gh",
+        payment_mode: "h2h",
+        wallet_interaction: {
+          provider: "airtel_gh",
+          surface: "merchant_web",
+          action: "phone_push",
+          phone: "+233200000000",
+        },
+      },
+      { idempotencyKey: EXECUTE_IDEMPOTENCY_KEY },
+    );
+
+    expect(result.wallet_action?.provider).toBe("airtel_gh");
+    const [, init] = fetchMock.mock.calls[0]!;
+    expect(JSON.parse(init.body as string)).toMatchObject({ payment_method: "airtel_gh" });
+  });
+
+  it("still requires wallet_interaction.provider to match an unknown payment_method", async () => {
+    const client = new ArcPayClient({
+      secretKey: "sk_test_x",
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+
+    await expect(
+      client.executePayment(
+        "pay_gh_1",
+        {
+          payment_method: "airtel_gh",
+          payment_mode: "h2h",
+          wallet_interaction: { provider: "pix", surface: "merchant_web", action: "redirect" },
+        },
+        { idempotencyKey: EXECUTE_IDEMPOTENCY_KEY },
+      ),
+    ).rejects.toMatchObject({ code: "invalid_request" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("rejects executePayment requests without explicit h2h payment_mode", async () => {
     const client = new ArcPayClient({
       secretKey: "sk_test_x",

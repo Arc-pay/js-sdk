@@ -9,7 +9,8 @@ export type KnownCurrency = "RUB" | "KZT" | "UZS" | "USD" | "EUR" | "TRY";
  */
 export type Currency = KnownCurrency | (string & {});
 
-export type PaymentMethod =
+/** Built-in payment methods with autocomplete. The set is open, see {@link PaymentMethod}. */
+export type KnownPaymentMethod =
   | "bank_card"
   | "sbp"
   | "sberpay"
@@ -19,6 +20,16 @@ export type PaymentMethod =
   | "mirpay"
   | "applepay"
   | "googlepay";
+
+/**
+ * Payment method code: 2-64 lowercase letters, digits and `_`, starting with a
+ * letter. The nine built-in methods are listed in {@link KnownPaymentMethod};
+ * provider catalogs add more (for example "pix" or "airtel_gh") and new codes
+ * can appear without an API version change, so code that reads a method from a
+ * response or webhook must tolerate unknown values. Send only a method returned
+ * by `listAvailablePaymentMethods()` for the same key environment.
+ */
+export type PaymentMethod = KnownPaymentMethod | (string & {});
 
 export type CaptureMode = "one_stage" | "two_stage";
 export type PaymentFlowMode = "h2h" | "redirect";
@@ -148,6 +159,8 @@ export interface CreatePaymentRequest {
   external_id: string;
   capture_mode: CaptureMode;
   customer_id?: string;
+  /** Saves the buyer's card or SBP mandate with this payment. Requires `customer_id` and `bank_card` or `sbp`. */
+  save_card?: boolean;
   description?: string;
   success_url?: string;
   fail_url?: string;
@@ -544,7 +557,12 @@ export interface CreateSubscriptionRequest {
   billing_trial_days?: number;
   billing_trial_price?: number;
   payment_method: SubscriptionPaymentMethod;
-  /** Reusable saved-card token, required for `bank_card`. */
+  /**
+   * Captured payment (created with `save_card: true`) that pays the first period. Direct subscriptions
+   * only. Without it the first period is not charged.
+   */
+  initial_payment_id?: string;
+  /** Reusable saved-card token, required for `bank_card` unless `initial_payment_id` is given. */
   card_token_id?: string;
   sbp_subscription_id?: string;
   sbp_member_id?: string;
@@ -598,6 +616,75 @@ export interface Subscription {
   retry_schedule?: number[];
   cancel_at_period_end?: boolean;
   /** Grows with every change; apply a webhook or a read only when it is greater than yours. */
+  version?: number;
+  billing_hold?: BillingHold;
+  pending_update?: PendingSubscriptionUpdate;
+}
+
+/** Stops automatic charges of a subscription while you collect a payment for it. */
+export interface BillingHold {
+  id: string;
+  created_at: string;
+  /** Ignored while a payment is bound. */
+  expires_at: string;
+  payment_id?: string;
+}
+
+/** Change of price and/or payment method that waits for the next period. Only changed fields are present. */
+export interface PendingSubscriptionUpdate {
+  amount?: number;
+  payment_method?: SubscriptionPaymentMethod;
+  card_mask?: string;
+  effective_at: string;
+  created_at: string;
+}
+
+export interface CreateBillingHoldRequest {
+  /** Seconds an unbound hold stops charges, 60 to 10800. Default 1800. */
+  expires_in?: number;
+}
+
+export interface BindBillingHoldPaymentRequest {
+  hold_id: string;
+  payment_id: string;
+}
+
+export interface PaySubscriptionRequest {
+  payment_id: string;
+}
+
+export interface UpdateSubscriptionTermsRequest {
+  apply: "now" | "next_period";
+  amount?: number;
+  payment_method?: SubscriptionPaymentMethod;
+  /** A saved card of the customer. Send either this or `mandate_payment_id`. */
+  card_token_id?: string;
+  /** Captured `sbp` payment made with `save_card: true`; its mandate becomes the instrument. */
+  mandate_payment_id?: string;
+  /** Captured top-up payment for a price increase with `apply: "now"`. Send with `top_up_amount` and `expected_current_period_end`. */
+  payment_id?: string;
+  top_up_amount?: number;
+  expected_current_period_end?: string;
+}
+
+export type SubscriptionUpdateChange = "accepted" | "applied" | "canceled";
+
+/** `data` of the `subscription.updated` webhook event. */
+export interface SubscriptionUpdatedEventData {
+  subscription_id: string;
+  organization_id?: string;
+  change: SubscriptionUpdateChange;
+  apply: "now" | "next_period";
+  amount?: number;
+  currency?: Currency;
+  payment_method?: SubscriptionPaymentMethod;
+  card_mask?: string;
+  effective_at?: string;
+  payment_id?: string;
+  top_up_amount?: number;
+  external_id?: string;
+  metadata?: Record<string, string>;
+  occurred_at?: string;
   version?: number;
 }
 

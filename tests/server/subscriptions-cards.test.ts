@@ -11,6 +11,8 @@ const ok = (body: unknown, status = 200): Response =>
     headers: { "content-type": "application/json" },
   });
 
+type Loose = Record<string, (...args: unknown[]) => Promise<unknown>>;
+
 describe("server ArcPayClient subscriptions and cards", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
   let client: ArcPayClient;
@@ -316,6 +318,165 @@ describe("server ArcPayClient subscriptions and cards", () => {
     expect(sent()).toMatchObject({
       url: `${API}/customer-transfer-cards/tok%2F1?customer_reference=rcp_1`,
       method: "GET",
+    });
+  });
+
+  describe("attach payment, billing hold and terms update", () => {
+    const SUB = "22222222-2222-7222-8222-222222222222";
+    const HOLD = "33333333-3333-7333-8333-333333333333";
+    const PAY = "44444444-4444-7444-8444-444444444444";
+    const base = `${API}/subscriptions-v2/${SUB}`;
+
+    it("sends save_card on create payment and initial_payment_id on create subscription", async () => {
+      await client.createPayment(
+        {
+          amount: 10000,
+          currency: "RUB",
+          payment_method: "bank_card",
+          external_id: "p1",
+          capture_mode: "auto",
+          customer_id: "cust_1",
+          save_card: true,
+        },
+        { idempotencyKey: IDEMPOTENCY_KEY },
+      );
+      expect(sent(0).url).toBe(`${API}/payments`);
+      expect(sent(0).body.save_card).toBe(true);
+
+      await client.createSubscription(
+        {
+          customer_id: "cust_1",
+          amount: 10000,
+          currency: "RUB",
+          billing_interval_type: "month",
+          billing_interval_count: 1,
+          payment_method: "bank_card",
+          initial_payment_id: PAY,
+        },
+        { idempotencyKey: IDEMPOTENCY_KEY },
+      );
+      expect(sent(1).body.initial_payment_id).toBe(PAY);
+    });
+
+    const cases: Array<
+      [string, () => Promise<unknown>, string, string, unknown]
+    > = [];
+    const opts = { idempotencyKey: IDEMPOTENCY_KEY };
+    const add = (
+      name: string,
+      call: () => Promise<unknown>,
+      method: string,
+      url: string,
+      body: unknown,
+    ) => cases.push([name, call, method, url, body]);
+    add(
+      "createBillingHold",
+      () => client.createBillingHold(SUB, { expires_in: 600 }, opts),
+      "POST",
+      `${base}/billing-hold`,
+      { expires_in: 600 },
+    );
+    add(
+      "bindBillingHoldPayment",
+      () =>
+        client.bindBillingHoldPayment(
+          SUB,
+          { hold_id: HOLD, payment_id: PAY },
+          opts,
+        ),
+      "POST",
+      `${base}/billing-hold/payment`,
+      { hold_id: HOLD, payment_id: PAY },
+    );
+    add(
+      "releaseBillingHold",
+      () => client.releaseBillingHold(SUB, HOLD, opts),
+      "DELETE",
+      `${base}/billing-hold?hold_id=${HOLD}`,
+      undefined,
+    );
+    add(
+      "paySubscription",
+      () => client.paySubscription(SUB, { payment_id: PAY }, opts),
+      "POST",
+      `${base}/pay`,
+      { payment_id: PAY },
+    );
+    add(
+      "updateSubscriptionTerms",
+      () =>
+        client.updateSubscriptionTerms(
+          SUB,
+          {
+            apply: "now",
+            amount: 15000,
+            payment_id: PAY,
+            top_up_amount: 5000,
+            expected_current_period_end: "2026-12-01T00:00:00Z",
+          },
+          opts,
+        ),
+      "POST",
+      `${base}/update`,
+      {
+        apply: "now",
+        amount: 15000,
+        payment_id: PAY,
+        top_up_amount: 5000,
+        expected_current_period_end: "2026-12-01T00:00:00Z",
+      },
+    );
+    add(
+      "cancelPendingSubscriptionUpdate",
+      () => client.cancelPendingSubscriptionUpdate(SUB, opts),
+      "DELETE",
+      `${base}/pending-update`,
+      undefined,
+    );
+
+    it.each(cases)(
+      "%s sends path, method, body and Idempotency-Key",
+      async (_n, call, method, url, body) => {
+        await call();
+        expect(sent()).toMatchObject({ url, method });
+        expect(sent().headers["Idempotency-Key"]).toBe(IDEMPOTENCY_KEY);
+        expect(sent().body).toEqual(body);
+      },
+    );
+
+    it.each([
+      ["createBillingHold", () => (client as unknown as Loose).createBillingHold(SUB, {})],
+      [
+        "bindBillingHoldPayment",
+        () =>
+          (client as unknown as Loose).bindBillingHoldPayment(SUB, {
+            hold_id: HOLD,
+            payment_id: PAY,
+          }),
+      ],
+      [
+        "releaseBillingHold",
+        () => (client as unknown as Loose).releaseBillingHold(SUB, HOLD),
+      ],
+      [
+        "paySubscription",
+        () => (client as unknown as Loose).paySubscription(SUB, { payment_id: PAY }),
+      ],
+      [
+        "updateSubscriptionTerms",
+        () =>
+          (client as unknown as Loose).updateSubscriptionTerms(SUB, {
+            apply: "next_period",
+            amount: 1,
+          }),
+      ],
+      [
+        "cancelPendingSubscriptionUpdate",
+        () => (client as unknown as Loose).cancelPendingSubscriptionUpdate(SUB),
+      ],
+    ])("%s refuses to run without an Idempotency-Key", async (_n, call) => {
+      await expect(call()).rejects.toThrow();
+      expect(fetchMock).not.toHaveBeenCalled();
     });
   });
 });
