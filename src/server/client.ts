@@ -101,6 +101,7 @@ export type {
   PaymentFlowMode,
   PaymentList,
   PaymentMethod,
+  KnownPaymentMethod,
   PaymentStatus,
   PaymentPreparationError,
   Refund,
