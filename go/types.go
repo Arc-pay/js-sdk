@@ -100,34 +100,36 @@ type PaymentOperationSummary struct {
 }
 
 type Payment struct {
-	ID               string                    `json:"id"`
-	Amount           int64                     `json:"amount"`
-	AuthorizedAmount *int64                    `json:"authorized_amount,omitempty"`
-	CapturedAmount   *int64                    `json:"captured_amount,omitempty"`
-	RefundedAmount   *int64                    `json:"refunded_amount,omitempty"`
-	Currency         Currency                  `json:"currency"`
-	PaymentMethod    PaymentMethod             `json:"payment_method"`
-	Status           PaymentStatus             `json:"status"`
-	ExternalID       string                    `json:"external_id,omitempty"`
-	Description      string                    `json:"description,omitempty"`
-	BankPaymentID    string                    `json:"bank_payment_id,omitempty"`
-	BankCode         string                    `json:"bank_code,omitempty"`
-	BankOrderID      string                    `json:"bank_order_id,omitempty"`
-	BankTerminalID   string                    `json:"bank_terminal_id,omitempty"`
-	BankRRN          string                    `json:"bank_rrn,omitempty"`
-	BankInternalRef  string                    `json:"bank_internal_ref,omitempty"`
-	BankAuthCode     string                    `json:"bank_auth_code,omitempty"`
-	CardTokenID      string                    `json:"card_token_id,omitempty"`
-	DeclineCode      string                    `json:"decline_code,omitempty"`
-	CardMask         string                    `json:"card_mask,omitempty"`
-	CardScheme       string                    `json:"card_scheme,omitempty"`
-	RedirectURL      string                    `json:"redirect_url,omitempty"`
-	PaymentMode      PaymentFlowMode           `json:"payment_mode,omitempty"`
-	CaptureMode      CaptureMode               `json:"capture_mode,omitempty"`
-	CreatedAt        string                    `json:"created_at"`
-	UpdatedAt        string                    `json:"updated_at"`
-	Metadata         map[string]string         `json:"metadata,omitempty"`
-	Operations       []PaymentOperationSummary `json:"operations"`
+	ID               string        `json:"id"`
+	Amount           int64         `json:"amount"`
+	AuthorizedAmount *int64        `json:"authorized_amount,omitempty"`
+	CapturedAmount   *int64        `json:"captured_amount,omitempty"`
+	RefundedAmount   *int64        `json:"refunded_amount,omitempty"`
+	Currency         Currency      `json:"currency"`
+	PaymentMethod    PaymentMethod `json:"payment_method"`
+	Status           PaymentStatus `json:"status"`
+	ExternalID       string        `json:"external_id,omitempty"`
+	Description      string        `json:"description,omitempty"`
+	BankPaymentID    string        `json:"bank_payment_id,omitempty"`
+	BankCode         string        `json:"bank_code,omitempty"`
+	BankOrderID      string        `json:"bank_order_id,omitempty"`
+	BankTerminalID   string        `json:"bank_terminal_id,omitempty"`
+	BankRRN          string        `json:"bank_rrn,omitempty"`
+	BankInternalRef  string        `json:"bank_internal_ref,omitempty"`
+	BankAuthCode     string        `json:"bank_auth_code,omitempty"`
+	CardTokenID      string        `json:"card_token_id,omitempty"`
+	DeclineCode      string        `json:"decline_code,omitempty"`
+	CardMask         string        `json:"card_mask,omitempty"`
+	CardScheme       string        `json:"card_scheme,omitempty"`
+	// PayerCountry is the payer country (ISO 3166-1 alpha-2, upper case); empty when unknown.
+	PayerCountry string                    `json:"payer_country,omitempty"`
+	RedirectURL  string                    `json:"redirect_url,omitempty"`
+	PaymentMode  PaymentFlowMode           `json:"payment_mode,omitempty"`
+	CaptureMode  CaptureMode               `json:"capture_mode,omitempty"`
+	CreatedAt    string                    `json:"created_at"`
+	UpdatedAt    string                    `json:"updated_at"`
+	Metadata     map[string]string         `json:"metadata,omitempty"`
+	Operations   []PaymentOperationSummary `json:"operations"`
 }
 
 type PaymentList struct {
@@ -175,22 +177,25 @@ type FiscalItem struct {
 }
 
 type CreatePaymentRequest struct {
-	Amount        int64             `json:"amount"`
-	Currency      Currency          `json:"currency"`
-	PaymentMethod PaymentMethod     `json:"payment_method"`
-	ExternalID    string            `json:"external_id"`
-	CaptureMode   CaptureMode       `json:"capture_mode"`
-	CustomerID    string            `json:"customer_id,omitempty"`
-	Description   string            `json:"description,omitempty"`
-	SuccessURL    string            `json:"success_url,omitempty"`
-	FailURL       string            `json:"fail_url,omitempty"`
-	ReturnURL     string            `json:"return_url,omitempty"`
-	CallbackURL   string            `json:"callback_url,omitempty"`
-	CustomerEmail string            `json:"customer_email,omitempty"`
-	CustomerPhone string            `json:"customer_phone,omitempty"`
-	MerchantINN   string            `json:"merchant_inn,omitempty"`
-	Metadata      map[string]string `json:"metadata,omitempty"`
-	FiscalItems   []FiscalItem      `json:"fiscal_items,omitempty"`
+	Amount        int64         `json:"amount"`
+	Currency      Currency      `json:"currency"`
+	PaymentMethod PaymentMethod `json:"payment_method"`
+	ExternalID    string        `json:"external_id"`
+	CaptureMode   CaptureMode   `json:"capture_mode"`
+	CustomerID    string        `json:"customer_id,omitempty"`
+	Description   string        `json:"description,omitempty"`
+	SuccessURL    string        `json:"success_url,omitempty"`
+	FailURL       string        `json:"fail_url,omitempty"`
+	ReturnURL     string        `json:"return_url,omitempty"`
+	CallbackURL   string        `json:"callback_url,omitempty"`
+	CustomerEmail string        `json:"customer_email,omitempty"`
+	CustomerPhone string        `json:"customer_phone,omitempty"`
+	// PayerCountry is the payer country (ISO 3166-1 alpha-2, upper case). Send it when known:
+	// country-restricted payment methods are routed only for an allowed country.
+	PayerCountry string            `json:"payer_country,omitempty"`
+	MerchantINN  string            `json:"merchant_inn,omitempty"`
+	Metadata     map[string]string `json:"metadata,omitempty"`
+	FiscalItems  []FiscalItem      `json:"fiscal_items,omitempty"`
 }
 
 type CreateCardSetupRequest struct {
@@ -274,6 +279,8 @@ type CardExecutePaymentRequest struct {
 	PaymentMode   PaymentFlowMode `json:"payment_mode"`
 	// BrowserInfo is optional; nil omits the field and Arc Pay uses its defaults.
 	BrowserInfo *CardBrowserInfo `json:"browser_info,omitempty"`
+	// PayerCountry replaces the payment's own payer country (upper-case ISO alpha-2).
+	PayerCountry string `json:"payer_country,omitempty"`
 }
 
 func (CardExecutePaymentRequest) executePaymentRequest() {}
@@ -282,6 +289,8 @@ type WalletExecutePaymentRequest struct {
 	PaymentMethod     PaymentMethod     `json:"payment_method"`
 	PaymentMode       PaymentFlowMode   `json:"payment_mode"`
 	WalletInteraction WalletInteraction `json:"wallet_interaction"`
+	// PayerCountry replaces the payment's own payer country (upper-case ISO alpha-2).
+	PayerCountry string `json:"payer_country,omitempty"`
 }
 
 func (WalletExecutePaymentRequest) executePaymentRequest() {}

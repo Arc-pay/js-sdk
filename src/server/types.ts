@@ -115,6 +115,8 @@ export interface Payment {
   decline_code?: string;
   card_mask?: string;
   card_scheme?: string;
+  /** Payer country (ISO 3166-1 alpha-2, upper case) as sent by the merchant or chosen by the payer. Absent when unknown. */
+  payer_country?: string;
   redirect_url?: string;
   payment_mode?: PaymentFlowMode;
   capture_mode?: CaptureMode;
@@ -168,6 +170,11 @@ export interface CreatePaymentRequest {
   callback_url?: string;
   customer_email?: string;
   customer_phone?: string;
+  /**
+   * Payer country, ISO 3166-1 alpha-2 in upper case (for example `GH`). Send it when
+   * known: country-restricted payment methods are routed only for an allowed country.
+   */
+  payer_country?: string;
   merchant_inn?: string;
   metadata?: Record<string, string>;
   fiscal_items?: FiscalItem[];
@@ -281,12 +288,16 @@ export interface CardExecutePaymentRequest {
   card_token_id: string;
   payment_mode: "h2h";
   browser_info?: CardBrowserInfo;
+  /** Payer country (upper-case ISO alpha-2); replaces the payment's own value. */
+  payer_country?: string;
 }
 
 export interface WalletExecutePaymentRequest {
   payment_method: Exclude<PaymentMethod, "bank_card">;
   payment_mode: "h2h";
   wallet_interaction: WalletInteraction;
+  /** Payer country (upper-case ISO alpha-2); replaces the payment's own value. */
+  payer_country?: string;
 }
 
 export type ExecutePaymentRequest = CardExecutePaymentRequest | WalletExecutePaymentRequest;
