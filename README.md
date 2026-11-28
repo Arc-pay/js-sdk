@@ -289,8 +289,16 @@ controls before live traffic. Keep `sk_*` keys on your backend for payment
 creation, execution, capture, void, refund, saved-card charges, payment links,
 and checkout sessions.
 
+`cancelPayment(paymentId, { reason }, { idempotencyKey })` cancels a payment
+that has not been captured. Read `cancellation.state` from the result: while it
+is `pending` the payer may still be charged, and an unpaid bank order can stay
+open for hours. Create another payment for the same order only when
+`new_attempt_allowed` is `true`. A captured payment is rejected with
+`payment_already_captured`; use `createRefund`.
+
 Mutating server-client methods require an explicit `{ idempotencyKey }`:
 `createPayment`, `createCardSetup`, `executePayment`, `capturePayment`, `voidPayment`,
+`cancelPayment`,
 `createRefund`, `chargeSavedCard`, `completeThreeDSMethod`, `createLink`,
 `cancelLink`, `createCheckoutSession`, `createSubscription`, and
 `retrySubscriptionBilling`. Missing idempotency raises

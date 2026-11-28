@@ -49,6 +49,52 @@ describe("server ArcPayClient", () => {
     }
   });
 
+  it("cancels a payment and waits long enough for the bank", async () => {
+    vi.useFakeTimers();
+    let aborted = false;
+    fetchMock.mockImplementation(
+      (_url: string, init: RequestInit) =>
+        new Promise((resolve) => {
+          init.signal?.addEventListener("abort", () => (aborted = true));
+          setTimeout(
+            () =>
+              resolve(
+                ok({
+                  id: "pay_1",
+                  status: "pending_3ds",
+                  cancellation: {
+                    state: "pending",
+                    requested_at: "2026-11-27T00:00:00Z",
+                    resolved_at: null,
+                  },
+                  new_attempt_allowed: false,
+                }),
+              ),
+            45_000,
+          );
+        }),
+    );
+    const client = new ArcPayClient({ secretKey: "sk_test_x", fetch: fetchMock });
+    const idempotencyKey = "018fe7e2-90c8-789c-9b17-4c861d4b5366";
+
+    const pending = client.cancelPayment(
+      "pay 1",
+      { reason: "switch_payment_method" },
+      { idempotencyKey },
+    );
+    await vi.advanceTimersByTimeAsync(45_000);
+    const payment = await pending;
+
+    expect(aborted).toBe(false);
+    expect(payment.cancellation?.state).toBe("pending");
+    expect(payment.new_attempt_allowed).toBe(false);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.arcpay.space/v1/payments/pay%201/cancel");
+    expect(init.method).toBe("POST");
+    expect(init.body).toBe(JSON.stringify({ reason: "switch_payment_method" }));
+    expect((init.headers as Record<string, string>)["Idempotency-Key"]).toBe(idempotencyKey);
+  });
+
   it("forwards stored-credential recurring fields on saved-card charges", async () => {
     fetchMock.mockResolvedValue(ok({ payment_id: "pay_1", status: "pending" }));
     const client = new ArcPayClient({
@@ -667,6 +713,10 @@ describe("server ArcPayClient", () => {
         name: "capturePayment",
         invoke: (opts: unknown) =>
           idempotentClient.capturePayment("pay_1", { amount: 5000 }, opts as never),
+      },
+      {
+        name: "cancelPayment",
+        invoke: (opts: unknown) => idempotentClient.cancelPayment("pay_1", {}, opts as never),
       },
       {
         name: "voidPayment",
