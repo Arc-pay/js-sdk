@@ -80,5 +80,13 @@ export type {
   SubscriptionPaymentMethod,
   SubscriptionReceiptItem,
   SubscriptionStatus,
+  BindBillingHoldPaymentRequest,
+  BillingHold,
+  CreateBillingHoldRequest,
+  PaySubscriptionRequest,
+  PendingSubscriptionUpdate,
+  SubscriptionUpdateChange,
+  SubscriptionUpdatedEventData,
+  UpdateSubscriptionTermsRequest,
 } from "./types";
 export type { ArcPayClientOptions, IdempotencyOptions, RequestOptions } from "./client";

@@ -73,6 +73,10 @@ import type {
   SavedCardsQuery,
   Subscription,
   SubscriptionList,
+  BindBillingHoldPaymentRequest,
+  CreateBillingHoldRequest,
+  PaySubscriptionRequest,
+  UpdateSubscriptionTermsRequest,
 } from "./types";
 
 export type {
@@ -118,6 +122,14 @@ export type {
   SubscriptionPaymentMethod,
   SubscriptionReceiptItem,
   SubscriptionStatus,
+  BindBillingHoldPaymentRequest,
+  BillingHold,
+  CreateBillingHoldRequest,
+  PaySubscriptionRequest,
+  PendingSubscriptionUpdate,
+  SubscriptionUpdateChange,
+  SubscriptionUpdatedEventData,
+  UpdateSubscriptionTermsRequest,
 } from "./types";
 
 export interface ArcPayClientOptions {
@@ -1043,6 +1055,127 @@ export class ArcPayClient {
     return this.request<BillingCycle>(
       "POST",
       `/subscriptions-v2/${encodeURIComponent(subscriptionId)}/retry`,
+      undefined,
+      opts,
+      true,
+    );
+  }
+
+  /** Stops automatic charges of the subscription while you collect a payment for it. */
+  async createBillingHold(
+    subscriptionId: string,
+    body: CreateBillingHoldRequest,
+    opts: IdempotencyOptions,
+  ): Promise<Subscription>;
+  async createBillingHold(
+    subscriptionId: string,
+    body: CreateBillingHoldRequest,
+    opts: RequestOptionsInput,
+  ): Promise<Subscription> {
+    return this.request<Subscription>(
+      "POST",
+      `/subscriptions-v2/${encodeURIComponent(subscriptionId)}/billing-hold`,
+      body,
+      opts,
+      true,
+    );
+  }
+
+  /** Binds a created, not yet executed payment to the hold. */
+  async bindBillingHoldPayment(
+    subscriptionId: string,
+    body: BindBillingHoldPaymentRequest,
+    opts: IdempotencyOptions,
+  ): Promise<Subscription>;
+  async bindBillingHoldPayment(
+    subscriptionId: string,
+    body: BindBillingHoldPaymentRequest,
+    opts: RequestOptionsInput,
+  ): Promise<Subscription> {
+    return this.request<Subscription>(
+      "POST",
+      `/subscriptions-v2/${encodeURIComponent(subscriptionId)}/billing-hold/payment`,
+      body,
+      opts,
+      true,
+    );
+  }
+
+  async releaseBillingHold(
+    subscriptionId: string,
+    holdId: string,
+    opts: IdempotencyOptions,
+  ): Promise<Subscription>;
+  async releaseBillingHold(
+    subscriptionId: string,
+    holdId: string,
+    opts: RequestOptionsInput,
+  ): Promise<Subscription> {
+    return this.request<Subscription>(
+      "DELETE",
+      appendQuery(
+        `/subscriptions-v2/${encodeURIComponent(subscriptionId)}/billing-hold`,
+        {
+          hold_id: holdId,
+        },
+      ),
+      undefined,
+      opts,
+      true,
+    );
+  }
+
+  /** Pays the unpaid period of the subscription with a captured payment. */
+  async paySubscription(
+    subscriptionId: string,
+    body: PaySubscriptionRequest,
+    opts: IdempotencyOptions,
+  ): Promise<Subscription>;
+  async paySubscription(
+    subscriptionId: string,
+    body: PaySubscriptionRequest,
+    opts: RequestOptionsInput,
+  ): Promise<Subscription> {
+    return this.request<Subscription>(
+      "POST",
+      `/subscriptions-v2/${encodeURIComponent(subscriptionId)}/pay`,
+      body,
+      opts,
+      true,
+    );
+  }
+
+  /** Changes the price and/or payment instrument now or from the next period. */
+  async updateSubscriptionTerms(
+    subscriptionId: string,
+    body: UpdateSubscriptionTermsRequest,
+    opts: IdempotencyOptions,
+  ): Promise<Subscription>;
+  async updateSubscriptionTerms(
+    subscriptionId: string,
+    body: UpdateSubscriptionTermsRequest,
+    opts: RequestOptionsInput,
+  ): Promise<Subscription> {
+    return this.request<Subscription>(
+      "POST",
+      `/subscriptions-v2/${encodeURIComponent(subscriptionId)}/update`,
+      body,
+      opts,
+      true,
+    );
+  }
+
+  async cancelPendingSubscriptionUpdate(
+    subscriptionId: string,
+    opts: IdempotencyOptions,
+  ): Promise<Subscription>;
+  async cancelPendingSubscriptionUpdate(
+    subscriptionId: string,
+    opts: RequestOptionsInput,
+  ): Promise<Subscription> {
+    return this.request<Subscription>(
+      "DELETE",
+      `/subscriptions-v2/${encodeURIComponent(subscriptionId)}/pending-update`,
       undefined,
       opts,
       true,
